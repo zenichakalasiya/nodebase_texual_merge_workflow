@@ -90,6 +90,16 @@ several planned features — see `BRANCHING-DEBATE.md`.
 Playwright and asserting computed styles and geometry, not by eyeballing
 screenshots alone. Write the script, run it, delete it.
 
+## Deployment
+
+Repo: https://github.com/zenichakalasiya/nodebase_texual_merge_workflow
+Live URL: https://zenichakalasiya.github.io/nodebase_texual_merge_workflow/
+
+Published from `main` by the GitHub Actions workflow in
+`.github/workflows/deploy.yml` — every push redeploys. The root `index.html`
+exists only to forward to `workflow-canvas.html`, since Pages serves
+`index.html` by default.
+
 ## Handoff
 
 Latest session state is in [HANDOFF.md](HANDOFF.md) — read it first.
