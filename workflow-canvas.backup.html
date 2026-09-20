@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workflow — Node Sidebar Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500&family=Inter:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page-text:#364658;
+    --gray-label:#7b8fa5;
+    --border:#dfe5ed;
+    --light-border:rgba(223,229,237,.4);
+    --grid-hover:rgba(223,229,237,.2);
+    --primary:#3d8bd0;
+    --light-gray-text:#a5bad0;
+    --critical:#f25c4e;
+    --major:#f58518;
+    --major-bg:rgba(245,133,24,.12);
+    --switch-bg:#eef2f6;
+    --neutral-darker:#14212d;
+    --white:#fff;
+    --ease:cubic-bezier(.4,0,.2,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+
+  /* ============ Stage / canvas ============ */
+  .stage{position:fixed;inset:0;display:flex;background:#f7f9fb;}
+  .canvas{
+    flex:1;position:relative;overflow:hidden;
+    background-color:#f7f9fb;
+    background-image:radial-gradient(#d8e0ea 1.3px, transparent 1.3px);
+    background-size:22px 22px;
+  }
+  .wf-node{
+    position:absolute;background:var(--white);border:1px solid var(--border);
+    border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;
+    box-shadow:0 2px 8px rgba(54,70,88,.08);width:230px;
+  }
+  .wf-node .wf-ic{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .wf-node .wf-ic img{width:18px;height:18px;}
+  .wf-node .wf-t{display:flex;flex-direction:column;gap:2px;}
+  .wf-node .wf-t b{font-size:13px;font-weight:500;color:var(--page-text);}
+  .wf-node .wf-t small{font-size:11px;color:var(--gray-label);}
+  .wf-node.trigger{left:120px;top:180px;}
+  .wf-node.trigger .wf-ic{background:#e8f1fb;}
+  .wf-node.ifelse{left:120px;top:300px;cursor:pointer;transition:box-shadow .15s,border-color .15s;}
+  .wf-node.ifelse .wf-ic{background:var(--major-bg);}
+  .wf-node.ifelse:hover{border-color:var(--primary);box-shadow:0 4px 14px rgba(61,139,208,.18);}
+  .wf-connector{position:absolute;left:150px;top:222px;width:2px;height:78px;background:var(--border);}
+  .canvas-hint{position:absolute;left:120px;top:388px;font-size:11px;color:var(--gray-label);width:230px;}
+
+  /* ============ Dock ============ */
+  .dock{width:400px;height:100%;flex-shrink:0;}
+  .sidebar{
+    width:400px;height:100%;background:var(--white);
+    border-left:1px solid var(--border);box-shadow:-2px 0 16px rgba(54,70,88,.06);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  /* shared square icon button */
+  .hover-box{
+    width:24px;height:24px;border:.8px solid var(--border);border-radius:6.4px;
+    display:flex;align-items:center;justify-content:center;
+    background:none;cursor:pointer;flex-shrink:0;transition:background .15s;
+  }
+  .hover-box:hover{background:var(--grid-hover);}
+  .hover-box img{width:12.8px;height:12.8px;display:block;}
+
+  /* ============================================================
+     SCREEN 1 — Node Selection
+     ============================================================ */
+  .ns-container{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:12px;}
+  .ns-inner{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:24px;}
+  .ns-header{display:flex;flex-direction:column;gap:4px;}
+  .ns-title-row{display:flex;align-items:center;justify-content:space-between;}
+  .ns-title{font-size:14px;font-weight:500;color:var(--page-text);line-height:1.36;}
+  .ns-subtitle{font-size:11px;font-weight:400;color:var(--gray-label);}
+  .ns-body{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:20px;}
+  .ns-sticky{display:flex;flex-direction:column;gap:16px;flex-shrink:0;}
+  .search{
+    width:100%;background:var(--grid-hover);border:1px solid var(--light-gray-text);
+    border-radius:8px;padding:8px;display:flex;align-items:center;gap:4px;cursor:text;
+  }
+  .search img{width:14px;height:14px;display:block;flex-shrink:0;}
+  .search input{border:none;background:none;outline:none;flex:1 1 0;min-width:0;font-family:inherit;font-size:12px;color:var(--page-text);}
+  .search input::placeholder{color:var(--gray-label);opacity:1;}
+  .tabs{display:flex;gap:10px;align-items:stretch;overflow-x:auto;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{
+    background:none;border:none;cursor:pointer;font-family:inherit;font-size:12px;line-height:1.36;
+    color:var(--page-text);font-weight:400;padding:4px;white-space:nowrap;flex-shrink:0;
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .tab.active{color:var(--primary);font-weight:500;}
+  .tab.active::after{content:"";display:block;width:100%;height:0;border-bottom:1.5px solid var(--primary);margin-top:4px;}
+  .ns-list-scroll{flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;width:100%;}
+  .ns-list-scroll::-webkit-scrollbar{width:6px;}
+  .ns-list-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  .ns-list{display:flex;flex-direction:column;gap:24px;width:100%;}
+  .ns-section{display:flex;flex-direction:column;gap:6px;width:100%;}
+  .ns-section-title{font-size:12px;font-weight:500;color:var(--gray-label);line-height:1.36;}
+  .ns-items{display:flex;flex-direction:column;gap:4px;width:100%;}
+  .node-item{
+    display:flex;gap:6px;align-items:flex-start;padding:6px;border-radius:8px;width:100%;
+    cursor:pointer;text-decoration:none;transition:background .15s;
+  }
+  .node-item:hover{background:var(--grid-hover);}
+  .node-icon{width:24px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:1px 0;}
+  .node-icon img{width:17.143px;height:17.143px;display:block;}
+  .node-text{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 0;}
+  .node-name{font-size:13px;font-weight:500;color:var(--page-text);line-height:1.36;}
+  .node-desc{font-size:11px;font-weight:400;color:var(--gray-label);line-height:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* ============================================================
+     SCREEN 2 — IF/Else configuration
+     ============================================================ */
+  .cfg-container{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:12px;}
+  .cfg-inner{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+
+  /* ---- Collapsing header ---- */
+  /* --dur: main collapse duration (slow), --dur-fade: opacity fade */
+  .cfg-head{display:flex;flex-direction:column;flex-shrink:0;padding-bottom:0;transition:box-shadow .45s var(--ease),padding-bottom .6s var(--ease);--dur:.6s;--dur-fade:.45s;}
+  .head-top{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px;}
+  .head-left{position:relative;display:flex;align-items:center;gap:8px;min-width:0;}
+  .goto-pill{
+    position:relative;
+    display:flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;
+    padding:4px 8px;background:none;cursor:pointer;flex-shrink:0;
+    transition:padding var(--dur) var(--ease);
+  }
+  .goto-pill img{width:14px;height:14px;display:block;transform:rotate(90deg);flex-shrink:0;}
+  .pill-text{
+    font-size:10px;font-weight:500;color:var(--gray-label);white-space:nowrap;overflow:hidden;
+    max-width:120px;opacity:1;margin-left:0;
+    transition:max-width var(--dur) var(--ease),opacity var(--dur-fade) var(--ease),margin-left var(--dur) var(--ease);
+  }
+  /* IF/Else title — absolutely positioned so it RISES UP from below into the
+     top bar (vertical motion), rather than sliding in horizontally. */
+  .title-inline{
+    position:absolute;left:36px;top:50%;
+    display:flex;align-items:center;gap:8px;
+    opacity:0;pointer-events:none;
+    transform:translateY(calc(-50% + 20px));
+    transition:opacity var(--dur-fade) var(--ease),transform var(--dur) var(--ease);
+  }
+  .head-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .cfg-actions{display:flex;align-items:center;gap:8px;}
+
+  .cfg-node-badge{width:24px;height:24px;border-radius:6px;background:var(--major-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .cfg-node-badge img{width:16px;height:16px;display:block;}
+  .cfg-node-name{font-size:14px;font-weight:500;color:var(--page-text);white-space:nowrap;}
+
+  /* expanded block: title + description (collapses on scroll) */
+  .head-expanded{
+    display:flex;flex-direction:column;gap:6px;overflow:hidden;
+    max-height:160px;opacity:1;margin-top:12px;
+    transition:max-height var(--dur) var(--ease),opacity var(--dur-fade) var(--ease),margin-top var(--dur) var(--ease);
+  }
+  .cfg-node-title{display:flex;align-items:center;gap:10px;}
+  .cfg-desc{font-size:11px;font-weight:400;color:var(--gray-label);line-height:normal;}
+  .cfg-desc a{color:var(--primary);text-decoration:underline;cursor:pointer;}
+  .cfg-doc{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  .cfg-doc img{width:12px;height:12px;display:inline-block;vertical-align:middle;}
+  /* full-bleed divider: extends past the 12px container padding so it touches
+     both sidebar edges with no horizontal inset */
+  .head-divider{
+    height:1px;background:var(--light-border);transform-origin:center;
+    width:calc(100% + 24px);margin-left:-12px;margin-top:12px;opacity:1;
+    transition:opacity var(--dur-fade) var(--ease),margin-top var(--dur) var(--ease),transform var(--dur) var(--ease);
+  }
+
+  /* collapsed state */
+  .cfg-head.collapsed .pill-text{max-width:0;opacity:0;margin-left:-4px;}
+  .cfg-head.collapsed .goto-pill{padding:4px 5px;}
+  .cfg-head.collapsed .title-inline{opacity:1;pointer-events:auto;transform:translateY(-50%);}
+  .cfg-head.collapsed .head-expanded{max-height:0;opacity:0;margin-top:0;}
+  .cfg-head.collapsed .head-divider{opacity:0;margin-top:0;transform:scaleY(0);}
+  .cfg-head.collapsed{box-shadow:0 4px 10px -8px rgba(54,70,88,.35);padding-bottom:12px;}
+
+  /* Tooltip on the collapsed back-icon (shows the hidden "Go to Trigger Node"
+     label instantly on hover, with an arrow pointing up to the icon) */
+  .goto-pill::after{
+    content:"Go to Trigger Node";
+    position:absolute;top:calc(100% + 9px);left:0;
+    background:var(--neutral-darker);color:#fff;font-size:11px;font-weight:400;line-height:1;
+    padding:6px 9px;border-radius:6px;white-space:nowrap;
+    opacity:0;visibility:hidden;pointer-events:none;z-index:60;
+    transition:opacity .1s var(--ease),visibility .1s var(--ease);
+  }
+  .goto-pill::before{
+    content:"";position:absolute;top:calc(100% + 3px);left:11px;
+    border:6px solid transparent;border-bottom-color:var(--neutral-darker);
+    opacity:0;visibility:hidden;pointer-events:none;z-index:60;
+    transition:opacity .1s var(--ease),visibility .1s var(--ease);
+  }
+  .cfg-head.collapsed .goto-pill:hover::after,
+  .cfg-head.collapsed .goto-pill:hover::before{opacity:1;visibility:visible;}
+
+  /* ---- Scroll region ---- */
+  .cfg-scroll{flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:24px;width:100%;padding-top:16px;}
+  .cfg-scroll::-webkit-scrollbar{width:6px;}
+  .cfg-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+  /* ---- Form fields ---- */
+  .cfg-form{display:flex;flex-direction:column;gap:16px;width:100%;}
+  .field{display:flex;flex-direction:column;gap:6px;width:100%;}
+  .field-label{font-size:12px;font-weight:400;color:var(--gray-label);}
+  .field-label .req{color:var(--critical);}
+  .field-help{font-size:10px;font-weight:400;color:var(--gray-label);padding:0 4px;line-height:1.36;}
+  .input-box{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:4px 12px;display:flex;align-items:center;gap:4px;width:100%;min-height:30px;}
+  .input-box .ph{font-size:12px;color:var(--page-text);opacity:.6;padding:3px 0;}
+  .input-box.textarea{height:64px;align-items:flex-start;}
+  .input-box img{width:18px;height:18px;display:block;flex-shrink:0;}
+  .input-box .grow{flex:1 1 0;min-width:0;}
+  .input-box.select{cursor:pointer;}
+  .switch-tabs{display:flex;gap:8px;align-items:center;padding:4px;width:100%;background:var(--switch-bg);border-radius:6px;}
+  .switch-tab{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 12px;border-radius:6px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:12px;color:var(--page-text);font-weight:400;}
+  .switch-tab.active{background:var(--white);font-weight:500;filter:drop-shadow(0 0 4px rgba(54,70,88,.08));}
+
+  /* ---- Condition builder ---- */
+  .cond-builder{display:flex;flex-direction:column;gap:12px;width:100%;}
+  .cond-group{display:flex;flex-direction:column;gap:6px;width:100%;}
+  .check-if-chip{align-self:flex-start;border:1px solid var(--border);border-radius:12px;padding:4px 8px;background:linear-gradient(90deg,rgba(223,229,237,.4),rgba(223,229,237,.4)),#fff;}
+  .check-if-chip span{font-size:10px;font-weight:500;color:var(--page-text);}
+  .cond-card{display:flex;flex-direction:column;gap:8px;padding:6px 8px;border-radius:9px;background:linear-gradient(90deg,rgba(223,229,237,.2),rgba(223,229,237,.2)),#fff;}
+  .cond-card-title{font-size:12px;font-weight:400;color:var(--gray-label);}
+  .cond-card-title .req{color:var(--critical);}
+  .cond-grid{display:flex;flex-direction:column;width:360px;max-width:100%;}
+  .cond-row{display:flex;width:100%;}
+  .cell{background:var(--white);border:1px solid var(--border);height:35px;display:flex;align-items:center;padding:4px 12px;font-size:11px;color:var(--page-text);}
+  .cell .ph{opacity:.6;font-weight:400;white-space:nowrap;}
+  .cell .val{font-weight:500;white-space:nowrap;}
+  .cell img{width:12px;height:12px;display:block;flex-shrink:0;}
+  .cell-condition{flex:1 1 0;min-width:0;border-radius:8px 0 0 0;border-right:none;justify-content:space-between;gap:6px;}
+  .cell-operator{border-radius:0 8px 0 0;justify-content:space-between;gap:6px;width:140px;}
+  .cell-direct{border-radius:0 0 0 8px;border-top:none;border-right:none;gap:6px;padding-left:8px;cursor:pointer;}
+  .cell-value{flex:1 1 0;min-width:0;border-radius:0 0 8px 0;border-top:none;}
+  .add-cond{align-self:flex-start;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:6px;font-family:inherit;font-size:12px;font-weight:500;color:var(--page-text);}
+  .add-cond:hover{background:var(--grid-hover);}
+  .add-cond-group{align-self:flex-start;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;padding:6px 12px 6px 8px;font-family:inherit;font-size:12px;font-weight:500;color:var(--page-text);}
+  .add-cond-group:hover{background:var(--grid-hover);}
+
+  /* ---- Next Node Selection ---- */
+  .next-node{display:flex;flex-direction:column;gap:12px;padding-top:18px;width:100%;}
+  .next-node-head{display:flex;flex-direction:column;gap:4px;}
+  .next-node-head h3{font-size:13px;font-weight:500;color:var(--neutral-darker);}
+  .next-node-head p{font-size:11px;font-weight:400;color:var(--gray-label);}
+  .nns-tree{position:relative;width:100%;height:180px;}
+  .nns-marker{position:absolute;left:0;top:0;border:1px solid var(--border);border-radius:6px;padding:6px;background:var(--white);}
+  .nns-marker-badge{width:20px;height:20px;border-radius:4px;background:var(--major-bg);display:flex;align-items:center;justify-content:center;}
+  .nns-marker-badge img{width:10.667px;height:10.667px;display:block;transform:scaleY(-1) rotate(180deg);}
+  .nns-connector{position:absolute;left:15px;top:20px;width:24.254px;height:89.652px;}
+  .nns-connector img{width:100%;height:100%;display:block;}
+  .nns-branch{position:absolute;left:56px;width:320px;max-width:calc(100% - 56px);background:var(--grid-hover);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;}
+  .nns-branch.if{top:4px;}
+  .nns-branch.els{top:96px;}
+  .nns-branch-label{font-size:11.5px;font-weight:400;color:var(--page-text);}
+  .nns-add{display:flex;align-items:center;gap:4px;width:100%;background:var(--white);border:1px dashed var(--border);border-radius:6px;padding:4px 12px 4px 8px;cursor:pointer;text-decoration:none;}
+  .nns-add img{width:18px;height:18px;display:block;flex-shrink:0;}
+  .nns-add span{font-size:12px;color:var(--page-text);opacity:.6;}
+
+  /* ---- Footer ---- */
+  .cfg-footer{display:flex;align-items:center;justify-content:space-between;padding:12px;flex-shrink:0;width:100%;border-top:1px solid var(--light-border);}
+  .btn-reset{border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;padding:6px 12px;font-family:'Inter',sans-serif;font-size:12px;font-weight:500;color:var(--page-text);}
+  .btn-save{background:var(--primary);border:none;border-radius:6px;cursor:pointer;padding:6px 12px;font-family:inherit;font-size:12px;font-weight:500;color:#fff;}
+
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+  <div class="stage">
+
+    <!-- ===================== CANVAS ===================== -->
+    <div class="canvas">
+      <div class="wf-node trigger">
+        <div class="wf-ic"><img src="assets/split-next.svg" alt=""></div>
+        <div class="wf-t"><b>Trigger Node</b><small>When a request is created</small></div>
+      </div>
+      <div class="wf-connector"></div>
+      <div class="wf-node ifelse" id="canvasIfElse">
+        <div class="wf-ic"><img src="assets/split2.svg" alt=""></div>
+        <div class="wf-t"><b>IF/Else</b><small>Split the workflow into two paths</small></div>
+      </div>
+      <div class="canvas-hint">↑ Click the IF/Else node (or pick it from the sidebar) to configure it.</div>
+    </div>
+
+    <!-- ===================== DOCK ===================== -->
+    <div class="dock">
+
+      <!-- --------- SCREEN 1: Node Selection --------- -->
+      <aside class="sidebar" id="nodeSelection">
+        <div class="ns-container">
+          <div class="ns-inner">
+            <div class="ns-header">
+              <div class="ns-title-row">
+                <span class="ns-title">Node&nbsp; Selection</span>
+                <button class="hover-box" aria-label="Close"><img src="assets/close.svg" alt=""></button>
+              </div>
+              <div class="ns-subtitle">Pick a step/node to add to your workflow.</div>
+            </div>
+            <div class="ns-body">
+              <div class="ns-sticky">
+                <label class="search">
+                  <img src="assets/search.svg" alt="">
+                  <input type="text" placeholder="Search actions, conditions, or modules...">
+                </label>
+                <div class="tabs">
+                  <button class="tab active">All</button>
+                  <button class="tab">Conditional Flows</button>
+                  <button class="tab">ITSM Modules</button>
+                  <button class="tab">Asset &amp; CMDB</button>
+                  <button class="tab">Communication &amp; Integration</button>
+                </div>
+              </div>
+              <div class="ns-list-scroll">
+                <div class="ns-list">
+                  <section class="ns-section">
+                    <div class="ns-section-title">Conditional Flows</div>
+                    <div class="ns-items">
+                      <a class="node-item" id="ifElseItem">
+                        <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                        <div class="node-text"><div class="node-name">IF / Else</div><div class="node-desc">Split the workflow into two paths based on a condition</div></div>
+                      </a>
+                      <a class="node-item">
+                        <div class="node-icon"><img src="assets/branch.svg" alt=""></div>
+                        <div class="node-text"><div class="node-name">Branch</div><div class="node-desc">Route to one of many paths based on a field value.</div></div>
+                      </a>
+                      <a class="node-item">
+                        <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                        <div class="node-text"><div class="node-name">Merge</div><div class="node-desc">Bring split paths back together into a single flow.</div></div>
+                      </a>
+                      <a class="node-item">
+                        <div class="node-icon"><img src="assets/loop-repeat.svg" alt=""></div>
+                        <div class="node-text"><div class="node-name">Loop</div><div class="node-desc">Repeat actions for each item in a list or result set.</div></div>
+                      </a>
+                      <a class="node-item">
+                        <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                        <div class="node-text"><div class="node-name">Wait Node</div><div class="node-desc">Pause the workflow for a set time or until a condition is met.</div></div>
+                      </a>
+                    </div>
+                  </section>
+                  <section class="ns-section">
+                    <div class="ns-section-title">ITSM&nbsp; Modules</div>
+                    <div class="ns-items">
+                      <a class="node-item"><div class="node-icon"><img src="assets/split.svg" alt=""></div><div class="node-text"><div class="node-name">Request</div><div class="node-desc">Split the workflow into two paths based on a condition</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/branch.svg" alt=""></div><div class="node-text"><div class="node-name">Problem</div><div class="node-desc">Create or update problem records linked to incidents.</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/split.svg" alt=""></div><div class="node-text"><div class="node-name">Change</div><div class="node-desc">Create or manage change requests and their approvals.</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/loop-repeat.svg" alt=""></div><div class="node-text"><div class="node-name">Release</div><div class="node-desc">Create or update release records for deployments.</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/split.svg" alt=""></div><div class="node-text"><div class="node-name">Task</div><div class="node-desc">Split the workflow into two paths based on a condition</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/split.svg" alt=""></div><div class="node-text"><div class="node-name">Approval</div><div class="node-desc">Split the workflow into two paths based on a condition</div></div></a>
+                    </div>
+                  </section>
+                  <section class="ns-section">
+                    <div class="ns-section-title">Asset &amp; CMDB</div>
+                    <div class="ns-items">
+                      <a class="node-item"><div class="node-icon"><img src="assets/split.svg" alt=""></div><div class="node-text"><div class="node-name">Hardware Asset</div><div class="node-desc">Assign, update, or look up physical assets like laptops and servers.</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/branch.svg" alt=""></div><div class="node-text"><div class="node-name">Software Asset</div><div class="node-desc">Manage software licenses, installations, and entitlements.</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/split.svg" alt=""></div><div class="node-text"><div class="node-name">Non-IT Asset</div><div class="node-desc">Manage facilities, furniture, and other non-IT inventory.</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/loop-repeat.svg" alt=""></div><div class="node-text"><div class="node-name">CMDB</div><div class="node-desc">Split the workflow into two paths based on a condition</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/split.svg" alt=""></div><div class="node-text"><div class="node-name">Asset Movement</div><div class="node-desc">Split the workflow into two paths based on a condition</div></div></a>
+                    </div>
+                  </section>
+                  <section class="ns-section">
+                    <div class="ns-section-title">Communication &amp; Integration</div>
+                    <div class="ns-items">
+                      <a class="node-item"><div class="node-icon"><img src="assets/split.svg" alt=""></div><div class="node-text"><div class="node-name">User</div><div class="node-desc">Look up user profiles, departments, or update user records.</div></div></a>
+                      <a class="node-item"><div class="node-icon"><img src="assets/branch.svg" alt=""></div><div class="node-text"><div class="node-name">Notification</div><div class="node-desc">Send emails, SMS, or in-app alerts to people.</div></div></a>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- --------- SCREEN 2: IF/Else configuration --------- -->
+      <aside class="sidebar hidden" id="ifelseConfig">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+
+            <!-- Collapsing header -->
+            <div class="cfg-head" id="cfgHead">
+              <div class="head-top">
+                <div class="head-left">
+                  <button class="goto-pill" aria-label="Go to Trigger Node">
+                    <img src="assets/chevron-down.svg" alt="">
+                    <span class="pill-text">Go to Trigger Node</span>
+                  </button>
+                  <div class="title-inline">
+                    <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                    <span class="cfg-node-name">IF/Else</span>
+                  </div>
+                </div>
+                <div class="head-right">
+                  <div class="cfg-actions">
+                    <button class="hover-box" aria-label="Repeat"><img src="assets/repeat.svg" alt=""></button>
+                    <button class="hover-box" aria-label="Delete"><img src="assets/delete.svg" alt=""></button>
+                    <button class="hover-box" aria-label="More"><img src="assets/more-vertical.svg" alt=""></button>
+                  </div>
+                  <button class="hover-box" id="cfgClose" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+
+              <div class="head-expanded">
+                <div class="cfg-node-title">
+                  <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                  <span class="cfg-node-name">IF/Else</span>
+                </div>
+                <p class="cfg-desc">Define a condition to split this workflow into two paths — one for when it's true, one for when it's not.
+                  <span class="cfg-doc"><a href="https://docs.motadata.com/serviceops-docs/admin-section/automation/workflow/#purpose-audience-and-scope" target="_blank">Doc</a><img src="assets/open-link.svg" alt=""></span>
+                </p>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+
+            <!-- Scrollable content -->
+            <div class="cfg-scroll" id="cfgScroll">
+              <div class="cfg-form">
+                <div class="field">
+                  <div class="field-label">Title <span class="req">*</span></div>
+                  <div class="input-box"><span class="ph">Title</span></div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Description <span class="req">*</span></div>
+                  <div class="input-box textarea"><span class="ph">Description</span></div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Select Source Node <span class="req">*</span></div>
+                  <div class="input-box select">
+                    <span class="ph grow">Search or select a field</span>
+                    <img src="assets/chevron-down2.svg" alt="">
+                  </div>
+                  <div class="field-help">The previous step/node whose data you want to use in this node</div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Select Type <span class="req">*</span></div>
+                  <div class="switch-tabs">
+                    <button class="switch-tab active">Condition</button>
+                    <button class="switch-tab">Expression</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cond-builder">
+                <div class="cond-group">
+                  <div class="check-if-chip"><span>Check IF</span></div>
+                  <div class="cond-card">
+                    <div class="cond-card-title">Select Condition <span class="req">*</span></div>
+                    <div class="cond-grid">
+                      <div class="cond-row">
+                        <div class="cell cell-condition"><span class="ph">Select condition</span><img src="assets/chevron-down.svg" alt=""></div>
+                        <div class="cell cell-operator"><span class="ph">Select operator</span><img src="assets/chevron-down.svg" alt=""></div>
+                      </div>
+                      <div class="cond-row">
+                        <div class="cell cell-direct"><img src="assets/chevron-down.svg" alt=""><span class="val">Direct</span></div>
+                        <div class="cell cell-value"><span class="ph">Select value</span></div>
+                      </div>
+                    </div>
+                    <button class="add-cond">+ Add Condition</button>
+                  </div>
+                </div>
+                <button class="add-cond-group">+ Add Condition Group</button>
+              </div>
+
+              <div class="next-node">
+                <div class="next-node-head">
+                  <h3>Next Node Selection</h3>
+                  <p>Pick the next step in your workflow</p>
+                </div>
+                <div class="nns-tree">
+                  <div class="nns-marker"><div class="nns-marker-badge"><img src="assets/split-next.svg" alt=""></div></div>
+                  <div class="nns-connector"><img src="assets/branch-connector.svg" alt=""></div>
+                  <div class="nns-branch if">
+                    <div class="nns-branch-label">IF</div>
+                    <a class="nns-add"><img src="assets/plus-square.svg" alt=""><span>Add step when condition is met</span></a>
+                  </div>
+                  <div class="nns-branch els">
+                    <div class="nns-branch-label">Else</div>
+                    <a class="nns-add"><img src="assets/plus-square.svg" alt=""><span>Add step when condition is not met</span></a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="cfg-footer">
+              <button class="btn-reset">Reset</button>
+              <button class="btn-save">Save</button>
+            </div>
+
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+
+  <script>
+    const nodeSel   = document.getElementById('nodeSelection');
+    const cfg       = document.getElementById('ifelseConfig');
+    const cfgScroll = document.getElementById('cfgScroll');
+    const cfgHead   = document.getElementById('cfgHead');
+
+    function openConfig(){
+      nodeSel.classList.add('hidden');
+      cfg.classList.remove('hidden');
+      cfgScroll.scrollTop = 0;
+      cfgHead.classList.remove('collapsed');
+    }
+    function openNodeSelection(){
+      cfg.classList.add('hidden');
+      nodeSel.classList.remove('hidden');
+    }
+
+    document.getElementById('ifElseItem').addEventListener('click', openConfig);
+    document.getElementById('canvasIfElse').addEventListener('click', openConfig);
+    document.getElementById('cfgClose').addEventListener('click', openNodeSelection);
+
+    /* Scroll-driven collapsing header.
+       State is derived from the class itself (single source of truth) with a
+       threshold + hysteresis band (collapse >24px, expand <8px) so the header
+       never flickers around a single trigger point. */
+    function updateCollapse(){
+      const st = cfgScroll.scrollTop;
+      const isCollapsed = cfgHead.classList.contains('collapsed');
+      if(!isCollapsed && st > 24){
+        cfgHead.classList.add('collapsed');
+      } else if(isCollapsed && st < 8){
+        cfgHead.classList.remove('collapsed');
+      }
+    }
+    cfgScroll.addEventListener('scroll', updateCollapse, { passive: true });
+
+    /* small nicety: switch tabs + type tabs toggle active state */
+    document.querySelectorAll('.switch-tabs').forEach(group => {
+      group.querySelectorAll('.switch-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('.switch-tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+    });
+    document.querySelectorAll('.tabs').forEach(group => {
+      group.querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>

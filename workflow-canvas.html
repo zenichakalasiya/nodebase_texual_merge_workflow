@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workflow — Node Canvas + Picker Popover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Inter:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="workflow-nodes.css">
+<link rel="stylesheet" href="workflow-popover.css">
+<link rel="stylesheet" href="workflow-chrome.css">
+<style>
+  :root{
+    --page-text:#364658;
+    --gray-label:#7b8fa5;
+    --border:#dfe5ed;
+    --light-border:rgba(223,229,237,.4);
+    --grid-hover:rgba(223,229,237,.2);
+    --primary:#3d8bd0;
+    --light-gray-text:#a5bad0;
+    --critical:#f25c4e;
+    --major:#f58518;
+    --major-bg:rgba(245,133,24,.12);
+    --switch-bg:#eef2f6;
+    --neutral-darker:#14212d;
+    --white:#fff;
+    --ease:cubic-bezier(.4,0,.2,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+
+  /* ============ Stage / canvas ============ */
+  .stage{position:fixed;inset:0;display:flex;background:#f7f9fb;}
+  .canvas{
+    flex:1;position:relative;overflow:hidden;   /* free-panning surface, not a scroller */
+    background-color:#f7f9fb;
+    background-image:radial-gradient(#d8e0ea 1.3px, transparent 1.3px);
+    background-size:22px 22px;
+  }
+
+  /* ============ Dock (slide-away drawer) ============
+     The drawer closes whenever a picker popover opens, so the canvas gets the
+     full width while you choose the next node. */
+  .dock{
+    width:412px;height:100%;flex-shrink:0;overflow:hidden;
+    padding:10px 10px 10px 0;
+    transition:width .3s var(--ease),padding .3s var(--ease);
+  }
+  .dock.closed{width:0;padding:0;}
+  /* a floating panel, not a flush wall: rounded on all four corners with a
+     margin from the window edges so the canvas reads as continuing behind it */
+  .sidebar{
+    width:402px;height:100%;background:var(--white);
+    border:1px solid var(--border);border-radius:14px;
+    box-shadow:0 10px 30px -14px rgba(54,70,88,.3),0 2px 6px rgba(54,70,88,.05);
+    display:flex;flex-direction:column;overflow:hidden;
+    transition:transform .3s var(--ease),opacity .22s var(--ease);
+  }
+  .dock.closed .sidebar{transform:translateX(24px);opacity:0;}
+
+  /* shared square icon button */
+  .hover-box{
+    width:24px;height:24px;border:.8px solid var(--border);border-radius:6.4px;
+    display:flex;align-items:center;justify-content:center;
+    background:none;cursor:pointer;flex-shrink:0;transition:background .15s;
+  }
+  .hover-box:hover{background:var(--grid-hover);}
+  .hover-box img{width:12.8px;height:12.8px;display:block;}
+
+  /* ============================================================
+     Configuration sidebars (Trigger / IF-Else / Branch)
+     ============================================================ */
+  .cfg-container{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:12px;}
+  .cfg-inner{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+
+  /* ---- Collapsing header ---- */
+  /* --dur: main collapse duration (slow), --dur-fade: opacity fade */
+  .cfg-head{
+    display:flex;flex-direction:column;flex-shrink:0;padding-bottom:0;
+    transition:box-shadow .45s var(--ease),padding-bottom .6s var(--ease);
+    --dur:.6s;--dur-fade:.45s;
+    /* expanding: the title clears out fast, then the pill re-opens */
+    --dur-pill:.18s;--delay-pill:.12s;--dur-title-out:.14s;
+  }
+  .head-top{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px;}
+  .head-left{position:relative;display:flex;align-items:center;gap:8px;min-width:0;}
+  /* "Go to <previous node>" — a labelled pill while the header is open. On
+     scroll its label slides left and folds away, leaving just the arrow. */
+  .goto-pill{
+    position:relative;flex-shrink:0;display:flex;align-items:center;gap:4px;
+    border:1px solid var(--border);border-radius:6px;padding:4px 8px;
+    background:none;cursor:pointer;
+    transition:padding var(--dur-pill) var(--ease) var(--delay-pill);
+  }
+  .goto-pill:hover{background:var(--grid-hover);}
+  .goto-pill img{width:14px;height:14px;display:block;transform:rotate(90deg);flex-shrink:0;}
+  .pill-text{
+    font-size:10px;font-weight:500;color:var(--gray-label);white-space:nowrap;overflow:hidden;
+    max-width:140px;opacity:1;margin-left:0;
+    transition:max-width var(--dur-pill) var(--ease) var(--delay-pill),
+               opacity var(--dur-pill) var(--ease) var(--delay-pill),
+               margin-left var(--dur-pill) var(--ease) var(--delay-pill);
+  }
+  /* The title's twin in the top bar. Absolutely positioned so it RISES from
+     below into place rather than sliding in from the side. */
+  .title-inline{
+    position:absolute;left:36px;top:50%;
+    display:flex;align-items:center;gap:8px;
+    opacity:0;pointer-events:none;
+    transform:translateY(calc(-50% + 18px));
+    transition:opacity var(--dur-title-out) var(--ease),transform var(--dur-title-out) var(--ease);
+  }
+  /* the trigger has no pill, so its twin starts at the edge */
+  .head-left > .title-inline:first-child{left:0;}
+  .head-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .cfg-actions{display:flex;align-items:center;gap:8px;}
+
+  .cfg-node-badge{width:24px;height:24px;border-radius:6px;background:var(--major-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .cfg-node-badge img{width:16px;height:16px;display:block;}
+  .cfg-node-name{font-size:14px;font-weight:500;color:var(--page-text);white-space:nowrap;}
+  /* the header name is click-to-rename */
+  span.cfg-node-name{cursor:text;border-radius:5px;padding:2px 5px;margin:0 -5px;transition:background .15s;}
+  span.cfg-node-name:hover{background:#f2f5f9;}
+  span.cfg-node-name.ph{color:var(--gray-label);font-weight:400;}
+  .cfg-name-input{
+    font-family:inherit;font-size:14px;font-weight:500;color:var(--page-text);
+    border:1px solid var(--primary);border-radius:6px;padding:2px 6px;outline:none;
+    width:190px;background:var(--white);
+  }
+
+  /* expanded block: title + description (collapses on scroll) */
+  .head-expanded{
+    display:flex;flex-direction:column;gap:6px;overflow:hidden;
+    max-height:240px;opacity:1;margin-top:12px;
+    transition:max-height var(--dur) var(--ease),opacity var(--dur-fade) var(--ease),margin-top var(--dur) var(--ease);
+  }
+  .cfg-node-title{display:flex;align-items:center;gap:10px;}
+  .cfg-desc{font-size:11px;font-weight:400;color:var(--gray-label);line-height:normal;padding:0 8px;}
+  .cfg-desc a{color:var(--primary);text-decoration:underline;cursor:pointer;}
+  .cfg-doc{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  .cfg-doc img{width:12px;height:12px;display:inline-block;vertical-align:middle;}
+  /* full-bleed divider: extends past the 12px container padding so it touches
+     both sidebar edges with no horizontal inset */
+  .head-divider{
+    height:1px;background:var(--light-border);transform-origin:center;
+    width:calc(100% + 24px);margin-left:-12px;margin-top:12px;opacity:1;
+    transition:opacity var(--dur-fade) var(--ease),margin-top var(--dur) var(--ease),transform var(--dur) var(--ease);
+  }
+
+  /* collapsed state */
+  /* collapsing: the pill folds away immediately, the title follows it in */
+  .cfg-head.collapsed{--dur-pill:.16s;--delay-pill:0s;}
+  .cfg-head.collapsed .pill-text{max-width:0;opacity:0;margin-left:-4px;}
+  .cfg-head.collapsed .goto-pill{padding:4px 5px;}
+  .cfg-head.collapsed .title-inline{
+    opacity:1;pointer-events:auto;transform:translateY(-50%);
+    transition:opacity .26s var(--ease) .18s,transform .4s var(--ease) .14s;
+  }
+  .cfg-head.collapsed .head-expanded{max-height:0;opacity:0;margin-top:0;}
+  .cfg-head.collapsed .head-divider{opacity:0;margin-top:0;transform:scaleY(0);}
+  .cfg-head.collapsed{box-shadow:0 4px 10px -8px rgba(54,70,88,.35);padding-bottom:12px;}
+
+  /* ---- Scroll region ---- */
+  .cfg-scroll{
+    flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;
+    display:flex;flex-direction:column;gap:24px;
+    /* reach 10px into the container padding, then push the content back off
+       the scrollbar by the same amount — leaves a clear gutter beside it */
+    width:calc(100% + 10px);margin-right:-10px;padding-right:10px;
+    padding-top:18px;padding-bottom:16px;
+  }
+  .cfg-scroll::-webkit-scrollbar{width:6px;}
+  .cfg-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+  /* ---- Error summary (shown on a node that was left incomplete) ---- */
+  .cfg-alert{
+    display:flex;gap:8px;align-items:flex-start;width:100%;
+    padding:8px 10px;border-radius:8px;
+    background:rgba(242,92,78,.07);border:1px solid rgba(242,92,78,.25);
+  }
+  .cfg-alert img{width:14px;height:14px;display:block;flex-shrink:0;margin-top:1px;}
+  .cfg-alert-text{font-size:11px;line-height:1.45;color:var(--critical);}
+  .cfg-alert-text b{font-weight:500;}
+
+  /* ---- Form fields ---- */
+  .cfg-form{display:flex;flex-direction:column;gap:16px;width:100%;}
+  .field{display:flex;flex-direction:column;gap:6px;width:100%;}
+  .field-label{font-size:12px;font-weight:400;color:var(--gray-label);}
+  .field-label .req{color:var(--critical);}
+  .field-help{font-size:10px;font-weight:400;color:var(--gray-label);padding:0 4px;line-height:1.36;}
+  .input-box{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:4px 12px;display:flex;align-items:center;gap:4px;width:100%;min-height:30px;}
+  .input-box .ph{font-size:12px;color:var(--page-text);opacity:.6;padding:3px 0;}
+  .input-box.textarea{height:64px;align-items:flex-start;}
+  .input-box img{width:18px;height:18px;display:block;flex-shrink:0;}
+  .input-box .grow{flex:1 1 0;min-width:0;}
+  .input-box.select{cursor:pointer;}
+  .switch-tabs{display:flex;gap:8px;align-items:center;padding:4px;width:100%;background:var(--switch-bg);border-radius:6px;}
+  .switch-tab{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 12px;border-radius:6px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:12px;color:var(--page-text);font-weight:400;}
+  .switch-tab.active{background:var(--white);font-weight:500;filter:drop-shadow(0 0 4px rgba(54,70,88,.08));}
+
+  /* ---- Inline description, straight under the node's one-liner.
+     Reads as plain text, tints on hover, becomes a real field on focus. ---- */
+  .desc-inline{
+    width:100%;margin-top:2px;display:block;resize:none;overflow:hidden;
+    font-family:inherit;font-size:12px;line-height:1.45;color:var(--page-text);
+    background:none;border:1px solid transparent;border-radius:8px;
+    padding:6px 8px;outline:none;
+    transition:background .15s,border-color .15s;
+  }
+  .desc-inline::placeholder{color:var(--gray-label);opacity:1;}
+  .desc-inline:hover{background:#f4f6f9;}
+  /* focused = the caret and nothing else */
+  .desc-inline:focus{background:transparent;border-color:transparent;}
+
+  /* ---- Picked-type row (what the popover chose, with a Change affordance) ---- */
+  .picked{
+    display:flex;align-items:center;gap:8px;width:100%;
+    border:1px solid var(--border);border-radius:6px;padding:6px 8px 6px 8px;
+    background:linear-gradient(90deg,rgba(223,229,237,.2),rgba(223,229,237,.2)),#fff;
+  }
+  .picked-ico{width:22px;height:22px;border-radius:5px;background:rgba(61,139,208,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .picked-ico img{width:12px;height:12px;display:block;}
+  .picked-text{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  .picked-name{font-size:12px;font-weight:500;color:var(--page-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .picked-kind{font-size:10px;color:var(--gray-label);}
+  .picked-change{
+    flex-shrink:0;border:1px solid var(--border);border-radius:6px;background:var(--white);cursor:pointer;
+    font-family:inherit;font-size:11px;font-weight:500;color:var(--primary);padding:4px 10px;
+  }
+  .picked-change:hover{background:var(--grid-hover);}
+
+  /* ---- Condition builder ---- */
+  .cond-builder{display:flex;flex-direction:column;gap:12px;width:100%;}
+  .cond-group{display:flex;flex-direction:column;gap:6px;width:100%;}
+  .check-if-chip{align-self:flex-start;border:1px solid var(--border);border-radius:12px;padding:4px 8px;background:linear-gradient(90deg,rgba(223,229,237,.4),rgba(223,229,237,.4)),#fff;}
+  .check-if-chip span{font-size:10px;font-weight:500;color:var(--page-text);}
+  .cond-card{display:flex;flex-direction:column;gap:8px;padding:6px 8px;border-radius:9px;background:linear-gradient(90deg,rgba(223,229,237,.2),rgba(223,229,237,.2)),#fff;}
+  .cond-card-title{font-size:12px;font-weight:400;color:var(--gray-label);}
+  .cond-card-title .req{color:var(--critical);}
+  .cond-grid{display:flex;flex-direction:column;width:360px;max-width:100%;}
+  .cond-row{display:flex;width:100%;}
+  .cell{background:var(--white);border:1px solid var(--border);height:35px;display:flex;align-items:center;padding:4px 12px;font-size:11px;color:var(--page-text);}
+  .cell .ph{opacity:.6;font-weight:400;white-space:nowrap;}
+  .cell .val{font-weight:500;white-space:nowrap;}
+  .cell img{width:12px;height:12px;display:block;flex-shrink:0;}
+  .cell-condition{flex:1 1 0;min-width:0;border-radius:8px 0 0 0;border-right:none;justify-content:space-between;gap:6px;}
+  .cell-operator{border-radius:0 8px 0 0;justify-content:space-between;gap:6px;width:140px;}
+  .cell-direct{border-radius:0 0 0 8px;border-top:none;border-right:none;gap:6px;padding-left:8px;cursor:pointer;}
+  .cell-value{flex:1 1 0;min-width:0;border-radius:0 0 8px 0;border-top:none;}
+  .add-cond{align-self:flex-start;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:6px;font-family:inherit;font-size:12px;font-weight:500;color:var(--page-text);}
+  .add-cond:hover{background:var(--grid-hover);}
+  .add-cond-group{align-self:flex-start;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;padding:6px 12px 6px 8px;font-family:inherit;font-size:12px;font-weight:500;color:var(--page-text);}
+  .add-cond-group:hover{background:var(--grid-hover);}
+
+  /* ---- Next Node Selection ---- */
+  .next-node{display:flex;flex-direction:column;gap:12px;padding-top:18px;width:100%;border-top:1px solid var(--light-border);}
+  .next-node-head{
+    display:flex;align-items:flex-start;justify-content:space-between;gap:12px;width:100%;
+    border:none;background:none;padding:0;cursor:pointer;text-align:left;font-family:inherit;
+  }
+  .nn-text{display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .next-node-head h3{font-size:13px;font-weight:500;color:var(--neutral-darker);}
+  .next-node-head p{font-size:11px;font-weight:400;color:var(--gray-label);}
+  .nn-chev{
+    width:24px;height:24px;flex-shrink:0;border-radius:6px;background:var(--chrome-hover);
+    display:flex;align-items:center;justify-content:center;transition:background .15s;
+  }
+  .next-node-head:hover .nn-chev{background:var(--border);}
+  .nn-chev img{width:13px;height:13px;display:block;transition:transform .25s var(--ease);}
+  .nn-body{display:flex;flex-direction:column;gap:10px;overflow:hidden;}
+  .next-node.collapsed .nn-body{display:none;}
+  .next-node.collapsed .nn-chev img{transform:rotate(-90deg);}
+  .nns-tree{position:relative;width:100%;height:180px;}
+  .nns-marker{position:absolute;left:0;top:0;border:1px solid var(--border);border-radius:6px;padding:6px;background:var(--white);}
+  .nns-marker-badge{width:20px;height:20px;border-radius:4px;background:var(--major-bg);display:flex;align-items:center;justify-content:center;}
+  .nns-marker-badge img{width:10.667px;height:10.667px;display:block;transform:scaleY(-1) rotate(180deg);}
+  .nns-connector{position:absolute;left:15px;top:20px;width:24.254px;height:89.652px;}
+  .nns-connector img{width:100%;height:100%;display:block;}
+  .nns-branch{position:absolute;left:56px;width:320px;max-width:calc(100% - 56px);background:var(--grid-hover);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;}
+  .nns-branch.if{top:4px;}
+  .nns-branch.els{top:96px;}
+  .nns-branch-label{font-size:11.5px;font-weight:400;color:var(--page-text);}
+  .nns-add{display:flex;align-items:center;gap:4px;width:100%;background:var(--white);border:1px dashed var(--border);border-radius:6px;padding:4px 12px 4px 8px;cursor:pointer;text-decoration:none;transition:border-color .15s,background .15s;}
+  .nns-add:hover{border-color:var(--primary);background:#f4f9fd;}
+  .nns-add img{width:18px;height:18px;display:block;flex-shrink:0;}
+  .nns-add span{font-size:12px;color:var(--page-text);opacity:.6;}
+  .nns-add.filled{border-style:solid;cursor:default;}
+  .nns-add.filled span{opacity:1;}
+
+  /* auto-save hint that replaces the old Save footer */
+  .autosave{
+    display:flex;align-items:center;gap:6px;flex-shrink:0;width:100%;
+    padding:8px 12px;border-top:1px solid var(--light-border);
+    font-size:10px;color:var(--light-gray-text);
+  }
+  .autosave i{width:5px;height:5px;border-radius:50%;background:#7fbf5a;flex-shrink:0;}
+
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+  <div class="app">
+  <div class="stage">
+
+    <!-- ===================== CANVAS ===================== -->
+    <div class="canvas" id="canvas">
+      <div class="world" id="world">
+        <svg id="edges" width="100" height="100"></svg>
+      </div>
+    </div>
+
+    <!-- ===================== DOCK ===================== -->
+    <div class="dock closed" id="dock">
+
+      <!-- --------- Trigger configuration --------- -->
+      <aside class="sidebar hidden" id="triggerCfg">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+            <div class="cfg-head" id="trHead">
+              <div class="head-top">
+                <div class="head-left">
+                  <div class="title-inline">
+                    <div class="cfg-node-badge" style="background:rgba(61,139,208,.12)"><img src="assets/n-trig-blue.svg" alt="" style="width:14px;height:14px"></div>
+                    <span class="cfg-node-name" data-name="tr" title="Click to rename">Trigger</span>
+                  </div>
+                </div>
+                <div class="head-right">
+                  <div class="cfg-actions">
+                    <button class="hover-box" data-tip="Documentation" aria-label="Documentation"><img src="assets/book.svg" alt=""></button>
+                    <button class="hover-box" id="trClear" data-tip="Clear" aria-label="Clear"><img src="assets/delete.svg" alt=""></button>
+                    <button class="hover-box" id="trMore" data-tip="More" aria-label="More"><img src="assets/more-vertical.svg" alt=""></button>
+                  </div>
+                  <button class="hover-box" id="trClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+              <div class="head-expanded">
+                <div class="cfg-node-title">
+                  <div class="cfg-node-badge" style="background:rgba(61,139,208,.12)"><img src="assets/n-trig-blue.svg" alt="" style="width:14px;height:14px"></div>
+                  <span class="cfg-node-name" data-name="tr" title="Click to rename">Trigger</span>
+                </div>
+                <p class="cfg-desc">Pick the event that fires this workflow — everything else runs after it.</p>
+                <textarea class="desc-inline" id="trDesc" rows="1" placeholder="Add a description..."></textarea>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+            <div class="cfg-scroll" id="trScroll">
+              <div class="cfg-alert hidden" id="trAlert"></div>
+              <div class="cfg-form">
+                <div class="field">
+                  <div class="field-label">Trigger Type <span class="req">*</span></div>
+                  <div class="picked" id="trPicked"></div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Trigger Name <span class="req">*</span></div>
+                  <div class="input-box" id="trTitleBox"><input id="trTitle" type="text" placeholder="Add title..."></div>
+                </div>
+                <!-- module / attributes / schedule are swapped in per trigger type -->
+                <div class="field" id="trModuleField">
+                  <div class="field-label">Select Module <span class="req">*</span></div>
+                  <div class="input-box select" id="trModuleBox"><select id="trModule"></select><img src="assets/chevron-down2.svg" alt=""></div>
+                  <div class="field-help">The record type this workflow watches — e.g. Incident, Request, or Change.</div>
+                </div>
+                <div class="field" id="trAttrField">
+                  <div class="field-label">Select Attribute <span class="req">*</span></div>
+                  <div id="trAttrs" style="display:flex;flex-direction:column;gap:8px"></div>
+                  <div class="field-help">Choose what change should start this workflow — e.g. priority updated, status changed, or assignee added.</div>
+                </div>
+                <div class="field" id="trAddField" style="gap:8px">
+                  <button class="btn-ghost" id="trAdd"><img src="assets/n-plus.svg" alt="">Add Trigger</button>
+                  <div class="field-help">You can add multiple triggers to this workflow. If any one of them occurs, the workflow will run.</div>
+                </div>
+                <div class="field" id="trSchedField">
+                  <div class="field-label" id="trSchedLabel">Schedule <span class="req">*</span></div>
+                  <div id="trSched" style="display:flex;flex-direction:column;gap:8px"></div>
+                </div>
+              </div>
+              <div class="next-node hidden" id="trNextWrap">
+                <button class="next-node-head" type="button" data-nn-toggle>
+                  <span class="nn-text"><h3>Next step</h3><p>Define what happens after this block</p></span>
+                  <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
+                </button>
+                <div class="nn-body" id="trNext"></div>
+              </div>
+            </div>
+            <div class="autosave"><i></i>All changes are saved automatically</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- --------- IF/Else configuration --------- -->
+      <aside class="sidebar hidden" id="ifelseConfig">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+
+            <!-- Collapsing header -->
+            <div class="cfg-head" id="cfgHead">
+              <div class="head-top">
+                <div class="head-left">
+                  <button class="goto-pill" id="ifGoto" aria-label="Go to previous node">
+                    <img src="assets/chevron-down.svg" alt="">
+                    <span class="pill-text">Go to Trigger Node</span>
+                  </button>
+                  <div class="title-inline">
+                    <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                    <span class="cfg-node-name" data-name="if" title="Click to rename">IF/Else</span>
+                  </div>
+                </div>
+                <div class="head-right">
+                  <div class="cfg-actions">
+                    <button class="hover-box" data-tip="Documentation" aria-label="Documentation"><img src="assets/book.svg" alt=""></button>
+                    <button class="hover-box" id="ifReplace" data-tip="Replace node" aria-label="Replace node"><img src="assets/repeat.svg" alt=""></button>
+                    <button class="hover-box" id="ifDelete" data-tip="Delete" aria-label="Delete"><img src="assets/delete.svg" alt=""></button>
+                    <button class="hover-box" id="ifMore" data-tip="More" aria-label="More"><img src="assets/more-vertical.svg" alt=""></button>
+                  </div>
+                  <button class="hover-box" id="cfgClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+
+              <div class="head-expanded">
+                <div class="cfg-node-title">
+                  <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                  <span class="cfg-node-name" data-name="if" title="Click to rename">IF/Else</span>
+                </div>
+                <p class="cfg-desc">Define a condition to split this workflow into two paths — one for when it's true, one for when it's not.</p>
+                <textarea class="desc-inline" id="ifDesc" rows="1" placeholder="Add a description..."></textarea>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+
+            <!-- Scrollable content -->
+            <div class="cfg-scroll" id="cfgScroll">
+              <div class="cfg-alert hidden" id="ifAlert"></div>
+              <div class="cfg-form">
+                <div class="field">
+                  <div class="field-label">Title <span class="req">*</span></div>
+                  <div class="input-box" id="ifTitleBox"><input id="ifTitle" type="text" placeholder="Add title..."></div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Select Source Node <span class="req">*</span></div>
+                  <div class="input-box select" id="ifSourceBox">
+                    <select id="ifSource"></select>
+                    <img src="assets/chevron-down2.svg" alt="">
+                  </div>
+                  <div class="field-help">The previous step/node whose data you want to use in this node</div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Select Type <span class="req">*</span></div>
+                  <div class="switch-tabs">
+                    <button class="switch-tab active">Condition</button>
+                    <button class="switch-tab">Expression</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cond-builder">
+                <div class="cond-group">
+                  <div class="check-if-chip"><span>Check IF</span></div>
+                  <div class="cond-card">
+                    <div class="cond-card-title">Select Condition <span class="req">*</span></div>
+                    <div class="cond-grid">
+                      <div class="cond-row">
+                        <div class="cell cell-condition"><span class="ph">Select condition</span><img src="assets/chevron-down.svg" alt=""></div>
+                        <div class="cell cell-operator"><span class="ph">Select operator</span><img src="assets/chevron-down.svg" alt=""></div>
+                      </div>
+                      <div class="cond-row">
+                        <div class="cell cell-direct"><img src="assets/chevron-down.svg" alt=""><span class="val">Direct</span></div>
+                        <div class="cell cell-value"><span class="ph">Select value</span></div>
+                      </div>
+                    </div>
+                    <button class="add-cond">+ Add Condition</button>
+                  </div>
+                </div>
+                <button class="add-cond-group" id="ifAddGroup">+ Add Condition Group</button>
+              </div>
+
+              <div class="next-node">
+                <button class="next-node-head" type="button" data-nn-toggle>
+                  <span class="nn-text"><h3>Next step</h3><p>Define what happens after this block</p></span>
+                  <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
+                </button>
+                <div class="nn-body" id="ifNext"></div>
+              </div>
+            </div>
+
+            <div class="autosave"><i></i>All changes are saved automatically</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- --------- Branch configuration --------- -->
+      <aside class="sidebar hidden" id="branchCfg">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+            <div class="cfg-head" id="brHead">
+              <div class="head-top">
+                <div class="head-left">
+                  <button class="goto-pill" id="brGoto" aria-label="Go to previous node">
+                    <img src="assets/chevron-down.svg" alt="">
+                    <span class="pill-text">Go to IF/Else Node</span>
+                  </button>
+                  <div class="title-inline">
+                    <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                    <span class="cfg-node-name" data-name="br" title="Click to rename">Branch</span>
+                  </div>
+                </div>
+                <div class="head-right">
+                  <div class="cfg-actions">
+                    <button class="hover-box" data-tip="Documentation" aria-label="Documentation"><img src="assets/book.svg" alt=""></button>
+                    <button class="hover-box" id="brReplace" data-tip="Replace node" aria-label="Replace node"><img src="assets/repeat.svg" alt=""></button>
+                    <button class="hover-box" id="brDelete" data-tip="Delete" aria-label="Delete"><img src="assets/delete.svg" alt=""></button>
+                    <button class="hover-box" id="brMore" data-tip="More" aria-label="More"><img src="assets/more-vertical.svg" alt=""></button>
+                  </div>
+                  <button class="hover-box" id="brClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+              <div class="head-expanded">
+                <div class="cfg-node-title">
+                  <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                  <span class="cfg-node-name" data-name="br" title="Click to rename">Branch</span>
+                </div>
+                <p class="cfg-desc">Send the workflow down different paths depending on what the value is — like sorting tickets into the right team.</p>
+                <textarea class="desc-inline" id="brDesc" rows="1" placeholder="Add a description..."></textarea>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+            <div class="cfg-scroll" id="brScroll">
+              <div class="cfg-alert hidden" id="brAlert"></div>
+              <div class="cfg-form">
+                <div class="field">
+                  <div class="field-label">Title <span class="req">*</span></div>
+                  <div class="input-box" id="brTitleBox"><input id="brTitle" type="text" placeholder="Add title..."></div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Select Source Node <span class="req">*</span></div>
+                  <div class="input-box select" id="brSourceBox">
+                    <select id="brSource"></select>
+                    <img src="assets/chevron-down2.svg" alt="">
+                  </div>
+                  <div class="field-help">The previous step/node whose data you want to use in this node</div>
+                </div>
+              </div>
+              <div id="brList" style="display:flex;flex-direction:column;gap:16px;width:100%"></div>
+              <button class="btn-ghost" id="brAdd"><img src="assets/n-plus.svg" alt="">Add Branch</button>
+              <div class="next-node">
+                <button class="next-node-head" type="button" data-nn-toggle>
+                  <span class="nn-text"><h3>Next step</h3><p>Define what happens after this block</p></span>
+                  <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
+                </button>
+                <div class="nn-body" id="brNext"></div>
+              </div>
+            </div>
+            <div class="autosave"><i></i>All changes are saved automatically</div>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+  </div>
+
+  <script src="workflow-popover.js"></script>
+  <script src="workflow-chrome.js"></script>
+  <script src="workflow-app.js"></script>
+</body>
+</html>

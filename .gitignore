@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# Playwright screenshots captured while exploring the reference builder —
+# session artefacts, not part of the prototype
+.playwright-mcp/

@@ -1,0 +1,174 @@
+/* ============ Canvas nodes (data-driven) ============ */
+.canvas{overflow:hidden;}
+.world{position:relative;min-width:100%;min-height:100%;}
+#edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;}
+.edge{fill:none;stroke:var(--light-gray-text);stroke-width:1.25;}
+.elabel{position:absolute;transform:translate(-50%,-50%);font-size:10px;font-weight:500;line-height:1;padding:4px 6px;border-radius:8px;background:#fff;border:1px solid var(--border);color:var(--page-text);white-space:nowrap;pointer-events:none;}
+.elabel.t{color:#6a9a2a;border-color:rgba(139,195,74,.4);background:#f4f9ec;}
+.elabel.f{color:var(--critical);border-color:rgba(242,92,78,.3);background:#fef1ef;}
+.t-dot{position:absolute;width:10px;height:10px;border-radius:50%;background:#fff;border:1.25px solid var(--primary);}
+.t-plus{position:absolute;width:20px;height:20px;border:1.25px solid var(--light-gray-text);border-radius:4px;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:border-color .15s,background .15s;}
+.t-plus img{width:12px;height:12px;display:block;}
+.t-plus:hover{border-color:var(--primary);background:#eef5fc;}
+/* the slot whose picker popover is currently open */
+.t-plus.on{border-color:var(--primary);background:#eef5fc;box-shadow:0 0 0 3px rgba(61,139,208,.16);}
+
+/* ---- hover controls on a live connection ----
+   The pair lays itself out along the line it belongs to: stacked for a vertical
+   connector, side by side for a horizontal one. */
+.edge-hot{
+  position:absolute;z-index:5;transform:translate(-50%,-50%);
+  display:flex;align-items:center;justify-content:center;
+}
+.edge-hot.v{width:56px;height:70px;}
+.edge-hot.h{width:90px;height:48px;}
+.edge-ctl{
+  display:flex;gap:3px;padding:3px;border-radius:9px;
+  background:var(--white);border:1px solid var(--border);
+  box-shadow:0 2px 9px rgba(54,70,88,.18),0 1px 2px rgba(54,70,88,.08);
+  opacity:0;transform:scale(.9);pointer-events:none;
+  transition:opacity .13s var(--ease),transform .13s var(--ease);
+}
+.edge-ctl.v{flex-direction:column;}
+.edge-hot:hover .edge-ctl,.edge-hot.open .edge-ctl{opacity:1;transform:none;pointer-events:auto;}
+.ec{
+  width:21px;height:21px;padding:0;border:none;background:none;border-radius:5px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:background .12s;
+}
+.ec img{width:12px;height:12px;display:block;}
+.ec:hover{background:var(--grid-hover);}
+.ec.del:hover{background:rgba(242,92,78,.14);}
+/* the connector lights up while its controls are in reach */
+.edge.hot{stroke:var(--primary);stroke-width:1.8;}
+
+.nd{position:absolute;width:250px;cursor:grab;user-select:none;}
+.nd.dragging{cursor:grabbing;z-index:20;}
+.nd.dragging .card{box-shadow:0 10px 24px -10px rgba(54,70,88,.35);}
+/* select tool: the canvas is not a drag surface, only the nodes are */
+.canvas{cursor:default;}
+.canvas.panning,.canvas.panning .nd{cursor:grabbing;}
+/* hand tool: everything becomes a pan surface */
+.canvas.tool-pan,.canvas.tool-pan .nd{cursor:grab;}
+.canvas.tool-pan.panning,.canvas.tool-pan.panning .nd{cursor:grabbing;}
+/* the controls sitting on the canvas keep a normal pointer */
+.t-plus,.ec,.nd .act,.nd .more{cursor:pointer;}
+.nd.enter{animation:ndIn .45s var(--ease) both;}
+@keyframes ndIn{from{opacity:0;transform:translateY(12px) scale(.96);}to{opacity:1;transform:none;}}
+.nd .pill-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;min-height:23px;}
+.nd .pill{display:inline-flex;align-items:center;gap:4px;height:23px;padding:4px 6px;border-radius:12px;border:1px solid var(--light-gray-text);background:linear-gradient(rgba(223,229,237,.2),rgba(223,229,237,.2)),#fff;font-size:10px;font-weight:500;color:var(--page-text);transition:all .15s;}
+.nd .pill img{width:12px;height:12px;display:block;}
+.nd .pill .p-sel{display:none;}
+.nd.selected .pill{background:linear-gradient(rgba(61,139,208,.12),rgba(61,139,208,.12)),#fff;border-color:rgba(61,139,208,.2);color:var(--primary);}
+.nd.selected .pill .p-def{display:none;}
+.nd.selected .pill .p-sel{display:block;}
+.nd .badge{display:inline-flex;align-items:center;height:22px;padding:4px 6px;border-radius:8px;}
+.nd .badge img{width:12px;height:12px;display:block;}
+.nd .badge.err{background:linear-gradient(rgba(242,92,78,.12),rgba(242,92,78,.12)),#fff;}
+.nd .badge.warn{background:linear-gradient(rgba(245,188,24,.12),rgba(245,188,24,.12)),#fff;}
+.nd .card{position:relative;background:var(--white);border:1px solid #e7e9f1;border-radius:10px;transition:border-color .15s,box-shadow .15s,background .15s;}
+.nd .card-top{display:flex;align-items:center;justify-content:space-between;padding:8px;gap:6px;}
+.nd .card-l{display:flex;align-items:center;gap:6px;min-width:0;}
+.nd .ico{position:relative;width:24px;height:24px;border-radius:6px;flex-shrink:0;background:rgba(123,143,165,.12);display:flex;align-items:center;justify-content:center;}
+.nd .ico img{width:12px;height:12px;display:block;}
+.nd .ico.blue{background:rgba(61,139,208,.12);}
+.nd .ico.major{background:rgba(245,133,24,.12);}
+.nd .ico.grey{background:rgba(128,128,128,.12);}
+.nd .ico.rot img{transform:rotate(-90deg) scaleY(-1);}
+.nd .ico.flip img{transform:scaleY(-1) rotate(180deg);}
+.nd .ico.lg img{width:12.8px;height:12.8px;}
+.nd .nm{font-size:12px;font-weight:500;color:var(--gray-label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.nd .nm.set{color:var(--page-text);}
+/* Description, editable in place. No chrome of its own: a faint tint on hover,
+   and on focus nothing but the caret. */
+.nd .card-bot{
+  display:block;width:calc(100% - 16px);margin:0 8px 8px;padding:5px 7px;
+  border:none;border-radius:6px;background:transparent;outline:none;
+  font-family:inherit;font-size:11px;color:var(--page-text);
+  text-overflow:ellipsis;transition:background .15s;cursor:text;
+}
+.nd .card-bot::placeholder{color:#9aa3b2;opacity:1;}
+.nd .card-bot:hover{background:#f4f6f9;}
+.nd .card-bot:focus{background:transparent;}
+/* state badge hanging above the card's top-right corner (IF/Else, Branch — the
+   trigger carries its own inside the pill row). Absolute, so switching state
+   never changes the card's height. */
+.nd .badge.float{position:absolute;right:0;top:-29px;}
+.nd .acts{display:flex;gap:2px;opacity:0;transition:opacity .15s;flex-shrink:0;}
+.nd:hover .acts{opacity:1;}
+.nd .act{width:18px;height:18px;border-radius:3.84px;display:flex;align-items:center;justify-content:center;border:none;background:none;cursor:pointer;padding:0;}
+.nd .act:hover{background:var(--grid-hover);}
+.nd .act img{width:12px;height:12px;display:block;}
+
+/* node states — empty / error / warning now apply to every node type, not just the trigger */
+.nd.empty:hover .card{border:1px dashed var(--primary);filter:drop-shadow(0 0 3px rgba(61,139,208,.4));}
+.nd:not(.empty):hover .card{border-color:var(--primary);}
+.nd.selected .card{border-color:var(--primary);}
+.nd.selected:hover .card{border-style:solid;}
+
+/* ERROR — required fields still blank. Dashed red: the node is unfinished.
+   WARNING — usable, but with loose ends. Solid amber.
+   Both keep their own colour through hover and selection, and both are written
+   after the hover/selected rules so the generic blue never masks them. */
+.nd.error .card{border:1px dashed rgba(242,92,78,.55);}
+.nd.error:hover .card,.nd.error.selected .card,.nd.error.selected:hover .card{
+  border:1px dashed var(--critical);
+}
+.nd.warning .card{border:1px solid rgba(245,188,24,.7);}
+.nd.warning:hover .card,.nd.warning.selected .card,.nd.warning.selected:hover .card{
+  border:1px solid #f5bc18;
+}
+.nd.disabled{cursor:not-allowed;}
+.nd.disabled .card{background:var(--light-border);}
+.nd.disabled .pill-row{display:none;}
+.nd .multi{padding:0 10px 10px;display:flex;flex-direction:column;gap:8px;}
+.nd .mrow{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--page-text);}
+.nd .mnum{width:12px;height:12px;border:1px solid var(--border);border-radius:10px;font-size:7px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.nd .mmore{font-size:10px;color:var(--gray-label);}
+
+/* if/else + branch */
+.nd .body{padding:4px 8px 8px;display:flex;flex-direction:column;gap:14px;}
+.nd .grp{display:flex;flex-direction:column;gap:4px;}
+.nd .chip{align-self:flex-start;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:2px 8px;font-size:10px;font-weight:500;color:var(--gray-label);white-space:nowrap;line-height:1.36;}
+.nd .bar{position:relative;background:#f2f5f9;border:1px solid transparent;border-radius:6px;padding:6px 8px;font-size:10px;color:var(--gray-label);}
+.nd .bar.set{color:var(--page-text);}
+.nd .bar span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.nd .chip-row{position:relative;}
+.nd .port{position:absolute;right:-13px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:#fff;border:1.25px solid var(--c,var(--light-gray-text));}
+.nd .port.if{--c:#8bc34a;}
+.nd .port.else{--c:var(--critical);}
+.nd .port.first{--c:var(--primary);}
+.nd .more{display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:11px;font-weight:500;color:var(--primary);cursor:pointer;}
+.nd .more img{width:12px;height:12px;display:block;}
+.nd .more.up img{transform:rotate(180deg);}
+
+/* placeholder ("Add a node") */
+.nd.ph:hover .card{border:1px dashed var(--primary);filter:drop-shadow(0 0 3px rgba(61,139,208,.4));}
+
+.toast{position:fixed;left:calc(50% - 200px);bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--neutral-darker);color:#fff;font-size:12px;padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100;}
+.toast.show{opacity:1;transform:translateX(-50%);}
+
+/* ============ Sidebar additions ============ */
+.input-box input,.input-box textarea{border:none;outline:none;background:none;width:100%;font-family:inherit;font-size:12px;color:var(--page-text);padding:3px 0;resize:none;}
+.input-box textarea{height:100%;}
+.input-box input::placeholder,.input-box textarea::placeholder{color:var(--page-text);opacity:.6;}
+.input-box:focus-within{border-color:var(--primary);}
+.input-box.invalid{border-color:var(--critical);}
+.input-box select{border:none;outline:none;background:none;width:100%;font-family:inherit;font-size:12px;color:var(--page-text);appearance:none;-webkit-appearance:none;padding:3px 0;cursor:pointer;}
+.input-box.select{position:relative;}
+.input-box.select img{pointer-events:none;}
+.field-error{font-size:10px;color:var(--critical);padding:0 4px;}
+.btn-ghost{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;padding:6px 12px 6px 8px;font-family:inherit;font-size:12px;font-weight:500;color:var(--page-text);}
+.btn-ghost:hover{background:var(--grid-hover);}
+.btn-ghost img{width:14px;height:14px;display:block;}
+.attr-row{display:flex;align-items:center;gap:6px;}
+.attr-row .input-box{flex:1 1 0;}
+.attr-rm{width:24px;height:24px;flex-shrink:0;}
+.tr-footer{justify-content:flex-end;}
+.br-card{display:flex;flex-direction:column;gap:8px;width:100%;}
+.br-head{display:flex;align-items:center;justify-content:space-between;}
+.br-name-chip{border:1px solid var(--border);border-radius:12px;padding:2px 8px;font-size:10px;font-weight:500;color:var(--page-text);background:linear-gradient(90deg,rgba(223,229,237,.4),rgba(223,229,237,.4)),#fff;}
+.br-tools{display:flex;gap:6px;}
+.br-body{display:flex;flex-direction:column;gap:12px;padding:8px;border-radius:9px;background:linear-gradient(90deg,rgba(223,229,237,.2),rgba(223,229,237,.2)),#fff;}
+.hover-box.sm{width:22px;height:22px;}
+.ifx .nns-branch{position:static;width:100%;max-width:none;margin-top:8px;}
+.ifx-wrap{padding-left:56px;}

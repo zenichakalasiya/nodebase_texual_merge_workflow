@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Node Selection Sidebar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500&family=Inter:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page-text:#364658;
+    --gray-label:#7b8fa5;
+    --border:#dfe5ed;
+    --light-border:rgba(223,229,237,.4);
+    --grid-hover:rgba(223,229,237,.2);
+    --primary:#3d8bd0;
+    --light-gray-text:#a5bad0;
+    --white:#fff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:#eef1f5;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    padding:24px;
+    min-height:100vh;
+  }
+
+  /* ---- Sidebar shell ---- */
+  .sidebar{
+    width:400px;
+    height:calc(100vh - 48px);
+    max-height:900px;
+    background:var(--white);
+    border-left:1px solid var(--border);
+    box-shadow:0 2px 16px rgba(54,70,88,.08);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .ns-container{
+    flex:1 1 0;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    padding:12px;
+  }
+  .ns-inner{
+    flex:1 1 0;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+  }
+
+  /* ---- Header ---- */
+  .ns-header{display:flex;flex-direction:column;gap:4px;}
+  .ns-title-row{display:flex;align-items:center;justify-content:space-between;}
+  .ns-title{font-size:14px;font-weight:500;color:var(--page-text);line-height:1.36;}
+  .ns-subtitle{font-size:11px;font-weight:400;color:var(--gray-label);}
+
+  .hover-box{
+    width:24px;height:24px;
+    border:.8px solid var(--border);
+    border-radius:6.4px;
+    display:flex;align-items:center;justify-content:center;
+    background:none;cursor:pointer;flex-shrink:0;
+    transition:background .15s;
+  }
+  .hover-box:hover{background:var(--grid-hover);}
+  .hover-box img{width:12.8px;height:12.8px;display:block;}
+
+  /* ---- Body (sticky search/tabs + scroll list) ---- */
+  .ns-body{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:20px;}
+  .ns-sticky{display:flex;flex-direction:column;gap:16px;flex-shrink:0;}
+
+  .search{
+    width:100%;
+    background:var(--grid-hover);
+    border:1px solid var(--light-gray-text);
+    border-radius:8px;
+    padding:8px;
+    display:flex;align-items:center;gap:4px;
+    cursor:text;
+  }
+  .search img{width:14px;height:14px;display:block;flex-shrink:0;}
+  .search input{
+    border:none;background:none;outline:none;
+    flex:1 1 0;min-width:0;
+    font-family:inherit;font-size:12px;color:var(--page-text);
+  }
+  .search input::placeholder{color:var(--gray-label);opacity:1;}
+
+  .tabs{
+    display:flex;gap:10px;align-items:stretch;
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{
+    background:none;border:none;cursor:pointer;
+    font-family:inherit;font-size:12px;line-height:1.36;
+    color:var(--page-text);font-weight:400;
+    padding:4px;white-space:nowrap;flex-shrink:0;
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .tab.active{color:var(--primary);font-weight:500;}
+  .tab.active::after{
+    content:"";display:block;width:100%;height:0;
+    border-bottom:1.5px solid var(--primary);
+    margin-top:4px;
+  }
+
+  /* ---- Scrollable node list ---- */
+  .ns-list-scroll{
+    flex:1 1 0;min-height:0;
+    overflow-y:auto;overflow-x:hidden;
+    width:100%;
+  }
+  .ns-list-scroll::-webkit-scrollbar{width:6px;}
+  .ns-list-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  .ns-list{display:flex;flex-direction:column;gap:24px;width:100%;}
+
+  .ns-section{display:flex;flex-direction:column;gap:6px;width:100%;}
+  .ns-section-title{font-size:12px;font-weight:500;color:var(--gray-label);line-height:1.36;}
+  .ns-items{display:flex;flex-direction:column;gap:4px;width:100%;}
+
+  .node-item{
+    display:flex;gap:6px;align-items:flex-start;
+    padding:6px;border-radius:8px;width:100%;
+    cursor:pointer;text-decoration:none;
+    transition:background .15s;
+  }
+  .node-item:hover{background:var(--grid-hover);}
+  .node-icon{
+    width:24px;height:20px;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;padding:1px 0;
+  }
+  .node-icon img{width:17.143px;height:17.143px;display:block;}
+  .node-text{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 0;}
+  .node-name{font-size:13px;font-weight:500;color:var(--page-text);line-height:1.36;}
+  .node-desc{
+    font-size:11px;font-weight:400;color:var(--gray-label);line-height:19px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+</style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="ns-container">
+      <div class="ns-inner">
+
+        <!-- Header -->
+        <div class="ns-header">
+          <div class="ns-title-row">
+            <span class="ns-title">Node&nbsp; Selection</span>
+            <button class="hover-box" aria-label="Close">
+              <img src="assets/close.svg" alt="">
+            </button>
+          </div>
+          <div class="ns-subtitle">Pick a step/node to add to your workflow.</div>
+        </div>
+
+        <!-- Body -->
+        <div class="ns-body">
+          <div class="ns-sticky">
+            <!-- Search -->
+            <label class="search">
+              <img src="assets/search.svg" alt="">
+              <input type="text" placeholder="Search actions, conditions, or modules...">
+            </label>
+            <!-- Tabs -->
+            <div class="tabs">
+              <button class="tab active">All</button>
+              <button class="tab">Conditional Flows</button>
+              <button class="tab">ITSM Modules</button>
+              <button class="tab">Asset &amp; CMDB</button>
+              <button class="tab">Communication &amp; Integration</button>
+            </div>
+          </div>
+
+          <!-- Scrollable list -->
+          <div class="ns-list-scroll">
+            <div class="ns-list">
+
+              <!-- Conditional Flows -->
+              <section class="ns-section">
+                <div class="ns-section-title">Conditional Flows</div>
+                <div class="ns-items">
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">IF / Else</div>
+                      <div class="node-desc">Split the workflow into two paths based on a condition</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/branch.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Branch</div>
+                      <div class="node-desc">Route to one of many paths based on a field value.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Merge</div>
+                      <div class="node-desc">Bring split paths back together into a single flow.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/loop-repeat.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Loop</div>
+                      <div class="node-desc">Repeat actions for each item in a list or result set.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Wait Node</div>
+                      <div class="node-desc">Pause the workflow for a set time or until a condition is met.</div>
+                    </div>
+                  </a>
+                </div>
+              </section>
+
+              <!-- ITSM Modules -->
+              <section class="ns-section">
+                <div class="ns-section-title">ITSM&nbsp; Modules</div>
+                <div class="ns-items">
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Request</div>
+                      <div class="node-desc">Split the workflow into two paths based on a condition</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/branch.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Problem</div>
+                      <div class="node-desc">Create or update problem records linked to incidents.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Change</div>
+                      <div class="node-desc">Create or manage change requests and their approvals.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/loop-repeat.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Release</div>
+                      <div class="node-desc">Create or update release records for deployments.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Task</div>
+                      <div class="node-desc">Split the workflow into two paths based on a condition</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Approval</div>
+                      <div class="node-desc">Split the workflow into two paths based on a condition</div>
+                    </div>
+                  </a>
+                </div>
+              </section>
+
+              <!-- Asset & CMDB -->
+              <section class="ns-section">
+                <div class="ns-section-title">Asset &amp; CMDB</div>
+                <div class="ns-items">
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Hardware Asset</div>
+                      <div class="node-desc">Assign, update, or look up physical assets like laptops and servers.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/branch.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Software Asset</div>
+                      <div class="node-desc">Manage software licenses, installations, and entitlements.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Non-IT Asset</div>
+                      <div class="node-desc">Manage facilities, furniture, and other non-IT inventory.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/loop-repeat.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">CMDB</div>
+                      <div class="node-desc">Split the workflow into two paths based on a condition</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Asset Movement</div>
+                      <div class="node-desc">Split the workflow into two paths based on a condition</div>
+                    </div>
+                  </a>
+                </div>
+              </section>
+
+              <!-- Communication & Integration -->
+              <section class="ns-section">
+                <div class="ns-section-title">Communication &amp; Integration</div>
+                <div class="ns-items">
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/split.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">User</div>
+                      <div class="node-desc">Look up user profiles, departments, or update user records.</div>
+                    </div>
+                  </a>
+                  <a class="node-item">
+                    <div class="node-icon"><img src="assets/branch.svg" alt=""></div>
+                    <div class="node-text">
+                      <div class="node-name">Notification</div>
+                      <div class="node-desc">Send emails, SMS, or in-app alerts to people.</div>
+                    </div>
+                  </a>
+                </div>
+              </section>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </aside>
+</body>
+</html>
