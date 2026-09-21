@@ -6,7 +6,7 @@ their own side fails. Their full reports are below, followed by the synthesis an
 the open questions.
 
 **Context:** Motadata ServiceOps. ITSM admins build 3–8 step workflows, a few
-times a quarter. The textual builder creates a vertical **lane** per branch, each
+times a quarter. The textual builder creatBes a vertical **lane** per branch, each
 holding its own condition *and* its own steps. The node builder creates one
 **Branch node** whose drawer holds the whole decision table, wired to its paths
 afterwards.

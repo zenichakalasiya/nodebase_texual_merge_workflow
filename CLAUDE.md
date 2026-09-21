@@ -90,6 +90,21 @@ several planned features — see `BRANCHING-DEBATE.md`.
 Playwright and asserting computed styles and geometry, not by eyeballing
 screenshots alone. Write the script, run it, delete it.
 
+**Reference builders.** Two live products are the behavioural reference:
+
+- the textual builder (URL above) — popover component, slot-chaining, shortcuts,
+  node colours. Its behaviour and tokens were read in full; it is a linear
+  "sentence builder", not a canvas, so only the popover/interaction model carries
+  over, not its layout.
+- a Monday.com custom-objects workflow (`blue-falcon-band.monday.com`) that
+  combines a node canvas with a popover picker plus side drawer — the target
+  feel. It needs a login, which is not stored anywhere in this repo.
+
+**Trigger drawer vs the design screenshots.** The design shows a "Workflow Module
+Configuration" drawer (Event/Periodic switch inside the drawer, Schedule Type /
+Frequency / Day chips / Month / Start At for periodic, "Trigger n" attribute
+cards). The built drawer is shaped differently — see `HANDOFF.md` for the gap.
+
 ## Deployment
 
 Repo: https://github.com/zenichakalasiya/nodebase_texual_merge_workflow
