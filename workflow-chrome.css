@@ -63,7 +63,7 @@
 
 /* ---------------- row 2: page bar ---------------- */
 .pagebar{
-  height:46px;flex-shrink:0;display:flex;align-items:center;gap:10px;
+  position:relative;height:46px;flex-shrink:0;display:flex;align-items:center;gap:10px;
   padding:0 16px;background:var(--white);border-bottom:1px solid var(--chrome-border);
 }
 .pagebar-left{display:flex;align-items:center;gap:8px;min-width:0;}
@@ -103,6 +103,7 @@
 
 /* Simple | Node view switch */
 .viewswitch{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   flex-shrink:0;display:flex;align-items:center;gap:2px;padding:3px;
   background:var(--chrome-hover);border-radius:9px;
 }
@@ -311,3 +312,17 @@ body.dock-open .bottombar{left:calc(50% - 206px);}
 .fc-area:focus{border-color:var(--primary);}
 .fc-area::placeholder{color:var(--gray-label);}
 
+
+/* ---------------- workflow name + description card ---------------- */
+.floatcard.flowinfo{width:330px;display:flex;flex-direction:column;gap:6px;}
+.fi-label{font-size:11px;font-weight:500;color:var(--gray-label);}
+.fi-input{
+  width:100%;height:32px;outline:none;border:1px solid var(--border);border-radius:8px;padding:0 10px;
+  font-family:inherit;font-size:12.5px;color:var(--page-text);margin-bottom:6px;
+}
+.fi-input:focus{border-color:var(--primary);}
+.fi-input::placeholder{color:var(--gray-label);}
+.floatcard.flowinfo .fc-area{height:88px;}
+.fi-foot{display:flex;justify-content:flex-end;margin-top:6px;}
+.fi-foot[hidden]{display:none;}
+.fi-foot .btn-blue.sm{height:30px;padding:0 16px;font-size:12px;}

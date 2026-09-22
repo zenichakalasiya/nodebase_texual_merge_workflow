@@ -172,3 +172,198 @@
 .hover-box.sm{width:22px;height:22px;}
 .ifx .nns-branch{position:static;width:100%;max-width:none;margin-top:8px;}
 .ifx-wrap{padding-left:56px;}
+
+/* ============ Branch → lanes ============ */
+.edge.dashed{stroke-dasharray:4 4;}
+/* a lane card's description is read-only (its conditions), not an input */
+.nd .card-bot.ro{cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9aa3b2;}
+.nd .card-bot.ro.set{color:var(--page-text);}
+.nd .card-bot.ro:hover{background:transparent;}
+/* the node whose drawer is open glows, and eases in and out as you move between them */
+.nd .card{transition:border-color .3s var(--ease),box-shadow .3s var(--ease),background .15s;}
+.nd.selected .card{box-shadow:0 0 0 4px rgba(61,139,208,.14),0 6px 18px -8px rgba(61,139,208,.35);}
+.world.glide{transition:transform .42s var(--ease);}
+
+/* branches list in the Branch drawer */
+.br-section{display:flex;flex-direction:column;gap:12px;width:100%;padding-top:18px;border-top:1px solid var(--light-border);}
+.br-section-head h3{font-size:13px;font-weight:500;color:var(--neutral-darker);}
+.br-section-head p{font-size:11px;color:var(--gray-label);margin-top:4px;}
+.br-rows{display:flex;flex-direction:column;gap:8px;}
+.br-row{position:relative;display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;background:var(--white);transition:border-color .15s,background .15s,box-shadow .3s;}
+.br-row:hover{border-color:var(--primary);background:#f8fbfe;}
+.br-row.bad{border-color:rgba(242,92,78,.55);border-style:dashed;}
+.br-row.fresh{box-shadow:0 0 0 4px rgba(61,139,208,.18);border-color:var(--primary);}
+.br-row-main{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:3px;text-align:left;background:none;border:none;cursor:pointer;padding:9px 0 9px 12px;font-family:inherit;}
+.br-row-name{font-size:12px;font-weight:500;color:var(--page-text);}
+.br-row-sum{font-size:11px;color:var(--gray-label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.br-row-sum.ph{opacity:.75;}
+.br-row-chev{padding-right:12px;display:flex;pointer-events:none;}
+.br-row-chev img{width:12px;height:12px;transform:rotate(-90deg);}
+.br-row-del{flex-shrink:0;}
+
+/* branch-path drawer: the sibling stepper, then simple condition rows */
+.lane-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0 10px;flex-shrink:0;}
+.lane-pos{font-size:11px;font-weight:500;color:var(--gray-label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lane-nav .hover-box:disabled{opacity:.35;cursor:default;}
+.lane-nav .hover-box:disabled:hover{background:none;}
+.cond-lines{display:flex;flex-direction:column;gap:8px;}
+.cond-line{position:relative;display:flex;align-items:flex-start;gap:6px;}
+.cond-line .cond-grid{flex:1 1 0;width:auto;}
+.cond-line.invalid .cell{border-color:var(--critical);}
+.cond-card.invalid{outline:1px solid rgba(242,92,78,.55);outline-offset:-1px;}
+.cond-and{align-self:flex-start;font-size:10px;font-weight:500;color:var(--gray-label);padding:0 6px;}
+.cond-rm{margin-top:6px;}
+.cell select,.cell input{border:none;outline:none;background:none;font-family:inherit;font-size:11px;color:var(--page-text);width:100%;min-width:0;appearance:none;-webkit-appearance:none;cursor:pointer;}
+.cell input{cursor:text;font-weight:500;}
+.cell input::placeholder{color:var(--page-text);opacity:.6;font-weight:400;}
+.cell select{padding-right:4px;}
+.cell:focus-within{border-color:var(--primary);position:relative;z-index:1;}
+
+/* ============ Periodic trigger: next execution ============ */
+.nd .next-run{margin:0 8px 2px;display:flex;flex-direction:column;gap:4px;}
+.nd .nr-label{font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-label);}
+.nd .nr-val{background:rgba(238,242,246,.7);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--page-text);}
+.nd .nr-val.ph{color:#9aa3b2;}
+
+/* ============ Grouped condition builder ============ */
+.cg-wrap{display:flex;flex-direction:column;gap:14px;width:100%;}
+.cg-list{display:flex;flex-direction:column;}
+.cg{display:flex;flex-direction:column;gap:8px;}
+.cg-head{display:flex;align-items:center;justify-content:space-between;}
+.cg-chip{border:1px solid var(--border);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:500;color:var(--page-text);background:linear-gradient(90deg,rgba(223,229,237,.4),rgba(223,229,237,.4)),#fff;}
+.cg-tools{display:flex;gap:6px;}
+.hover-box.danger:hover{background:rgba(242,92,78,.12);}
+.cg-body{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:9px;background:linear-gradient(90deg,rgba(223,229,237,.28),rgba(223,229,237,.28)),#fff;}
+.cg-cond{display:flex;flex-direction:column;gap:6px;}
+.cg-cond-head{display:flex;align-items:center;justify-content:space-between;}
+.cg-toggle{display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:2px 0;font-family:inherit;font-size:11px;font-weight:500;color:var(--page-text);}
+.cg-toggle img{width:11px;height:11px;display:block;transition:transform .2s var(--ease);}
+.cg-cond.closed .cg-toggle img{transform:rotate(-90deg);}
+.cg-cond.closed .cg-cond-body{display:none;}
+.cg-x{width:20px;height:20px;border:none;background:none;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:.55;}
+.cg-x:hover{opacity:1;background:rgba(242,92,78,.12);}
+.cg-x img{width:12px;height:12px;display:block;}
+.cg-cond .cond-grid{width:100%;}
+.cell-val{flex:1 1 0;min-width:0;border-radius:0 0 0 8px;border-top:none;border-right:none;}
+.fx-btn{width:38px;height:35px;flex-shrink:0;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 0;background:rgba(223,229,237,.35);cursor:pointer;font-family:'Poppins',serif;font-style:italic;font-size:11px;font-weight:500;color:var(--page-text);}
+.fx-btn:hover{background:rgba(223,229,237,.7);}
+.fx-btn.on{background:rgba(61,139,208,.14);color:var(--primary);border-color:rgba(61,139,208,.45);}
+/* And / Or chip on a thin rail between conditions and between groups */
+.cg-join{display:flex;flex-direction:column;align-items:flex-start;padding-left:14px;}
+.cg-join i{display:block;width:1px;height:12px;background:var(--border);margin-left:16px;}
+.cg-join .join-chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:3px 9px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:500;color:var(--page-text);transition:background .15s,border-color .15s;}
+.cg-join .join-chip:hover{background:#f4f9fd;border-color:var(--primary);}
+.cg-join .join-chip img{width:11px;height:11px;display:block;}
+.cg-list > .cg-join{padding-left:0;}
+.cg-list > .cg-join i{margin-left:26px;}
+.cg-body > .cg-join{padding-left:0;}
+.cg-body > .cg-join i{margin-left:14px;}
+.btn-ghost.sm{padding:5px 10px 5px 8px;font-size:11px;background:#fff;}
+.btn-ghost.dark{border-color:var(--neutral-darker);color:var(--neutral-darker);}
+.cg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.btn-clear{display:inline-flex;align-items:center;gap:6px;flex:1 1 auto;justify-content:center;border:none;border-radius:6px;background:rgba(242,92,78,.1);cursor:pointer;padding:7px 12px;font-family:inherit;font-size:12px;font-weight:500;color:var(--critical);}
+.btn-clear:hover{background:rgba(242,92,78,.18);}
+.btn-clear img{width:12px;height:12px;display:block;}
+
+/* "Workflow starts here" — the trigger drawer's version of the back pill: same
+   shape and same fold-to-icon on scroll, but nothing to go back to */
+.goto-pill.start{cursor:default;}
+.goto-pill.start:hover{background:none;}
+
+/* ============ Branches list: tree rail ============
+   One continuous rail runs down the left of the list; each branch hangs off it
+   with a rounded elbow, so the rows read as the children of the Branch node above.
+   ::after is the straight rail (full row height + the gap, so rows join up);
+   ::before is the curved stub into the row. The last row's rail stops where its
+   stub begins. */
+.br-rows{position:relative;gap:12px;padding-left:24px;}
+.br-row,.br-row-add{position:relative;}
+.br-row::after,.br-row-add::after{
+  content:"";position:absolute;left:-17px;top:-12px;bottom:-12px;
+  border-left:1.5px solid #ccd5e0;pointer-events:none;
+}
+.br-row-add::after{bottom:auto;height:calc(50% + 2px);}
+.br-row::before,.br-row-add::before{
+  content:"";position:absolute;left:-17px;top:calc(50% - 10px);width:17px;height:10px;
+  border-left:1.5px solid #ccd5e0;border-bottom:1.5px solid #ccd5e0;border-bottom-left-radius:10px;
+  pointer-events:none;
+}
+
+/* ============ Parallel nodes ============ */
+/* the dashed "add one more alongside" slot — on the canvas and in the drawer */
+.par-slot{
+  position:absolute;width:250px;min-height:40px;display:flex;align-items:center;gap:10px;
+  padding:8px 12px;border:1px dashed #b9c6d6;border-radius:10px;background:rgba(255,255,255,.6);
+  cursor:pointer;font-family:inherit;text-align:left;
+  transition:border-color .15s,background .15s,box-shadow .2s;
+}
+.par-slot img{width:16px;height:16px;display:block;flex-shrink:0;opacity:.55;transition:opacity .15s;}
+.par-slot span{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9aa8ba;transition:color .15s;}
+.par-slot:hover,.par-slot.on{border-color:var(--primary);background:#f4f9fd;}
+.par-slot:hover img,.par-slot.on img{opacity:1;}
+.par-slot:hover span,.par-slot.on span{color:var(--primary);}
+.par-slot.on{box-shadow:0 0 0 3px rgba(61,139,208,.14);}
+.elabel.par{color:var(--primary);border-color:rgba(61,139,208,.35);background:#f1f7fd;letter-spacing:.02em;}
+.nns-add.par{border-style:dashed;background:rgba(255,255,255,.6);}
+.nns-add.par span{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9aa8ba;opacity:1;}
+.nns-add.par img{opacity:.6;}
+.nns-add.par:hover span{color:var(--primary);}
+
+/* ============ Next step: the same tree rail as the branches list ============ */
+.next-node .nn-body{position:relative;padding-left:24px;gap:12px;}
+.next-node .nn-body > .nns-branch{position:relative;}
+.next-node .nn-body > .nns-branch::after{
+  content:"";position:absolute;left:-17px;top:-12px;bottom:-12px;
+  border-left:1.5px solid #ccd5e0;pointer-events:none;
+}
+.next-node .nn-body > .nns-branch:first-child::after{top:0;}
+.next-node .nn-body > .nns-branch:last-child::after{bottom:auto;height:calc(50% + 2px);}
+.next-node .nn-body > .nns-branch:first-child:last-child::after{height:calc(50% - 8px);}
+.next-node .nn-body > .nns-branch::before{
+  content:"";position:absolute;left:-17px;top:calc(50% - 10px);width:17px;height:10px;
+  border-left:1.5px solid #ccd5e0;border-bottom:1.5px solid #ccd5e0;border-bottom-left-radius:10px;
+  pointer-events:none;
+}
+/* rows must fit inside the rail's padding, not spill past the drawer's edge */
+.next-node .nn-body > .nns-branch{width:auto !important;max-width:none !important;}
+.next-node .nn-body > .nns-branch{left:0 !important;top:auto !important;}
+
+/* ============ Branch stepper: ‹ 1 of 3 › in the drawer header ============ */
+.lane-step{display:flex;align-items:center;height:24px;border:.8px solid var(--border);border-radius:6.4px;padding:0 1px;flex-shrink:0;}
+.ls-btn{width:20px;height:22px;border:none;background:none;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background .15s;}
+.ls-btn:hover:not(:disabled){background:var(--grid-hover);}
+.ls-btn:disabled{opacity:.3;cursor:default;}
+.ls-btn img{width:12px;height:12px;display:block;}
+.lane-step .lane-pos{font-size:10px;font-weight:500;color:var(--gray-label);padding:0 2px;white-space:nowrap;min-width:32px;text-align:center;}
+
+/* pills carry text only; and the periodic card gets room around its schedule field */
+.nd .pill{padding:4px 9px;}
+.nd .next-run{margin:6px 8px 4px;gap:6px;}
+.nd .nr-val{padding:7px 9px;}
+.nd .next-run + .card-bot{margin-top:2px;}
+
+/* the condition builder reports problems in one quiet line below the groups */
+.cg-err{font-size:10px;line-height:1.4;color:var(--critical);padding:0 4px;}
+
+/* ============ Confirmation dialog ============ */
+.wf-modal-back{
+  position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;
+  background:rgba(20,33,45,.38);opacity:0;transition:opacity .16s var(--ease);
+}
+.wf-modal-back.in{opacity:1;}
+.wf-modal{
+  width:400px;max-width:calc(100vw - 32px);background:var(--white);border-radius:14px;padding:22px 22px 18px;
+  box-shadow:0 24px 60px -18px rgba(20,33,45,.5),0 2px 8px rgba(20,33,45,.12);
+  transform:translateY(8px) scale(.98);transition:transform .18s var(--ease);
+}
+.wf-modal-back.in .wf-modal{transform:none;}
+.wf-modal-ico{width:36px;height:36px;border-radius:10px;background:rgba(242,92,78,.12);display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
+.wf-modal-ico img{width:18px;height:18px;display:block;}
+.wf-modal h3{font-size:15px;font-weight:500;color:var(--neutral-darker);margin-bottom:6px;}
+.wf-modal p{font-size:12px;line-height:1.5;color:var(--gray-label);}
+.wf-modal-btns{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
+.wf-btn{border:1px solid var(--border);border-radius:8px;background:var(--white);cursor:pointer;padding:8px 16px;font-family:inherit;font-size:12px;font-weight:500;color:var(--page-text);transition:background .15s,border-color .15s;}
+.wf-btn:hover{background:var(--grid-hover);}
+.wf-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+.wf-btn.danger{background:var(--critical);border-color:var(--critical);color:#fff;}
+.wf-btn.danger:hover{background:#e04b3d;border-color:#e04b3d;}

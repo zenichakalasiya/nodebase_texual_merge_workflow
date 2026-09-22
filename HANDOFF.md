@@ -1,90 +1,136 @@
-# Handoff — 2026-09-21 11:00
+# Handoff — 2026-09-22 11:50
 
 ## Read first
 
-`CLAUDE.md` — the **"Key context"** section, especially *Behaviour that is
-deliberate* and the new *Reference builders* / *Trigger drawer vs the design
-screenshots* notes. Then `BRANCHING-DEBATE.md` for the still-open branching
-question carried over from the previous session.
+`CLAUDE.md` — the **"Key context"** section, all of it; a large chunk was
+rewritten this session (Branch/IF-Else redesign, parallel nodes, connector
+dragging, confirm dialogs, condition-error display, top bar). `BRANCHING-DEBATE.md`
+is now historical — its open questions were answered by explicit direction
+rather than by the two-agent research it recorded; skim it for context only.
 
 ## What we worked on this session
 
-Studied the textual builder in depth, then re-checked the requested
-"popover + drawer" trigger flow against the real page. **No app code changed this
-session** — the flow was already built; this session confirmed that and pinned down
-the remaining differences from the design screenshots.
+Reshaped Branch and IF/Else to match the textual builder's reference screens
+(lanes/paths fan out from a Trigger-style card, no node-picker inside the card
+itself), added parallel nodes, a real grouped condition builder, then a long run
+of bug fixes and polish: connectors following dragged nodes, arrowheads, confirm
+dialogs before destructive deletes, a quiet one-line condition error instead of
+red field outlines, a cleaned-up top bar, and a workflow name/description popup
+with explicit Save.
 
 ## Completed
 
-- **Read the textual builder end to end** (source + a live walkthrough): design
-  tokens, component inventory, per-node behaviour, chrome, popovers, shortcuts.
-  Two agents did this; findings were merged into a component-based reference.
-  (The working notes lived in the session scratchpad and are gone; the takeaways
-  are in this file and `CLAUDE.md`.)
-- **Verified the requested flow in a browser** — all working:
-  1. trigger node is placed on load, drawer closed;
-  2. clicking it opens the picker popover with **Event / Periodic** tabs;
-  3. picking a type opens the trigger drawer;
-  4. the **Next step** block appears only once the trigger is complete;
-  5. that row (or a canvas `+`) closes the drawer and opens the "What happens
-     next" popover under the `+`;
-  6. picking a node reopens the drawer for that node;
-  7. no Save button — "All changes are saved automatically".
+- **Branch redesign** — `branch` node now holds `lanes: []`; each lane is its
+  own `lane` node (`kind:'if'|'else'`) with its own `groups`/drawer/Next-step.
+  Branch card is Trigger-style (tag/icon/title/description), no branches drawn
+  inside it. Lines fan **downward**: solid to each real lane, dotted "pending"
+  slot at the end whose `+` opens **Add branch: Or if / Or else**
+  (`openBranchType()`). Branch 1 (first `if` lane) can't be deleted.
+- **IF/Else redesign** — same Trigger-style card; exactly two fixed outputs
+  (Is True / Is False, no more Else-IF), same downward fan, condition read back
+  into the card's description.
+- **Grouped condition builder** — `groupsHTML()` / `bindBuilder()`, shared by
+  the branch-path drawer (`#lnCond`) and IF/Else (`#ifCond`): Condition Group
+  N cards, collapsible conditions, And/Or join chips (`cjoin`/`gjoin`), `fx`
+  expression toggle, Add Condition / Add Condition Group / Remove All
+  Condition. Matches the reference screenshots.
+- **Branch-path drawer** — name, conditions, Next step, back arrow to the
+  parent Branch, and a `‹ 1 of N ›` stepper in the header (hidden when N < 2,
+  per explicit request) to move between sibling branches.
+- **Parallel nodes** — Trigger and branch-path `next` outputs only. A dashed
+  "Add parallel node" slot (canvas + drawer Next-step block) adds a sibling
+  that runs alongside the first; 2+ fan out under a "Parallel" tag, same visual
+  language as a branch fan.
+- **Periodic trigger** — card shows a computed **Next execution time**
+  (`nextRun()`), pill reads "Periodic workflow". All node pills (Trigger,
+  Periodic workflow, IF/Else, Branch) lost their icon — text only, per request.
+- **Connector-follow-drag bug, fixed** — every line is now drawn to the child's
+  live position (`entry()`), not its original layout slot, so dragging a node
+  keeps its connector (and everything under it) attached. A node dragged above
+  its parent gets a smooth S-curve instead of a folded elbow.
+- **Arrowheads** — every connector that lands on a node ends in one
+  (`marker-end="url(#wf-arrow)"`, defined once in the SVG `<defs>`); lines that
+  end in a "+" don't get one.
+- **Tree-rail visuals** — the Branches list in the main Branch drawer and every
+  drawer's Next-step block now share one continuous-rail tree look
+  (`.br-rows`/`.nn-body`), replacing the earlier boxed rows.
+- **Confirm dialogs before destructive deletes** — `confirmDialog()` +
+  `.wf-modal-*`: deleting a branch (names the step count it would take with
+  it), Reset (bottom bar), and header ⋮ → Delete workflow all ask first.
+  Cancel/Esc/outside-click decline; undo still restores after confirming.
+- **Condition-error display fixed** — no more stale/incorrect red field
+  outlines. One line under the condition groups (`condError()`/`.cg-err`)
+  names the first incomplete condition and what it's missing; it updates live
+  as you type and clears the moment the condition is complete.
+- **Top bar cleanup** — removed the description icon and the Working/Published
+  version dropdown; Simple/Node view is now centred on the bar independent of
+  the breadcrumb.
+- **Workflow name/description popup** — clicking the workflow name opens a
+  card with Name + Description fields. Opens plain; a **Save** button appears
+  only once something has been edited (compared against the values when it
+  opened), and nothing reaches the top bar or tab title until Save is pressed.
+  Any other close (Esc/outside-click/re-click) discards the edit.
 
 ## In progress
 
-Nothing mid-flight; the build is unchanged and consistent.
+Nothing mid-flight; the build is consistent (checked in-browser after every
+change this session, no console errors in any of the runs).
 
-**One question is waiting on the teammate:** should the trigger drawer be brought
-in line with the design screenshots? Gaps found (all in `openTrigger()` /
-`renderSched()` / the `#triggerCfg` markup in `workflow-canvas.html`, and
-`TRIGGER_ITEMS` / `SCHED` in `workflow-app.js`):
-
-- no "Workflow Module Configuration" title, no "Workflow starts here" pill, no
-  Event/Periodic switch or info banner *inside* the drawer (the built one shows a
-  "Trigger Type" card with a Change button);
-- periodic fields: design = Schedule Type, Frequency, Day chips (Sun–Sat), Month,
-  Start At; built = per-type fields for Once / Hourly / Daily / Weekly / Monthly;
-- periodic popover rows: textual builder = "Once" + "Every time period"; built =
-  Once / Hourly / Daily / Weekly / Monthly;
-- "Trigger 1" attribute cards with Any/Any dropdowns and ON toggles are not built
-  (plain attribute dropdowns instead).
+**Open question the teammate hasn't answered yet:** deleting a *non-branch*
+node (an IF/Else, or via the connector's insert/delete hover control) still
+removes everything after it with **no** confirmation — only branch deletes and
+the two resets got the dialog. Worth asking whether that should get the same
+treatment.
 
 ## Next steps
 
-1. **Answer the trigger-drawer question above**, then align the drawer and the
-   periodic popover rows with the design screenshots if yes.
-2. **Answer the three branching questions** in the previous handoff (still open,
-   restated in `BRANCHING-DEBATE.md`): realistic branch count, build the real
-   condition builder now, and whether the drawer may stay open for branch paths.
-3. **Fix the verified reachability bug**: with 5 branches the drawer lists 6 paths
-   but the canvas exposes only 4 `+` buttons — branches 4 and 5 hide behind the
-   "+N more" collapse. See `portsOf()` vs `allPortsOf()` in `workflow-app.js`.
-4. **Model the branch condition** as field / operator / value (today it is one
-   free-text `cond` string); branching creates one branch + Default, not two;
-   port labels should read the condition back.
-5. Fill in the real second-level contents for the picker's module rows (still
-   placeholders).
+1. Decide whether non-branch node deletion (IF/Else delete icon, connector
+   hover-delete) should get the same confirm dialog as branches/reset.
+2. Trigger drawer still doesn't match the design screenshots' shape (see
+   `CLAUDE.md` → "Trigger drawer vs the design screenshots") — only the
+   periodic card's Next-execution-time and pill wording were pulled from those
+   screenshots so far, not the drawer layout itself.
+3. Field/operator/value lists in the condition builder (`FIELDS`, `OPS` in
+   `workflow-app.js`) are still placeholders — swap for the real per-module
+   lists when available.
+4. Consider whether a half-filled *second* condition/group (beyond Condition 1
+   of Group 1) should also surface in the one-line error, or stay silent as now.
+5. Fill in real second-level picker content for the still-placeholder module
+   rows (carried over from before this session).
 
 ## Decisions made
 
-- **No code change without confirmation on the trigger drawer.** The built drawer
-  works and follows the "always closes when the picker opens" rule; reshaping it
-  is a design call, so it was raised rather than done.
-- **Take popover/interaction ideas from the textual builder, not its layout.** It
-  is a linear sentence builder with no canvas, so it informs the picker, slots and
-  shortcuts only.
+- **Branch/IF-Else UX comes from the reference screens, not from first
+  principles.** Every shape decision (downward fan, dotted pending slot, Or
+  if/Or else popup, lane stepper position, parallel-node placeholder) was
+  confirmed against a screenshot or an explicit multiple-choice answer before
+  building — see the `AskUserQuestion` rounds in this session's transcript if a
+  "why this and not that" ever needs re-deriving.
+- **Confirm dialogs only where deletion is irreversible-feeling** (takes other
+  work with it, or wipes the whole flow) — not on every delete icon. Deliberately
+  narrower than "confirm everything".
+- **No per-field red outlines, ever, for conditions.** One quiet summary line
+  instead — explicit correction after the red-border-goes-stale bug.
+- **The workflow name/description popup is the one exception to "no Save
+  button anywhere"** — explicit request, kept narrowly scoped to that one popup.
 
 ## Gotchas & notes
 
-- **The Monday.com reference needs a login.** Only a username was ever given; no
-  password is stored or should be guessed. Ask the teammate for screenshots or
-  access if a comparison is needed.
-- **`.playwright-mcp/` is gitignored** and holds ~100+ screenshots/snapshots from
-  exploring both builders. Safe to delete.
-- **Playwright text selectors can match twice.** The picker's help bubble repeats
-  the row title, so `text=Check a condition` hits both; scope to `.wfpop-label`.
-- An old `node server.js` may already hold :8777; it serves from disk, so reloads
-  pick up edits (use `/workflow-canvas.html` explicitly).
-- `BRANCHING-DEBATE.md` shows a one-line uncommitted edit that was not made this
-  session.
+- **Shell quoting broke a couple of inline JS-in-bash edits mid-session**
+  (nested backticks/template literals inside a `bash -c` heredoc). The fix each
+  time was to write the replacement as its own `.js` script file in the
+  scratchpad and run it with `node`, rather than trying to inline it — do that
+  from the start for any edit with template literals or nested quotes.
+- **`showPar`/`chainFans` (parallel-node layout) key off `selId`** — the dashed
+  "add parallel" slot only renders for the currently-selected node, so a
+  layout check right after a programmatic `selectNode()` needs a tick/`render()`
+  to settle before asserting on it.
+- **`.nns-branch` rows needed `position:relative` for the new tree rail**, which
+  fought a leftover `left:56px` from the old lane-tree layout — both are now
+  overridden with `!important` in `workflow-nodes.css`; if that rail ever looks
+  offset again, check for a third layer setting `left`/`top` on `.nns-branch`.
+- **Playwright text-selectors matching twice** is a recurring trap in this repo
+  (a popover's help bubble repeats the row title) — scope to `.wfpop-label`
+  rather than a bare `text=`.
+- **`.playwright-mcp/` keeps accumulating screenshots** from ad hoc verification
+  runs; it's gitignored, safe to delete anytime, not part of the app.

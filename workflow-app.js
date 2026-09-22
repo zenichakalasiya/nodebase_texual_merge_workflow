@@ -13,13 +13,13 @@
 (function(){
   const $ = (s, r=document) => r.querySelector(s);
   const world = $('#world'), edgesSvg = $('#edges'), dock = $('#dock'), canvasEl = $('#canvas');
-  const panels = { trigger: $('#triggerCfg'), ifelse: $('#ifelseConfig'), branch: $('#branchCfg') };
+  const panels = { trigger: $('#triggerCfg'), ifelse: $('#ifelseConfig'), branch: $('#branchCfg'), lane: $('#laneCfg') };
 
   /* ---------------------------------------------------------- catalogs */
   const MODULES = ['Request','Incident','Problem','Change','Release','Task','Hardware Asset','Software Asset','User'];
   const ATTRS = ['Status is Changed','Department is Changed','Incident is Changed','Priority is Updated','Assignee is Added','Category is Changed','Impact is Changed'];
   const WEEKDAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const TYPE_LABEL = { trigger:'Trigger', ifelse:'IF/Else', branch:'Branch' };
+  const TYPE_LABEL = { trigger:'Trigger', ifelse:'IF/Else', branch:'Branch', lane:'Branch path' };
 
   /* Trigger types — the textual builder's two groups, re-cut as the two tabs the
      node builder uses (Event | Periodic). Same rows, same help copy. */
@@ -218,31 +218,71 @@
     return nodes[id];
   }
   function newTrigger(){ return mk('trigger', { trigType:null, module:'', attrs:[''], sched:{} }); }
-  function newIfElse(){ return mk('ifelse', { title:'IF / Else', groups:1 }); }
-  function newBranch(){ return mk('branch', { title:'Branch', expanded:false, branches:[ newBr('Branch 1'), newBr('Branch 2') ] }); }
-  let brSeq = 0;
-  function newBr(name){ return { key:'b' + (++brSeq), name, cond:'' }; }
+  function newIfElse(){ return mk('ifelse', { title:'IF / Else', groups:[newGroup()] }); }
+  /* A Branch node is a trigger-style card that FANS OUT sideways into lanes. Each
+     lane is a real node of its own (type 'lane'): an "if" lane carries a name and
+     conditions, the single "else" lane is the Default. Whatever runs after a lane
+     hangs off that lane's own `next` slot — never off the Branch card itself.
+     `lanes` is ordered: every "if" lane, then the Default (if it exists). A dotted
+     "pending" line always ends the row; its "+" asks Or if / Or else. */
+  function newBranch(){
+    const b = mk('branch', { title:'Branch', lanes:[] });
+    addLane(b, 'if');                              // Branch 1 — mandatory, solid line
+    return b;
+  }
+  let brSeq = 0;                                    // kept for history snapshots
+  const FIELDS = ['Category','Priority','Status','Department','Assignee','Impact','Urgency'];
+  const OPS = ['is','is not','contains','is one of'];
+  /* A branch's condition is one or more GROUPS; each group holds one or more
+     conditions. `join` on a condition/group is how it links to the one before it
+     (And / Or) — the first of each ignores it. */
+  const newCond = () => ({ field:'', op:'', value:'', fx:false, join:'and', open:true });
+  const newGroup = () => ({ join:'and', conds:[newCond()] });
+  function ifLanes(b){ return b.lanes.map(id => nodes[id]).filter(l => l.kind === 'if'); }
+  function defaultLane(b){ return b.lanes.map(id => nodes[id]).find(l => l.kind === 'else'); }
+  function addLane(b, kind){
+    const lane = mk('lane', { kind, parent:b.id, title: kind === 'else' ? 'Default' : 'Branch ' + (ifLanes(b).length + 1),
+                              groups: kind === 'else' ? [] : [newGroup()] });
+    /* "if" lanes slot in before the Default so the Default always stays last */
+    if(kind === 'if'){
+      const at = defaultLane(b) ? b.lanes.indexOf(defaultLane(b).id) : b.lanes.length;
+      b.lanes.splice(at, 0, lane.id);
+    } else b.lanes.push(lane.id);
+    b.slots[lane.id] = lane.id;
+    return lane;
+  }
+  const condDone = c => !!(c.field && c.op && String(c.value).trim());
+  function condSummary(l){
+    if(l.kind === 'else') return 'Runs when no other branch matches';
+    /* "If Category is Networking and Priority is High" — several groups read as
+       "(…) or (…)", so the grouping survives in the one-line description */
+    const parts = [];
+    l.groups.forEach(g => {
+      const done = g.conds.filter(condDone);
+      if(!done.length) return;
+      parts.push({ join:g.join, text:done.map((c, i) => (i ? ' ' + c.join + ' ' : '') + c.field + ' ' + c.op + ' ' + c.value).join('') });
+    });
+    if(!parts.length) return '';
+    const many = parts.length > 1;
+    return 'If ' + parts.map((p, i) => (i ? ' ' + p.join + ' ' : '') + (many ? '(' + p.text + ')' : p.text)).join('');
+  }
+
+  /* Every node hanging off a Trigger / branch path's single output: the first one
+     (slots.next), then any parallel siblings. They all run at the same time. */
+  const kidsOf = n => (n.slots.next ? [n.slots.next] : []).concat(n.parallel || []);
+  const canParallel = n => n.type === 'trigger' || n.type === 'lane';
 
   /* ports = output connection points of a node, in top→bottom order */
   function portsOf(n){
-    if(n.type === 'trigger') return [{ key:'next', label:'', cls:'' }];
+    if(n.type === 'trigger' || n.type === 'lane') return [{ key:'next', label:'', cls:'' }];
     if(n.type === 'ifelse'){
-      const p = [];
-      for(let i=0;i<n.groups;i++) p.push({ key:'g'+i, label: i===0 ? 'Is True' : 'Else IF '+i, cls:'t' });
-      p.push({ key:'else', label:'Is False', cls:'f' });
-      return p;
+      /* exactly two ways out — a condition is either true or it is not */
+      return [{ key:'g0', label:'Is True', cls:'t' }, { key:'else', label:'Is False', cls:'f' }];
     }
-    if(n.type === 'branch'){
-      return (n.expanded ? n.branches : n.branches.slice(0, 3)).map(b => ({ key:b.key, label:b.name, cls:'' }))
-        .concat([{ key:'default', label:'Default', cls:'' }]);
-    }
-    return [];
+    return [];          // a Branch card has no ports of its own — its lanes do
   }
   /* every port, including the ones the collapsed card hides — used by the drawer */
-  function allPortsOf(n){
-    if(n.type === 'branch') return n.branches.map(b => ({ key:b.key, label:b.name })).concat([{ key:'default', label:'Default' }]);
-    return portsOf(n);
-  }
+  function allPortsOf(n){ return portsOf(n); }
 
   /* ---------------------------------------------------------- validation */
   function missingOf(n){
@@ -256,10 +296,15 @@
       } else {
         SCHED[n.trigType].fields.forEach(f => { if(!String(n.sched[f.k] || '').trim()) miss.push('sched:' + f.k); });
       }
+    } else if(n.type === 'lane'){
+      if(n.kind === 'if'){
+        if(!n.title.trim()) miss.push('title');
+        if(!n.groups.some(g => g.conds.some(condDone))) miss.push('conds');
+      }
     } else {
       if(!n.title.trim()) miss.push('title');
       if(!n.source) miss.push('source');
-      if(n.type === 'branch' && n.branches.some(b => !b.name.trim())) miss.push('branches');
+      if(n.type === 'ifelse' && !n.groups.some(g => g.conds.some(condDone))) miss.push('conds');
     }
     return miss;
   }
@@ -271,6 +316,7 @@
     if(n.type === 'trigger'){
       return isEventTrig(n.trigType) && n.attrs.length > 1 && n.attrs.some(a => !a);
     }
+    if(n.type === 'branch') return false;          // its lanes carry the loose ends, not the card
     return allPortsOf(n).some(p => !n.slots[p.key]);
   }
   function stateOf(n){
@@ -318,15 +364,60 @@
     return [parts.length ? parts.join(' · ') : 'No schedule set'];
   }
 
+  /* When a periodic trigger will next fire, from the schedule the user set — or
+     null while the schedule is still incomplete. */
+  function nextRun(n){
+    const s = n.sched || {}, now = new Date();
+    const hm = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? [+m[1], +m[2]] : null; };
+    const at = (d, t) => { d.setHours(t[0], t[1], 0, 0); return d; };
+    let d = null;
+    if(n.trigType === 'once'){
+      const t = hm(s.time), p = String(s.date || '').split('-').map(Number);
+      if(t && p.length === 3 && p[0]) d = new Date(p[0], p[1] - 1, p[2], t[0], t[1]);
+    } else if(n.trigType === 'hourly'){
+      const min = s.minute === '' || s.minute == null ? NaN : +s.minute;
+      if(!isNaN(min) && +s.every >= 1){
+        d = new Date(now); d.setMinutes(min, 0, 0);
+        if(d <= now) d.setHours(d.getHours() + 1);
+      }
+    } else if(n.trigType === 'daily'){
+      const t = hm(s.time);
+      if(t){ d = at(new Date(now), t); if(d <= now) d.setDate(d.getDate() + 1); }
+    } else if(n.trigType === 'weekly'){
+      const t = hm(s.time), wd = WEEKDAYS.indexOf(s.day);            // Monday-first list
+      if(t && wd >= 0){
+        d = at(new Date(now), t);
+        const want = (wd + 1) % 7;                                    // JS: Sunday = 0
+        d.setDate(d.getDate() + ((want - d.getDay() + 7) % 7));
+        if(d <= now) d.setDate(d.getDate() + 7);
+      }
+    } else if(n.trigType === 'monthly'){
+      const t = hm(s.time), dom = +s.dom;
+      if(t && dom >= 1 && dom <= 31){
+        const mk1 = (y, m) => at(new Date(y, m, Math.min(dom, new Date(y, m + 1, 0).getDate())), t);
+        d = mk1(now.getFullYear(), now.getMonth());
+        if(d <= now) d = mk1(now.getFullYear(), now.getMonth() + 1);
+      }
+    }
+    return d;
+  }
+  const fmtRun = d => d.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+    + ', ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+
   function triggerHTML(n, st){
     const empty = st === 'empty';
-    const pill = `<div class="pill-row"><span class="pill"><span class="p-def">${img('n-trig-grey')}</span><span class="p-sel">${img('n-trig-blue-pill')}</span>Trigger</span>${badgeHTML(st)}</div>`;
+    const periodic = !empty && !isEventTrig(n.trigType);
+    const pill = `<div class="pill-row"><span class="pill">${periodic ? 'Periodic workflow' : 'Trigger'}</span>${badgeHTML(st)}</div>`;
     const name = empty ? 'Add a trigger' : (n.title || TRIG_LABEL(n.trigType));
     const icoCls = empty ? 'ico lg' : 'ico blue';
-    const icoImg = empty ? img('n-trig-grey-lg') : img('n-trig-blue');
+    const icoImg = empty ? img('n-trig-grey-lg') : img(periodic ? 'calendar-clock' : 'n-trig-blue');
     let bottom;
     if(empty){
       bottom = descLine(n);
+    } else if(periodic){
+      const d = nextRun(n);
+      bottom = `<div class="next-run"><span class="nr-label">Next execution time</span>`
+        + `<div class="nr-val${d ? '' : ' ph'}">${d ? esc(fmtRun(d)) : 'Set the schedule to see it'}</div></div>` + descLine(n);
     } else {
       const lines = triggerSummary(n);
       bottom = lines.length > 1
@@ -337,26 +428,33 @@
     return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="${icoCls}">${icoImg}</div><span class="nm ${empty?'':'set'}">${esc(name)}</span></div>${actsHTML}</div>${bottom}</div>`;
   }
 
+  /* IF/Else wears the same clothes as the trigger and the Branch: a tag above,
+     icon + title, and a description line — here read-only, and showing the
+     condition. Its two outputs (Is True / Is False) are drawn as lines below. */
   function ifelseHTML(n, st){
-    let groups = '';
-    for(let i=0;i<n.groups;i++){
-      groups += `<div class="grp"><span class="chip">${i===0?'IF':'Else IF'}</span><div class="bar" data-port="g${i}"><span>Condition</span><i class="port if"></i></div></div>`;
-    }
-    const els_ = `<div class="chip-row" data-port="else"><span class="chip">Else</span><i class="port else"></i></div>`;
-    return `${badgeHTML(st, true)}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major flip">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'IF / Else')}</span></div>${actsHTML}</div>${descLine(n)}<div class="body">${groups}${els_}</div></div>`;
+    const pill = `<div class="pill-row"><span class="pill">IF / Else</span>${badgeHTML(st)}</div>`;
+    const sum = condSummary(n);
+    return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major flip">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'IF / Else')}</span></div>${actsHTML}</div>`
+      + `<div class="card-bot ro ${sum ? 'set' : ''}">${esc(sum || 'Set up the condition')}</div></div>`;
   }
 
+  /* The Branch card wears the same clothes as the trigger: a small tag above, then
+     icon + title + a description line. The branches themselves are NOT drawn
+     inside it any more — they fan out below as lanes. */
   function branchHTML(n, st){
-    const LIMIT = 3;
-    const list = n.expanded ? n.branches : n.branches.slice(0, LIMIT);
-    let rows = list.map((b, i) => `<div class="grp"><span class="chip">${esc(b.name)}</span><div class="bar ${b.cond?'set':''}" data-port="${b.key}"><span>${esc(b.cond || b.name + ' Condition')}</span><i class="port ${i===0?'first':''}"></i></div></div>`).join('');
-    rows += `<div class="chip-row" data-port="default"><span class="chip">Default</span><i class="port"></i></div>`;
-    const hidden = n.branches.length - LIMIT;
-    let toggle = '';
-    if(hidden > 0) toggle = n.expanded
-      ? `<div class="more up" data-act="toggle">Collapse ${img('n-chevron')}</div>`
-      : `<div class="more" data-act="toggle">+${hidden} more ${img('n-chevron')}</div>`;
-    return `${badgeHTML(st, true)}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major rot">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'Branch')}</span></div>${actsHTML}</div>${descLine(n)}<div class="body">${rows}${toggle}</div></div>`;
+    const pill = `<div class="pill-row"><span class="pill">Branch</span>${badgeHTML(st)}</div>`;
+    return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major rot">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'Branch')}</span></div>${actsHTML}</div>${descLine(n)}</div>`;
+  }
+
+  /* A lane card: its name, and — once filled — its conditions as the description.
+     Read-only on the canvas; the conditions are edited in the drawer. */
+  function laneHTML(n, st){
+    const sum = condSummary(n);
+    const isFirst = ifLanes(nodes[n.parent])[0] === n;               // Branch 1 is mandatory
+    const del = isFirst ? '' : `<div class="acts"><button class="act" data-act="delete" aria-label="Delete branch">${img('n-act-delete')}</button></div>`;
+    const line = n.kind === 'else' ? sum : (sum || 'Set up conditions');
+    return `${badgeHTML(st, true)}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major rot">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'Add name...')}</span></div>${del}</div>`
+      + `<div class="card-bot ro ${sum || n.kind === 'else' ? 'set' : ''}">${esc(line)}</div></div>`;
   }
 
   /* Ports whose visible row is hidden (collapsed branches) still need a y —
@@ -383,7 +481,7 @@
   }
 
   function nodeClass(n, st){
-    let c = 'nd ' + (n.type === 'trigger' ? 'trig ' : '') + n.type;
+    let c = 'nd ' + (n.type === 'trigger' || n.type === 'branch' ? 'trig ' : '') + n.type;
     if(n.id === selId) c += ' selected';
     if(st && st !== 'empty' && st !== 'draft') c += ' ' + st;
     if(st === 'empty') c += ' empty';
@@ -398,14 +496,17 @@
       const n = nodes[id];
       list.push({ key:id, n });
       portsOf(n).forEach(p => { const cid = n.slots[p.key]; if(cid) walk(cid); });
+      if(n.type === 'branch') n.lanes.forEach(walk);
+      (n.parallel || []).forEach(walk);
     })(rootId);
 
     // 1. inner HTML + class
+    const HTML = { trigger:triggerHTML, ifelse:ifelseHTML, branch:branchHTML, lane:laneHTML };
     list.forEach(item => {
       seen.add(item.key);
       const el = getEl(item.key), n = item.n, st = stateOf(n);
       el.className = nodeClass(n, st);
-      el.innerHTML = n.type === 'trigger' ? triggerHTML(n, st) : n.type === 'ifelse' ? ifelseHTML(n, st) : branchHTML(n, st);
+      el.innerHTML = HTML[n.type](n, st);
     });
     Object.keys(els).forEach(k => { if(!seen.has(k)){ els[k].remove(); delete els[k]; born.delete(k); } });
     relayout();
@@ -423,6 +524,44 @@
       minX = Math.min(minX, x); minY = Math.min(minY, y - 30);   // -30 leaves room for the state badge
       return { h };
     }
+    /* How far a node's subtree reaches to the left / right of its card's centre.
+       A Branch fans its lanes out sideways, so it needs this to know how much
+       room each lane's own subtree (which may fan out again) claims. */
+    const LANE_GAP = 56, LANE_DY = 118, BUS_DY = 52;
+    function ext(key){
+      const n = nodes[key];
+      if(canParallel(n) && kidsOf(n).length === 1 && showPar(n)){
+        /* the slot sits beside the child's CARD; the child's own fan starts lower, so it need not clear that */
+        const e = ext(kidsOf(n)[0]);
+        return { l:Math.max(125, e.l), r:Math.max(e.r, 306 + 125) };
+      }
+      if((n.type === 'trigger' || n.type === 'lane') && !chainFans(n)){
+        const c = n.slots.next, e = c ? ext(c) : { l:125, r:125 };
+        return { l:Math.max(125, e.l), r:Math.max(125, e.r) };
+      }
+      const w = laneWidths(n);                            // branch + if/else: outputs fan out below
+      return { l:Math.max(125, w.total / 2), r:Math.max(125, w.total / 2) };
+    }
+    /* the row of outputs: a Branch's lanes then its dotted "pending" slot; an IF/Else's
+       Is True / Is False (each holding whatever node was added there, or nothing yet) */
+    /* a trigger / branch path fans out only once there is more than one thing to
+       draw: parallel kids, or one kid plus the dashed slot offered while selected */
+    const showPar = n => canParallel(n) && n.slots.next && selId === n.id;
+    function chainFans(n){ return kidsOf(n).length > 1 || !!showPar(n); }
+    function laneItems(n){
+      if(canParallel(n)) return kidsOf(n).map(id => ({ id })).concat(showPar(n) ? [{ par:true }] : []);
+      if(n.type === 'ifelse') return portsOf(n).map(p => ({ id:n.slots[p.key], port:p }));
+      return n.lanes.map(id => ({ id })).concat([{ pending:true }]);
+    }
+    function laneWidths(n){
+      const items = laneItems(n); let cur = 0;
+      const cs = items.map(it => {
+        const e = it.id ? ext(it.id) : { l:125, r:125 };
+        const c = cur + e.l; cur += e.l + e.r + LANE_GAP; return c;
+      });
+      const total = cur - LANE_GAP;
+      return { items, centres:cs, total };
+    }
     function layout(key, x, y){
       /* a node's manual drag offset shifts it AND everything hanging off it,
          because its children are laid out from its own coordinates */
@@ -431,12 +570,70 @@
       const { h } = place(key, x, y);
       const n = nodes[key];
       let bottom = y + h;
-      if(n.type === 'trigger'){
+      if(canParallel(n) && kidsOf(n).length === 1 && showPar(n)){
+        /* one node so far: it stays put, and the dashed slot waits to its right */
+        const mid = x + 125, rowY = y + h + LANE_DY, kid = kidsOf(n)[0];
+        const parCx = mid + 306;
+        bottom = Math.max(bottom, layout(kid, x, rowY));
+        edges.push({ kind:'pfan', from:key, to:kid, cx:mid, y:rowY });
+        edges.push({ kind:'ppar', from:key, cx:parCx, y:rowY });
+        maxX = Math.max(maxX, parCx + 125); maxY = Math.max(maxY, rowY + 44); bottom = Math.max(bottom, rowY + 44);
+        return bottom;
+      }
+      if(canParallel(n) && chainFans(n)){
+        /* parallel nodes: one line splits, the nodes sit side by side under it */
+        const w = laneWidths(n), mid = x + 125, rowY = y + h + LANE_DY;
+        w.items.forEach((it, i) => {
+          const cx = mid - w.total / 2 + w.centres[i];
+          if(it.id){
+            bottom = Math.max(bottom, layout(it.id, cx - 125, rowY));
+            edges.push({ kind:'pfan', from:key, to:it.id, cx, y:rowY });
+          } else {
+            edges.push({ kind:'ppar', from:key, cx, y:rowY });
+            minX = Math.min(minX, cx - 125); maxX = Math.max(maxX, cx + 125);
+            maxY = Math.max(maxY, rowY + 44); bottom = Math.max(bottom, rowY + 44);
+          }
+        });
+        return bottom;
+      }
+      if(n.type === 'trigger' || n.type === 'lane'){
         const c = n.slots.next;
         if(c){
           bottom = layout(c, x, y + h + 64);
           edges.push({ kind:'trig', from:key, to:c });
         }
+        return bottom;
+      }
+      if(n.type === 'branch'){
+        /* lanes fan out below the card, centred on it, side by side */
+        const w = laneWidths(n), mid = x + 125, rowY = y + h + LANE_DY;
+        w.items.forEach((it, i) => {
+          const cx = mid - w.total / 2 + w.centres[i];
+          if(it.pending){
+            edges.push({ kind:'pending', from:key, cx, y:rowY });
+            minX = Math.min(minX, cx - 125); maxX = Math.max(maxX, cx + 125); maxY = Math.max(maxY, rowY + 70);
+            bottom = Math.max(bottom, rowY + 70);
+          } else {
+            bottom = Math.max(bottom, layout(it.id, cx - 125, rowY));
+            edges.push({ kind:'lane', from:key, to:it.id, cx, y:rowY });
+          }
+        });
+        return bottom;
+      }
+      if(n.type === 'ifelse'){
+        /* two outputs fan out below the card: Is True on the left, Is False on the right */
+        const w = laneWidths(n), mid = x + 125, rowY = y + h + LANE_DY;
+        w.items.forEach((it, i) => {
+          const cx = mid - w.total / 2 + w.centres[i];
+          if(it.id){
+            bottom = Math.max(bottom, layout(it.id, cx - 125, rowY));
+            edges.push({ kind:'fan', from:key, to:it.id, port:it.port, cx, y:rowY });
+          } else {
+            edges.push({ kind:'fanplus', from:key, slot:it.port.key, port:it.port, cx, y:rowY });
+            minX = Math.min(minX, cx - 125); maxX = Math.max(maxX, cx + 125); maxY = Math.max(maxY, rowY + 70);
+            bottom = Math.max(bottom, rowY + 70);
+          }
+        });
         return bottom;
       }
       let cursor = y;
@@ -447,8 +644,9 @@
         if(!cid){ edges.push({ kind:'plus', from:key, slot:p.key, port:p, dy }); return; }
         const cy = Math.max(y + dy - 24, cursor);
         /* 240px of clear connector — enough for the port label AND the hover
-           controls to sit side by side without touching */
-        const cb = layout(cid, x + 250 + 240, cy);
+           controls to sit side by side without touching. A child that itself fans
+           out sideways is pushed further right so its left-most lane clears us. */
+        const cb = layout(cid, x + 250 + 240 + Math.max(0, ext(cid).l - 125), cy);
         cursor = cb + 20; bottom = Math.max(bottom, cb);
         edges.push({ kind:'port', from:key, to:cid, port:p, dy });
       });
@@ -468,7 +666,7 @@
     });
 
     // 4. edges + the "+" buttons that open the node popover
-    world.querySelectorAll('.elabel,.t-dot,.t-plus,.edge-hot').forEach(e => e.remove());
+    world.querySelectorAll('.elabel,.t-dot,.t-plus,.edge-hot,.par-slot').forEach(e => e.remove());
     let svg = '';
 
     /* Hover controls on a LIVE connection: insert a step, or drop this step and
@@ -508,20 +706,100 @@
       b.dataset.pid = pid; b.dataset.slot = slot;
       b.innerHTML = img('n-plus');
       b.style.left = x + 'px'; b.style.top = y + 'px';
-      b.addEventListener('click', ev => { ev.stopPropagation(); openNodePicker(pid, slot); });
+      b.addEventListener('click', ev => { ev.stopPropagation(); slot === 'pending' ? openBranchType(pid) : openNodePicker(pid, slot); });
       world.appendChild(b);
       return b;
     }
+    /* Branch → lanes: one trunk down from the card, then a rounded elbow out to
+       each lane. Solid where a lane exists, dotted for the pending slot. */
+    /* `end` adds the arrowhead — only on a line that actually ENTERS a node */
+    function elbow(x0, y0, x1, y1, busY, dashed, end){
+      const r = 12, dx = x1 - x0, s = dx > 0 ? 1 : -1, mk = end ? ' marker-end="url(#wf-arrow)"' : '';
+      let d;
+      if(Math.abs(dx) < 2) d = `M${x0} ${y0} V${y1}`;
+      else if(y1 - y0 < BUS_DY + 34){
+        /* the node was dragged up beside/above its parent: a smooth S-curve keeps the
+           link intact where a square elbow would fold back on itself */
+        const c = Math.max(40, Math.abs(y1 - y0) / 2);
+        d = `M${x0} ${y0} C${x0} ${y0 + c}, ${x1} ${y1 - c}, ${x1} ${y1}`;
+      } else d = `M${x0} ${y0} V${busY - r} Q${x0} ${busY} ${x0 + s * r} ${busY} H${x1 - s * r} Q${x1} ${busY} ${x1} ${busY + r} V${y1}`;
+      return `<path class="edge${dashed ? ' dashed' : ''}" d="${d}"${mk}/>`;
+    }
+    /* where a line should land on a node: centre of its card's top edge, not the
+       top of its wrapper (which starts at the state tag above the card) */
+    const entry = key => {
+      const c = els[key].querySelector('.card');
+      return { x: pos[key].x + 125, y: pos[key].y + (c ? c.offsetTop : 0) };
+    };
     Object.keys(nodes).forEach(id => {
-      const n = nodes[id]; if(n.type !== 'trigger' || !pos[id]) return;
+      const n = nodes[id]; if((n.type !== 'branch' && n.type !== 'ifelse') || !pos[id]) return;
+      const p = pos[id], h = els[id].offsetHeight, mx = p.x + 125, by = p.y + h, busY = by + BUS_DY;
+      const dot = document.createElement('div'); dot.className = 't-dot';
+      dot.style.left = (mx - 5) + 'px'; dot.style.top = (by - 4) + 'px'; world.appendChild(dot);
+      edges.filter(e => ['lane', 'pending', 'fan', 'fanplus'].includes(e.kind) && e.from === id).forEach(e => {
+        const open = e.kind === 'pending' || e.kind === 'fanplus';       // no node at the end of this line yet
+        /* a line that ends in a node follows THAT node wherever it has been dragged */
+        const to = open ? null : entry(e.to);
+        svg += open ? elbow(mx, by + 6, e.cx, e.y + 10, busY, e.kind === 'pending', false)
+                    : elbow(mx, by + 6, to.x, to.y, busY, false, true);
+        if(e.kind === 'fan' || e.kind === 'fanplus'){
+          /* IF/Else: the tag sits on the line; an empty output ends in a solid "+" */
+          const tag = document.createElement('div');
+          tag.className = 'elabel ' + (e.port.cls || '');
+          tag.textContent = e.port.label;
+          tag.style.left = (open ? e.cx : to.x) + 'px'; tag.style.top = (open ? e.y + 14 : Math.max(by + BUS_DY + 18, to.y - 30)) + 'px';
+          world.appendChild(tag);
+          if(e.kind === 'fanplus'){
+            svg += `<path class="edge" d="M${e.cx} ${e.y + 24} V${e.y + 48}"/>`;
+            plusBtn(id, e.slot, e.cx - 10, e.y + 48, e.port.label);
+          }
+          return;
+        }
+        if(e.kind !== 'pending') return;
+        /* the dotted slot: a pill naming what it would become, then the "+" */
+        const lab = document.createElement('div');
+        lab.className = 'elabel'; lab.textContent = 'Branch ' + (ifLanes(n).length + 1);
+        lab.style.left = e.cx + 'px'; lab.style.top = (e.y + 14) + 'px'; world.appendChild(lab);
+        svg += `<path class="edge dashed" d="M${e.cx} ${e.y + 24} V${e.y + 48}"/>`;
+        plusBtn(id, 'pending', e.cx - 10, e.y + 48, 'a new branch');
+      });
+    });
+    Object.keys(nodes).forEach(id => {
+      const n = nodes[id]; if((n.type !== 'trigger' && n.type !== 'lane') || !pos[id]) return;
       const p = pos[id], h = els[id].offsetHeight;
       const cx = p.x + 125, by = p.y + h;
       const dot = document.createElement('div'); dot.className = 't-dot';
       dot.style.left = (cx - 5) + 'px'; dot.style.top = (by - 4) + 'px'; world.appendChild(dot);
+      const fan = edges.filter(e => (e.kind === 'pfan' || e.kind === 'ppar') && e.from === id);
+      if(fan.length){
+        /* the split: one trunk, a "Parallel" tag on it, an elbow to each node */
+        const busY = by + BUS_DY;
+        fan.forEach(e => {
+          if(e.kind === 'pfan'){ const to = entry(e.to); svg += elbow(cx, by + 6, to.x, to.y, busY, false, true); return; }
+          svg += elbow(cx, by + 6, e.cx, e.y, busY, false, false);
+          const slot = document.createElement('button');
+          slot.type = 'button'; slot.className = 'par-slot' + (picking && picking.parentId === id && picking.slot === 'par' ? ' on' : '');
+          slot.dataset.pid = id; slot.dataset.slot = 'par';
+          slot.innerHTML = img('plus-square') + '<span>Add parallel node</span>';
+          slot.style.left = (e.cx - 125) + 'px'; slot.style.top = e.y + 'px';
+          slot.addEventListener('click', ev => { ev.stopPropagation(); openNodePicker(id, 'par'); });
+          world.appendChild(slot);
+        });
+        const tag = document.createElement('div');
+        tag.className = 'elabel par'; tag.textContent = 'Parallel';
+        tag.style.left = cx + 'px'; tag.style.top = (by + 26) + 'px'; world.appendChild(tag);
+        return;
+      }
       if(n.slots.next){
         const kid = n.slots.next, ekey = id + ':next';
-        svg += `<path class="edge" data-ekey="${ekey}" d="M${cx} ${by+6} L${cx} ${pos[kid].y}"/>`;
-        edgeControls(id, 'next', kid, cx, (by + 6 + pos[kid].y) / 2, 'v', ekey);   // vertical line → stacked icons
+        const to = entry(kid), dx = to.x - cx;
+        if(Math.abs(dx) < 2){
+          svg += `<path class="edge" data-ekey="${ekey}" d="M${cx} ${by+6} L${cx} ${to.y}" marker-end="url(#wf-arrow)"/>`;
+        } else {                                       // dragged sideways: keep the link, curve it
+          const c = Math.max(40, Math.abs(to.y - by) / 2);
+          svg += `<path class="edge" data-ekey="${ekey}" d="M${cx} ${by+6} C${cx} ${by+6+c}, ${to.x} ${to.y-c}, ${to.x} ${to.y}" marker-end="url(#wf-arrow)"/>`;
+        }
+        edgeControls(id, 'next', kid, (cx + to.x) / 2, (by + 6 + to.y) / 2, 'v', ekey);   // vertical line → stacked icons
       } else {
         svg += `<path class="edge" d="M${cx} ${by+6} L${cx} ${by+38}"/>`;
         plusBtn(id, 'next', cx - 10, by + 38, '');
@@ -561,7 +839,8 @@
       maxX = Math.max(maxX, px - 76);
     });
     edgesSvg.setAttribute('width', maxX + 200); edgesSvg.setAttribute('height', maxY + 200);
-    edgesSvg.innerHTML = svg;
+    edgesSvg.innerHTML = '<defs><marker id="wf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">'
+      + '<path d="M1 1.5 L9 5 L1 8.5 z" fill="#a5bad0"/></marker></defs>' + svg;
     world.style.width = (maxX + 200) + 'px'; world.style.height = (maxY + 200) + 'px';
     content = { minX, minY, maxX, maxY };      // what "fit to screen" and centring work from
     applyView();
@@ -583,6 +862,33 @@
     t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1800);
   }
 
+  /* A confirmation dialog for anything that destroys work. Cancel is focused, so a
+     stray Enter never deletes; Esc and a click on the backdrop both cancel. */
+  function confirmDialog(o){
+    document.querySelectorAll('.wf-modal-back').forEach(e => e.remove());
+    const back = document.createElement('div');
+    back.className = 'wf-modal-back';
+    back.innerHTML = '<div class="wf-modal" role="alertdialog" aria-modal="true" aria-labelledby="wfModalT">'
+      + '<div class="wf-modal-ico">' + img('n-warning-red') + '</div>'
+      + '<h3 id="wfModalT">' + esc(o.title) + '</h3><p>' + esc(o.body) + '</p>'
+      + '<div class="wf-modal-btns"><button type="button" class="wf-btn" data-r="cancel">Cancel</button>'
+      + '<button type="button" class="wf-btn danger" data-r="ok">' + esc(o.confirmLabel || 'Delete') + '</button></div></div>';
+    document.body.appendChild(back);
+    const close = () => { document.removeEventListener('keydown', onKey, true); back.classList.remove('in'); setTimeout(() => back.remove(), 160); };
+    const onKey = e => { if(e.key === 'Escape'){ e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    back.addEventListener('mousedown', e => { if(e.target === back) close(); });
+    back.querySelector('[data-r=cancel]').addEventListener('click', close);
+    back.querySelector('[data-r=ok]').addEventListener('click', () => { close(); o.onConfirm(); });
+    requestAnimationFrame(() => { back.classList.add('in'); back.querySelector('[data-r=cancel]').focus(); });
+  }
+  /* how many steps hang below a node — what deleting it would take with it */
+  function stepsBelow(id){
+    const n = nodes[id]; let c = 0;
+    Object.values(n.slots).concat(n.parallel || []).forEach(k => { if(nodes[k] && nodes[k].type !== 'lane') c += 1 + stepsBelow(k); else if(nodes[k]) c += stepsBelow(k); });
+    return c;
+  }
+
   function selectNode(id){
     const prev = selId;
     if(prev && prev !== id) markChecked(prev);
@@ -593,6 +899,7 @@
       openTrigger(n);
     }
     else if(n.type === 'ifelse') openIfElse(n);
+    else if(n.type === 'lane') openLane(n);
     else openBranch(n);
     render();
   }
@@ -606,7 +913,7 @@
   /* The anchors are looked up live: the canvas re-renders while a popover is
      open, so a captured element node would go stale after one frame. */
   const nodeAnchor = id => () => els[id];
-  const plusAnchor = (pid, slot) => () => world.querySelector(`.t-plus[data-pid="${pid}"][data-slot="${slot}"]`) || els[pid];
+  const plusAnchor = (pid, slot) => () => world.querySelector(`.t-plus[data-pid="${pid}"][data-slot="${slot}"],.par-slot[data-pid="${pid}"][data-slot="${slot}"]`) || els[pid];
   const insertAnchor = (pid, slot) => () => world.querySelector(`.edge-hot[data-pid="${pid}"][data-slot="${slot}"] .ec[data-a="ins"]`) || els[pid];
 
   function openTriggerPicker(){
@@ -651,15 +958,15 @@
     if(selId) markChecked(selId);
     picking = { parentId, slot };
     render();
-    const btn = world.querySelector(`.t-plus[data-pid="${parentId}"][data-slot="${slot}"]`);
+    const btn = world.querySelector(`.t-plus[data-pid="${parentId}"][data-slot="${slot}"],.par-slot[data-pid="${parentId}"][data-slot="${slot}"]`);
     /* clear room for the menu AND its help bubble on whichever side it opens */
-    const toSide = slot !== 'next';
+    const toSide = false;                              // every connector runs downward now
     if(btn) panIntoView(btn, toSide ? { left:170, right:650, top:150, bottom:210 }
                                     : { left:170, right:170, top:140, bottom:200 });
     const restore = selId;
     const port = allPortsOf(nodes[parentId]).find(p => p.key === slot);
     closeDrawer();                                   // the drawer always steps aside for the picker
-    const rootTitle = insert ? 'Insert a step here'
+    const rootTitle = slot === 'par' ? 'Add a parallel node' : insert ? 'Insert a step here'
       : port && port.label ? 'What happens on “' + port.label + '”' : 'What happens next';
     /* Levels replace each other in place. WFPop.open closes whatever is open
        first, which would otherwise read as "cancelled" and put the drawer back —
@@ -672,7 +979,7 @@
       anchor: insert ? insertAnchor(parentId, slot) : plusAnchor(parentId, slot),
       /* follow the connector: the trigger's line runs down, so the menu drops
          below it; a port's line runs right, so the menu opens off its end */
-      side: slot === 'next' ? 'bottom' : 'right',
+      side: 'bottom',
       title,
       back,
       wide: true,
@@ -696,11 +1003,14 @@
            count as fully configured, and nothing would ever flag as incomplete. */
         if(insert){                                  // push the existing subtree down
           const old = nodes[parentId].slots[slot];
-          node.slots[allPortsOf(node)[0].key] = old;
-          nodes[old].parent = node.id;
+          /* a Branch has no output of its own: the old subtree hangs off Branch 1 */
+          const host = node.type === 'branch' ? nodes[node.lanes[0]] : node;
+          host.slots[portsOf(host)[0].key] = old;
+          nodes[old].parent = host.id;
           nodes[old].source = TYPE_LABEL[node.type];
         }
-        nodes[parentId].slots[slot] = node.id;
+        if(slot === 'par'){ const p = nodes[parentId]; p.parallel = (p.parallel || []).concat(node.id); }   // runs alongside the others
+        else nodes[parentId].slots[slot] = node.id;
         selId = node.id;
         render();
         selectNode(node.id);
@@ -716,6 +1026,48 @@
     openLevel(NODE_CATALOG, rootTitle, null);
   }
 
+
+  /* The dotted "+" at the end of a Branch's row: is the new path another
+     condition (Or if) or the catch-all Default (Or else)? Either way a new lane
+     appears and its drawer opens. The drawer steps aside for the menu first. */
+  function openBranchType(bid){
+    const b = nodes[bid];
+    if(selId) markChecked(selId);
+    picking = { parentId:bid, slot:'pending' };
+    render();
+    const btn = world.querySelector(`.t-plus[data-pid="${bid}"][data-slot="pending"]`);
+    if(btn) panIntoView(btn, { left:170, right:170, top:150, bottom:230 });
+    const restore = selId, hasDefault = !!defaultLane(b);
+    closeDrawer();
+    WFPop.open({
+      anchor: plusAnchor(bid, 'pending'),
+      side: 'bottom', menu: true, noSearch: true, width: 264, title: 'Add branch',
+      items: [
+        { id:'if', label:'Or if', sub:'another condition path' },
+        { id:'else', label:'Or else', sub: hasDefault ? 'already added' : 'runs when nothing else matches', soon: hasDefault },
+      ],
+      onPick(item){
+        if(item.id === 'else' && hasDefault) return true;           // greyed: stays open
+        picking = null;
+        const lane = addLane(b, item.id);
+        selId = lane.id; render(); selectNode(lane.id);
+      },
+      onClose(reason){
+        if(reason === 'pick') return;
+        picking = null; render();
+        if(restore && nodes[restore]) selectNode(restore);           // cancelled → drawer comes back
+      }
+    });
+  }
+
+  /* Glide the canvas so a node sits in the clear part of the view — used when the
+     drawer, not the canvas, moved the selection (rows, prev/next, back arrow). */
+  function focusNode(id){
+    const el = els[id]; if(!el) return;
+    world.classList.add('glide');
+    panIntoView(el, { left:120, right:470, top:140, bottom:150 });
+    setTimeout(() => world.classList.remove('glide'), 450);
+  }
 
   /* The ⋮ menu, shared by a node's card and its drawer header. */
   function openNodeMenu(n, anchor){
@@ -742,13 +1094,14 @@
   /* ---------------------------------------------------------- shared drawer bits */
   /* Names the still-empty required fields, so an error node opens onto a drawer
      that says what to fill rather than just a red outline. */
-  const MISS_LABEL = { type:'Trigger Type', title:'Title', module:'Select Module', attrs:'Select Attribute', source:'Select Source Node', branches:'every branch Name' };
+  const MISS_LABEL = { type:'Trigger Type', title:'Title', module:'Select Module', attrs:'Select Attribute', source:'Select Source Node', conds:'a complete condition (field, operator and value)' };
   function missLabel(n, m){
     if(m.indexOf('sched:') === 0){
       const f = SCHED[n.trigType].fields.find(x => x.k === m.slice(6));
       return f ? f.lab : 'Schedule';
     }
     if(m === 'title' && n.type === 'trigger') return 'Trigger Name';
+    if(m === 'title' && n.type === 'lane') return 'Name';
     return MISS_LABEL[m] || m;
   }
   function renderAlert(host, n){
@@ -764,7 +1117,9 @@
   /* the pill carries its label; the tooltip only matters once it has folded away */
   function gotoLabel(n, pill){
     const p = n.parent ? nodes[n.parent] : null;
-    const label = 'Go to ' + (p ? (p.type === 'trigger' ? 'Trigger' : TYPE_LABEL[p.type]) : 'Trigger') + ' Node';
+    const label = p && p.type === 'lane'
+      ? 'Go to ' + (p.title || 'Branch')                       // a step under a branch goes back to that branch
+      : 'Go to ' + (p ? (p.type === 'trigger' ? 'Trigger' : TYPE_LABEL[p.type]) : 'Trigger') + ' Node';
     pill.querySelector('.pill-text').textContent = label;
     pill.dataset.tip = label;
   }
@@ -786,12 +1141,20 @@
   /* One "Next Node Selection" row per output port: a dashed add-row when the slot
      is free, the child's name when it is taken. */
   function nextRowsHTML(n){
+    if(canParallel(n) && kidsOf(n).length){
+      /* the chain's rows: every node that follows (the first, then its parallel
+         siblings), then the dashed slot to add one more alongside them */
+      const row = (label, body) => `<div class="nns-branch" style="position:relative;width:100%;max-width:none">${label ? `<div class="nns-branch-label">${label}</div>` : ''}${body}</div>`;
+      return kidsOf(n).map((cid, i) =>
+        row(i ? 'Parallel' : '', `<a class="nns-add filled" data-goto="${cid}"><img src="assets/n-trig-blue.svg" alt=""><span>${esc(nodes[cid].title || TYPE_LABEL[nodes[cid].type])}</span></a>`)
+      ).join('') + row('', `<a class="nns-add par" data-slot="par"><img src="assets/plus-square.svg" alt=""><span>Add parallel node</span></a>`);
+    }
     return allPortsOf(n).map(p => {
       const cid = n.slots[p.key];
       const body = cid
         ? `<a class="nns-add filled" data-goto="${cid}"><img src="assets/n-trig-blue.svg" alt=""><span>${esc(nodes[cid].title || TYPE_LABEL[nodes[cid].type])}</span></a>`
         : `<a class="nns-add" data-slot="${p.key}"><img src="assets/plus-square.svg" alt=""><span>${esc(p.label ? 'Select next block · ' + p.label : 'Select next block')}</span></a>`;
-      return `<div class="nns-branch" style="position:static;width:100%;max-width:none">`
+      return `<div class="nns-branch" style="position:relative;width:100%;max-width:none">`
         + (p.label ? `<div class="nns-branch-label">${esc(p.label)}</div>` : '')
         + body + `</div>`;
     }).join('');
@@ -824,6 +1187,7 @@
       const host = e.target.closest('span[data-name="' + key + '"]');
       if(!host) return;
       const n = nodes[selId]; if(!n) return;
+      if(key === 'ln' && n.kind === 'else') return;            // the Default keeps its name
       const input = document.createElement('input');
       input.className = 'cfg-name-input'; input.dataset.name = key;
       input.value = n.title; input.placeholder = 'Add title...';
@@ -845,6 +1209,7 @@
   bindHeadName('tr', '#trTitle');
   bindHeadName('if', '#ifTitle');
   bindHeadName('br', '#brTitle');
+  bindHeadName('ln', '#lnName');
 
   /* ---- Next step: expanded by default, collapsible ---- */
   document.querySelectorAll('[data-nn-toggle]').forEach(btn => {
@@ -949,6 +1314,7 @@
     $('#ifTitleBox').classList.toggle('invalid', n.checked && !n.title.trim());
     setHeadName('if', n);
     $('#ifSourceBox').classList.toggle('invalid', n.checked && !n.source);
+    showCondError('#ifCondErr', n);
     renderAlert($('#ifAlert'), n);
   }
   function openIfElse(n){
@@ -957,6 +1323,7 @@
     setHeadName('if', n);
     gotoLabel(n, $('#ifGoto'));
     fillSource(n, $('#ifSource'), $('#ifSourceBox'));
+    $('#ifCond').innerHTML = groupsHTML(n);
     $('#ifNext').innerHTML = nextRowsHTML(n);
     syncIfValidity(n);
     $('#cfgScroll').scrollTop = 0; $('#cfgHead').classList.remove('collapsed');
@@ -972,9 +1339,8 @@
     const n = nodes[selId]; if(!n) return;
     n.source = e.target.value; syncIfValidity(n); render();
   });
-  $('#ifAddGroup').addEventListener('click', () => {
-    const n = nodes[selId]; n.groups++; $('#ifNext').innerHTML = nextRowsHTML(n); render();
-  });
+  /* the same grouped builder the branches use — one check, exactly two outputs */
+  bindBuilder('#ifCond', '#ifAddGroup', '#ifClearAll', () => { const n = nodes[selId]; if(n && n.type === 'ifelse'){ syncIfValidity(n); render(); } });
   $('#cfgClose').addEventListener('click', deselect);
   $('#ifGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p) selectNode(p); });
   $('#ifDelete').addEventListener('click', () => removeNode(selId));
@@ -982,31 +1348,28 @@
   $('#ifMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#ifMore')));
   bindNext($('#ifNext'));
 
-  /* ------------------ Branch drawer */
-  function brCardHTML(b, i){
-    return `<div class="br-card" data-k="${b.key}">
-      <div class="br-head"><span class="br-name-chip">${esc(b.name || 'Branch ' + (i+1))}</span>
-        <div class="br-tools"><button class="hover-box sm" data-a="copy" aria-label="Duplicate"><img src="assets/repeat.svg" alt=""></button><button class="hover-box sm" data-a="del" aria-label="Delete"><img src="assets/delete.svg" alt=""></button></div></div>
-      <div class="br-body">
-        <div class="field"><div class="field-label">Name <span class="req">*</span></div><div class="input-box"><input data-f="name" type="text" placeholder="Name" value="${esc(b.name)}"></div></div>
-        <div class="field"><div class="field-label">Select Type <span class="req">*</span></div><div class="input-box select"><span class="ph grow" style="opacity:1">Condition</span><img src="assets/chevron-down2.svg" alt=""></div></div>
-        <div class="field"><div class="field-label">Condition summary</div><div class="input-box"><input data-f="cond" type="text" placeholder="e.g. If Category In Networking" value="${esc(b.cond)}"></div></div>
-        <div class="cond-group"><div class="check-if-chip"><span>Check IF</span></div>
-          <div class="cond-card"><div class="cond-card-title">Select Condition <span class="req">*</span></div>
-            <div class="cond-grid"><div class="cond-row"><div class="cell cell-condition"><span class="ph">Select condition</span><img src="assets/chevron-down.svg" alt=""></div><div class="cell cell-operator"><span class="ph">Select operator</span><img src="assets/chevron-down.svg" alt=""></div></div>
-            <div class="cond-row"><div class="cell cell-direct"><img src="assets/chevron-down.svg" alt=""><span class="val">Direct</span></div><div class="cell cell-value"><span class="ph">Select value</span></div></div></div>
-            <button class="add-cond">+ Add Condition</button></div></div>
-      </div></div>`;
-  }
-  function renderBranchList(n){
-    $('#brList').innerHTML = n.branches.map(brCardHTML).join('');
-    $('#brNext').innerHTML = nextRowsHTML(n);
+  /* ------------------ Branch drawer
+     The Branch node's own settings, then the list of its branches. Each row opens
+     that branch's own drawer (openLane); the next steps live THERE, not here. */
+  function laneRowsHTML(b){
+    return b.lanes.map(id => nodes[id]).map(l => {
+      const bad = l.checked && !isComplete(l);
+      const sum = condSummary(l) || 'Set up conditions';
+      const del = ifLanes(b)[0] === l ? '' : `<button class="hover-box sm br-row-del" type="button" data-del="${l.id}" aria-label="Delete ${esc(l.title)}"><img src="assets/delete.svg" alt=""></button>`;
+      return `<div class="br-row${bad ? ' bad' : ''}" data-row="${l.id}">`
+        + `<button class="br-row-main" type="button" data-lane="${l.id}"><span class="br-row-name">${esc(l.title || 'Add name...')}</span>`
+        + `<span class="br-row-sum${condSummary(l) ? '' : ' ph'}">${esc(sum)}</span></button>${del}`
+        + `<span class="br-row-chev">${img('chevron-down')}</span></div>`;
+    }).join('')
+      /* the add button rides the same rail, as the last leaf of the tree */
+      + `<div class="br-row-add"><button class="btn-ghost" type="button" data-add><img src="assets/n-plus.svg" alt="">Add branch</button></div>`;
   }
   function syncBrValidity(n){
     $('#brTitleBox').classList.toggle('invalid', n.checked && !n.title.trim());
     setHeadName('br', n);
     $('#brSourceBox').classList.toggle('invalid', n.checked && !n.source);
     renderAlert($('#brAlert'), n);
+    $('#brRows').innerHTML = laneRowsHTML(n);
   }
   function openBranch(n){
     openDrawer('branch');
@@ -1014,7 +1377,6 @@
     setHeadName('br', n);
     gotoLabel(n, $('#brGoto'));
     fillSource(n, $('#brSource'), $('#brSourceBox'));
-    renderBranchList(n);
     syncBrValidity(n);
     $('#brScroll').scrollTop = 0; $('#brHead').classList.remove('collapsed');
   }
@@ -1027,53 +1389,182 @@
     const n = nodes[selId]; if(!n) return;
     n.source = e.target.value; syncBrValidity(n); render();
   });
-  $('#brAdd').addEventListener('click', () => {
-    const n = nodes[selId]; n.branches.push(newBr('Branch ' + (n.branches.length + 1)));
-    renderBranchList(n); render();
-    const sc = $('#brScroll'); requestAnimationFrame(() => sc.scrollTo({ top:sc.scrollHeight, behavior:'smooth' }));
-  });
-  $('#brList').addEventListener('input', e => {
-    const f = e.target.dataset.f; if(!f) return;
-    const n = nodes[selId], k = e.target.closest('.br-card').dataset.k, b = n.branches.find(x => x.key === k);
-    b[f] = e.target.value;
-    if(f === 'name'){
-      e.target.closest('.br-card').querySelector('.br-name-chip').textContent = b.name || 'Branch';
-      $('#brNext').innerHTML = nextRowsHTML(n);
-      syncBrValidity(n);
-    }
-    render();
-  });
-  $('#brList').addEventListener('click', e => {
-    const btn = e.target.closest('[data-a]'); if(!btn) return;
-    const n = nodes[selId], k = btn.closest('.br-card').dataset.k;
-    const i = n.branches.findIndex(x => x.key === k);
-    if(btn.dataset.a === 'copy'){
-      const c = newBr(n.branches[i].name + ' copy'); c.cond = n.branches[i].cond; n.branches.splice(i+1, 0, c);
-    } else if(n.branches.length > 1){
-      const removed = n.branches.splice(i, 1)[0];
-      const child = n.slots[removed.key];
-      if(child) dropSubtree(child);
-      delete n.slots[removed.key];
-    } else { toast('A branch node needs at least one branch'); return; }
-    renderBranchList(n); render();
+  /* adds an "Or if" branch; the Default (if any) stays last */
+  function addBranchFromDrawer(){
+    const n = nodes[selId], lane = addLane(n, 'if');
+    syncBrValidity(n); render();
+    const row = $('#brRows').querySelector(`[data-row="${lane.id}"]`);
+    if(row){ row.classList.add('fresh'); row.scrollIntoView({ block:'nearest', behavior:'smooth' }); setTimeout(() => row.classList.remove('fresh'), 900); }
+  }
+  $('#brRows').addEventListener('click', e => {
+    if(e.target.closest('[data-add]')){ addBranchFromDrawer(); return; }
+    const del = e.target.closest('[data-del]');
+    if(del){ removeNode(del.dataset.del); return; }
+    const go = e.target.closest('[data-lane]');
+    if(go){ selectNode(go.dataset.lane); focusNode(go.dataset.lane); }
   });
   $('#brClose').addEventListener('click', deselect);
-  $('#brGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p) selectNode(p); });
+  $('#brGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p){ selectNode(p); focusNode(p); } });
   $('#brDelete').addEventListener('click', () => removeNode(selId));
   $('#brReplace').addEventListener('click', () => replaceNode(selId));
   $('#brMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#brMore')));
-  bindNext($('#brNext'));
+
+  /* ------------------ Branch-path (lane) drawer
+     One branch's own configuration: its name and conditions, then what runs next
+     along THIS path. The back arrow returns to the Branch node; prev/next step
+     through the sibling branches without going back first. */
+  const optionsHTML = (list, cur, ph) => `<option value="">${ph}</option>` + list.map(o => `<option${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('');
+  /* One line under the groups when no condition is complete yet: names the first
+     incomplete condition and what it still needs. Nothing is outlined in red. */
+  function condError(n){
+    if(!n.checked || n.groups.some(g => g.conds.some(condDone))) return '';
+    const g = n.groups[0], c = g.conds[0];
+    const need = [!c.field && 'a field', !c.op && 'an operator', !String(c.value).trim() && 'a value'].filter(Boolean);
+    const list = need.length > 1 ? need.slice(0, -1).join(', ') + ' and ' + need[need.length - 1] : need[0];
+    return 'Condition Group 1, Condition 1 needs ' + list + '.';
+  }
+  function showCondError(sel, n){
+    const el = $(sel), msg = condError(n);
+    el.textContent = msg; el.classList.toggle('hidden', !msg);
+  }
+
+  /* The grouped condition builder: "Condition Group n" cards, each holding
+     collapsible conditions joined by an And/Or chip; groups are joined by their
+     own chip. Every join chip is a toggle (the ⟳ flips And ↔ Or). */
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const joinChip = (act, g, c, join) =>
+    `<div class="cg-join"><i></i><button class="join-chip" type="button" data-a="${act}" data-g="${g}" data-c="${c}" data-tip="Switch between And / Or">${cap(join)} ${img('refresh-ccw')}</button><i></i></div>`;
+  function condHTML(n, g, gi, c, ci){
+    return (ci ? joinChip('cjoin', gi, ci, c.join) : '')
+      + `<div class="cg-cond${c.open ? '' : ' closed'}" data-g="${gi}" data-c="${ci}">`
+      + `<div class="cg-cond-head"><button class="cg-toggle" type="button" data-a="ctoggle"><img src="assets/chevron-down.svg" alt="">Condition ${ci + 1}</button>`
+      + (g.conds.length > 1 ? `<button class="cg-x" type="button" data-a="cdel" aria-label="Remove condition"><img src="assets/delete.svg" alt=""></button>` : '')
+      + `</div><div class="cg-cond-body"><div class="cond-grid">`
+      + `<div class="cond-row"><div class="cell cell-condition"><select data-f="field">${optionsHTML(FIELDS, c.field, 'Select condition')}</select><img src="assets/chevron-down.svg" alt=""></div>`
+      + `<div class="cell cell-operator"><select data-f="op">${optionsHTML(OPS, c.op, 'Select operator')}</select><img src="assets/chevron-down.svg" alt=""></div></div>`
+      + `<div class="cond-row"><div class="cell cell-val"><input data-f="value" type="text" placeholder="${c.fx ? 'Expression, e.g. ticket.priority' : 'Select value'}" value="${esc(c.value)}"></div>`
+      + `<button class="fx-btn${c.fx ? ' on' : ''}" type="button" data-a="fx" data-tip="${c.fx ? 'Use a plain value' : 'Use an expression'}">fx</button></div>`
+      + `</div></div></div>`;
+  }
+  function groupsHTML(n){
+    return n.groups.map((g, gi) =>
+      (gi ? joinChip('gjoin', gi, 0, g.join) : '')
+      + `<div class="cg" data-g="${gi}"><div class="cg-head"><span class="cg-chip">Condition Group ${gi + 1}</span>`
+      + `<div class="cg-tools"><button class="hover-box sm" type="button" data-a="gdup" data-tip="Duplicate group" aria-label="Duplicate group"><img src="assets/copy.svg" alt=""></button>`
+      + (n.groups.length > 1 ? `<button class="hover-box sm danger" type="button" data-a="gdel" data-tip="Delete group" aria-label="Delete group"><img src="assets/delete.svg" alt=""></button>` : '')
+      + `</div></div><div class="cg-body">${g.conds.map((c, ci) => condHTML(n, g, gi, c, ci)).join('')}`
+      + `<button class="btn-ghost sm" type="button" data-a="cadd" data-g="${gi}"><img src="assets/n-plus.svg" alt="">Add Condition</button></div></div>`
+    ).join('');
+  }
+  function syncLaneValidity(n){
+    const miss = missingOf(n), show = n.checked;
+    $('#lnNameBox').classList.toggle('invalid', show && miss.includes('title'));
+    showCondError('#lnCondErr', n);
+    setHeadName('ln', n);
+    renderAlert($('#lnAlert'), n);
+    const done = miss.length === 0;
+    $('#lnNextWrap').classList.toggle('hidden', !done);
+    if(done) $('#lnNext').innerHTML = nextRowsHTML(n);
+  }
+  function openLane(n){
+    openDrawer('lane');
+    const b = nodes[n.parent], isElse = n.kind === 'else', idx = b.lanes.indexOf(n.id);
+    gotoLabel(n, $('#lnGoto'));
+    $('#lnName').value = n.title; setHeadName('ln', n);
+    $('#lnIfOnly').classList.toggle('hidden', isElse);
+    $('#lnDesc').textContent = isElse
+      ? 'Runs when none of the branches above match.'
+      : 'Set the conditions that send the workflow down this path.';
+    $('#lnCond').innerHTML = isElse ? '' : groupsHTML(n);
+    $('#lnDelete').classList.toggle('hidden', ifLanes(b)[0] === n);
+    $('#lnPos').textContent = (idx + 1) + ' of ' + b.lanes.length;
+    $('.lane-step').classList.toggle('hidden', b.lanes.length < 2);     // nothing to step through with a single branch
+    $('#lnPrev').disabled = idx <= 0;
+    $('#lnNextBtn').disabled = idx >= b.lanes.length - 1;
+    syncLaneValidity(n);
+    $('#lnScroll').scrollTop = 0; $('#lnHead').classList.remove('collapsed');
+  }
+  const laneEdited = () => { const n = nodes[selId]; if(n && n.type === 'lane'){ syncLaneValidity(n); render(); } };
+  $('#lnName').addEventListener('input', e => {
+    const n = nodes[selId]; if(!n) return;
+    n.title = e.target.value;
+    laneEdited();
+  });
+  /* Wires one grouped builder to its DOM: `edited` runs after every change so the
+     owning drawer can revalidate and repaint the canvas. Used by the branch-path
+     drawer and by IF/Else — one builder, two homes. */
+  const condAt = (n, el) => { const c = el.closest('.cg-cond'); return c ? n.groups[+c.dataset.g].conds[+c.dataset.c] : null; };
+  function bindBuilder(listSel, addSel, clearSel, edited){
+    const list = $(listSel);
+    const redraw = n => { list.innerHTML = groupsHTML(n); edited(); };
+    function onField(e){
+      const f = e.target.dataset.f; if(!f) return;
+      const n = nodes[selId], c = condAt(n, e.target); if(!c) return;
+      c[f] = e.target.value; edited();
+    }
+    list.addEventListener('input', onField);
+    list.addEventListener('change', onField);
+    list.addEventListener('click', e => {
+      const b = e.target.closest('[data-a]'); if(!b) return;
+      const n = nodes[selId], a = b.dataset.a, host = b.closest('.cg-cond');
+      const gi = +(b.dataset.g != null && b.dataset.g !== '' ? b.dataset.g : (host ? host.dataset.g : b.closest('.cg').dataset.g));
+      const ci = host ? +host.dataset.c : +b.dataset.c;
+      const g = n.groups[gi];
+      if(a === 'ctoggle'){ g.conds[ci].open = !g.conds[ci].open; list.innerHTML = groupsHTML(n); return; }   // layout only
+      if(a === 'fx') g.conds[ci].fx = !g.conds[ci].fx;
+      else if(a === 'cjoin') g.conds[ci].join = g.conds[ci].join === 'and' ? 'or' : 'and';
+      else if(a === 'gjoin') g.join = g.join === 'and' ? 'or' : 'and';
+      else if(a === 'cadd') g.conds.push(newCond());
+      else if(a === 'cdel') g.conds.splice(ci, 1);
+      else if(a === 'gdup') n.groups.splice(gi + 1, 0, JSON.parse(JSON.stringify(g)));
+      else if(a === 'gdel'){ if(n.groups.length < 2) return; n.groups.splice(gi, 1); }
+      redraw(n);
+    });
+    $(addSel).addEventListener('click', () => { const n = nodes[selId]; n.groups.push(newGroup()); redraw(n); });
+    $(clearSel).addEventListener('click', () => { const n = nodes[selId]; n.groups = [newGroup()]; redraw(n); });
+  }
+  bindBuilder('#lnCond', '#lnAddGroup', '#lnClearAll', () => laneEdited());
+  function stepLane(d){
+    const n = nodes[selId], b = nodes[n.parent], to = b.lanes[b.lanes.indexOf(n.id) + d];
+    if(to){ selectNode(to); focusNode(to); }
+  }
+  $('#lnPrev').addEventListener('click', () => stepLane(-1));
+  $('#lnNextBtn').addEventListener('click', () => stepLane(1));
+  $('#lnGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p){ selectNode(p); focusNode(p); } });
+  $('#lnClose').addEventListener('click', deselect);
+  $('#lnDelete').addEventListener('click', () => removeNode(selId));
+  bindNext($('#lnNext'));
 
   /* ------------------ node lifecycle */
   function dropSubtree(id){
     const n = nodes[id]; if(!n) return;
     Object.values(n.slots).forEach(dropSubtree);
+    (n.parallel || []).forEach(dropSubtree);
     delete nodes[id];
   }
-  function removeNode(id){
+  function removeNode(id, confirmed){
     const n = nodes[id]; if(!n || !n.parent) return;
     const parent = nodes[n.parent];
+    if(n.type === 'lane'){
+      if(ifLanes(parent)[0] === n){ toast('Branch 1 is required — it cannot be deleted'); return; }
+      /* deleting a branch takes everything built after it — so ask first */
+      if(!confirmed){
+        const k = stepsBelow(id);
+        confirmDialog({
+          title: 'Delete ' + (n.title || 'this branch') + '?',
+          body: k ? 'This branch and the ' + k + ' step' + (k > 1 ? 's' : '') + ' after it will be deleted. You can undo this right after.'
+                  : 'This branch will be deleted. You can undo this right after.',
+          confirmLabel: 'Delete branch',
+          onConfirm: () => removeNode(id, true)
+        });
+        return;
+      }
+      parent.lanes.splice(parent.lanes.indexOf(id), 1);
+    }
     Object.keys(parent.slots).forEach(k => { if(parent.slots[k] === id) delete parent.slots[k]; });
+    if(parent.parallel) parent.parallel = parent.parallel.filter(k => k !== id);
+    /* if the first node went and parallel siblings remain, the next one steps up */
+    if(!parent.slots.next && parent.parallel && parent.parallel.length) parent.slots.next = parent.parallel.shift();
     dropSubtree(id);
     selId = null; selectNode(parent.id);
   }
@@ -1081,8 +1572,9 @@
   function replaceNode(id){
     const n = nodes[id]; if(!n || !n.parent) return;
     const parent = nodes[n.parent];
-    const slot = Object.keys(parent.slots).find(k => parent.slots[k] === id);
+    let slot = Object.keys(parent.slots).find(k => parent.slots[k] === id);
     Object.keys(parent.slots).forEach(k => { if(parent.slots[k] === id) delete parent.slots[k]; });
+    if(parent.parallel && parent.parallel.includes(id)){ parent.parallel = parent.parallel.filter(k => k !== id); slot = 'par'; }
     dropSubtree(id);
     selId = parent.id; render();
     openNodePicker(parent.id, slot);
@@ -1097,7 +1589,7 @@
 
   canvasEl.addEventListener('mousedown', e => {
     if(e.button !== 0) return;
-    if(e.target.closest('.t-plus,.edge-hot,[data-act],.card-bot')) return;   // those have their own jobs
+    if(e.target.closest('.t-plus,.par-slot,.edge-hot,[data-act],.card-bot:not(.ro)')) return;   // those have their own jobs
     /* The hand tool pans, from anywhere — including from on top of a node.
        The select tool only moves nodes: dragging the empty canvas does nothing,
        so the flow is never shifted by accident. */
@@ -1177,7 +1669,7 @@
      a background click, closing the drawer it had just opened. */
   canvasEl.addEventListener('click', e => {
     if(dragged) return;                                  // that was a drag, not a click
-    if(e.target.closest('.t-plus,.card-bot')) return;     // handle themselves
+    if(e.target.closest('.t-plus,.par-slot,.card-bot:not(.ro)')) return;     // handle themselves
     const el = e.target.closest('.nd');
     if(!el){ deselect(); return; }                       // empty canvas → drop the selection
     const n = nodes[el.dataset.key]; if(!n) return;
@@ -1232,6 +1724,7 @@
   bindCollapse($('#cfgScroll'), $('#cfgHead'));
   bindCollapse($('#brScroll'), $('#brHead'));
   bindCollapse($('#trScroll'), $('#trHead'));
+  bindCollapse($('#lnScroll'), $('#lnHead'));
 
   document.querySelectorAll('.switch-tabs').forEach(group => {
     group.querySelectorAll('.switch-tab').forEach(btn => btn.addEventListener('click', () => {
@@ -1322,6 +1815,7 @@
   /* ---------------------------------------------------------- chrome bridge */
   window.WFApp = {
     toast,
+    confirm: confirmDialog,
     setZoom(z){ zoomAt(z, canvasEl.clientWidth / 2, canvasEl.clientHeight / 2); },
     onZoom(cb){ zoomCbs.push(cb); },
     fitScale(){

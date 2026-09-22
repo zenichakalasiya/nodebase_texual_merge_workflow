@@ -321,6 +321,10 @@
             <div class="cfg-head" id="trHead">
               <div class="head-top">
                 <div class="head-left">
+                  <span class="goto-pill start" id="trStart" data-tip="Workflow starts here">
+                    <img src="assets/play.svg" alt="" style="transform:none">
+                    <span class="pill-text">Workflow starts here</span>
+                  </span>
                   <div class="title-inline">
                     <div class="cfg-node-badge" style="background:rgba(61,139,208,.12)"><img src="assets/n-trig-blue.svg" alt="" style="width:14px;height:14px"></div>
                     <span class="cfg-node-name" data-name="tr" title="Click to rename">Trigger</span>
@@ -456,23 +460,16 @@
 
               <div class="cond-builder">
                 <div class="cond-group">
-                  <div class="check-if-chip"><span>Check IF</span></div>
-                  <div class="cond-card">
-                    <div class="cond-card-title">Select Condition <span class="req">*</span></div>
-                    <div class="cond-grid">
-                      <div class="cond-row">
-                        <div class="cell cell-condition"><span class="ph">Select condition</span><img src="assets/chevron-down.svg" alt=""></div>
-                        <div class="cell cell-operator"><span class="ph">Select operator</span><img src="assets/chevron-down.svg" alt=""></div>
-                      </div>
-                      <div class="cond-row">
-                        <div class="cell cell-direct"><img src="assets/chevron-down.svg" alt=""><span class="val">Direct</span></div>
-                        <div class="cell cell-value"><span class="ph">Select value</span></div>
-                      </div>
+
+                  <div class="cg-wrap" id="ifCondCard">
+                    <div id="ifCond" class="cg-list"></div>
+                    <div class="cg-err hidden" id="ifCondErr"></div>
+                    <div class="cg-foot">
+                      <button class="btn-ghost dark" id="ifAddGroup" type="button"><img src="assets/n-plus.svg" alt="">Add Condition Group</button>
+                      <button class="btn-clear" id="ifClearAll" type="button"><img src="assets/close2.svg" alt="">Remove All Condition</button>
                     </div>
-                    <button class="add-cond">+ Add Condition</button>
                   </div>
                 </div>
-                <button class="add-cond-group" id="ifAddGroup">+ Add Condition Group</button>
               </div>
 
               <div class="next-node">
@@ -541,14 +538,85 @@
                   <div class="field-help">The previous step/node whose data you want to use in this node</div>
                 </div>
               </div>
-              <div id="brList" style="display:flex;flex-direction:column;gap:16px;width:100%"></div>
-              <button class="btn-ghost" id="brAdd"><img src="assets/n-plus.svg" alt="">Add Branch</button>
-              <div class="next-node">
+              <div class="br-section">
+                <div class="br-section-head"><h3>Branches</h3><p>Pick a branch to set up its conditions and what runs next</p></div>
+                <div class="br-rows" id="brRows"></div>
+              </div>
+            </div>
+            <div class="autosave"><i></i>All changes are saved automatically</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- --------- Branch path (one branch's own configuration) --------- -->
+      <aside class="sidebar hidden" id="laneCfg">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+            <div class="cfg-head" id="lnHead">
+              <div class="head-top">
+                <div class="head-left">
+                  <button class="goto-pill" id="lnGoto" aria-label="Go to Branch node">
+                    <img src="assets/chevron-down.svg" alt="">
+                    <span class="pill-text">Go to Branch Node</span>
+                  </button>
+                  <div class="title-inline">
+                    <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                    <span class="cfg-node-name" data-name="ln" title="Click to rename">Branch</span>
+                  </div>
+                </div>
+                <div class="head-right">
+                  <div class="cfg-actions">
+                    <!-- step through the sibling branches: ‹ 1 of 3 › -->
+                    <div class="lane-step" role="group" aria-label="Branches">
+                      <button class="ls-btn" id="lnPrev" type="button" data-tip="Previous branch" aria-label="Previous branch"><img src="assets/chevron-down.svg" alt="" style="transform:rotate(90deg)"></button>
+                      <span class="lane-pos" id="lnPos"></span>
+                      <button class="ls-btn" id="lnNextBtn" type="button" data-tip="Next branch" aria-label="Next branch"><img src="assets/chevron-down.svg" alt="" style="transform:rotate(-90deg)"></button>
+                    </div>
+                    <button class="hover-box" data-tip="Documentation" aria-label="Documentation"><img src="assets/book.svg" alt=""></button>
+                    <button class="hover-box" id="lnDelete" data-tip="Delete branch" aria-label="Delete branch"><img src="assets/delete.svg" alt=""></button>
+                  </div>
+                  <button class="hover-box" id="lnClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+              <div class="head-expanded">
+                <div class="cfg-node-title">
+                  <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                  <span class="cfg-node-name" data-name="ln" title="Click to rename">Branch</span>
+                </div>
+                <p class="cfg-desc" id="lnDesc"></p>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+            <div class="cfg-scroll" id="lnScroll">
+              <div class="cfg-alert hidden" id="lnAlert"></div>
+              <div id="lnIfOnly" style="display:flex;flex-direction:column;gap:16px;width:100%">
+                <div class="cfg-form">
+                  <div class="field">
+                    <div class="field-label">Name <span class="req">*</span></div>
+                    <div class="input-box" id="lnNameBox"><input id="lnName" type="text" placeholder="Add name..."></div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Select Type <span class="req">*</span></div>
+                    <div class="input-box select"><span class="ph grow" style="opacity:1">Condition</span><img src="assets/chevron-down2.svg" alt=""></div>
+                  </div>
+                </div>
+                <div class="cond-group">
+                  <div class="cg-wrap" id="lnCondCard">
+                    <div id="lnCond" class="cg-list"></div>
+                    <div class="cg-err hidden" id="lnCondErr"></div>
+                    <div class="cg-foot">
+                      <button class="btn-ghost dark" id="lnAddGroup" type="button"><img src="assets/n-plus.svg" alt="">Add Condition Group</button>
+                      <button class="btn-clear" id="lnClearAll" type="button"><img src="assets/close2.svg" alt="">Remove All Condition</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="next-node hidden" id="lnNextWrap">
                 <button class="next-node-head" type="button" data-nn-toggle>
-                  <span class="nn-text"><h3>Next step</h3><p>Define what happens after this block</p></span>
+                  <span class="nn-text"><h3>Next step</h3><p>Define what happens after this branch</p></span>
                   <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
                 </button>
-                <div class="nn-body" id="brNext"></div>
+                <div class="nn-body" id="lnNext"></div>
               </div>
             </div>
             <div class="autosave"><i></i>All changes are saved automatically</div>

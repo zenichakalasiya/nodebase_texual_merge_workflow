@@ -1,7 +1,7 @@
 /* App chrome — the product frame around the canvas.
 
    · application bar (row 1): panel toggle, logo, Ask AI, quick actions, avatar
-   · page bar (row 2):  Workflows / <name> · state pill · description · version
+   · page bar (row 2):  Workflows / <name> · state pill   (Simple|Node view centred)
                         · Simple|Node view switch          — left
                         Enabled · Save As Draft · Publish · history · ⋮ — right
    · a floating toolbar centred at the bottom of the canvas: guide, shortcuts,
@@ -144,13 +144,11 @@
         + `<span class="crumb-sep">/</span>`
         + `<span class="page-title" id="pageTitle" title="Click to rename">Untitled rule</span>`
         + `<span class="state-pill draft" id="statePill">Draft</span>`
-        + `<button class="cbtn sm" id="descBtn" data-tip="Add description" aria-label="Add description">${svg('lines')}</button>`
-        + `<button class="pill-select" id="verSelect"><span id="verLabel">Working</span>${svg('chevD')}</button>`
-        + `<span class="pagebar-sep"></span>`
-        + `<div class="viewswitch" id="viewSwitch">`
-          + `<button class="vs-btn" type="button" data-view="simple">${svg('simple')}Simple view</button>`
-          + `<button class="vs-btn active" type="button" data-view="node">${svg('nodes')}Node view</button>`
-        + `</div>`
+      + `</div>`
+      /* Simple | Node — centred on the bar, independent of the breadcrumb and actions */
+      + `<div class="viewswitch" id="viewSwitch">`
+        + `<button class="vs-btn" type="button" data-view="simple">${svg('simple')}Simple view</button>`
+        + `<button class="vs-btn active" type="button" data-view="node">${svg('nodes')}Node view</button>`
       + `</div>`
       + `<div class="pagebar-right">`
         + `<div class="enable-row"><span>Enabled</span>`
@@ -322,41 +320,53 @@
 
     /* --- page bar --- */
     let flowName = 'Untitled rule', flowDesc = '';
+
+    /* Click the workflow name → a small card under it with the name and a
+       description. It opens plain; a Save button appears only once something has
+       actually been edited, and nothing reaches the top bar until it is pressed.
+       Closing the card any other way drops the unsaved edits. */
+    let infoCard = null;
+    const closeInfo = () => {
+      if(!infoCard) return;
+      infoCard.remove(); infoCard = null;
+      document.removeEventListener('mousedown', offInfo, true);
+      document.removeEventListener('keydown', escInfo, true);
+    };
+    const offInfo = e => { if(infoCard && !infoCard.contains(e.target) && !$('#pageTitle').contains(e.target)) closeInfo(); };
+    const escInfo = e => { if(e.key === 'Escape'){ e.stopPropagation(); closeInfo(); } };
+    $('#pageTitle').title = 'Edit name and description';
     $('#pageTitle').addEventListener('click', () => {
-      const host = $('#pageTitle');
-      const input = document.createElement('input');
-      input.className = 'page-title-input'; input.id = 'pageTitle'; input.value = flowName;
-      host.replaceWith(input); input.focus(); input.select();
-      const commit = () => {
-        flowName = input.value.trim() || 'Untitled rule';
-        const span = document.createElement('span');
-        span.className = 'page-title'; span.id = 'pageTitle'; span.title = 'Click to rename';
-        span.textContent = flowName;
-        input.replaceWith(span);
-        span.addEventListener('click', () => $('#pageTitle').click());
+      if(infoCard){ closeInfo(); return; }
+      infoCard = document.createElement('div');
+      infoCard.className = 'floatcard flowinfo';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      infoCard.innerHTML = '<label class="fi-label" for="flowNameIn">Workflow name</label>'
+        + '<input class="fi-input" id="flowNameIn" type="text" placeholder="Untitled rule" value="' + esc(flowName) + '">'
+        + '<label class="fi-label" for="flowDescIn">Description</label>'
+        + '<textarea class="fc-area" id="flowDescIn" placeholder="What does this workflow do?">' + esc(flowDesc) + '</textarea>'
+        + '<div class="fi-foot" id="flowFoot" hidden><button type="button" class="btn-blue sm" id="flowSave">Save</button></div>';
+      document.body.appendChild(infoCard);
+      const r = $('#pageTitle').getBoundingClientRect();
+      infoCard.style.left = Math.round(Math.max(12, Math.min(r.left - 8, window.innerWidth - infoCard.offsetWidth - 12))) + 'px';
+      infoCard.style.top = Math.round(r.bottom + 10) + 'px';
+      const nameIn = $('#flowNameIn'), descIn = $('#flowDescIn'), foot = $('#flowFoot');
+      const startName = nameIn.value, startDesc = descIn.value;
+      const dirty = () => { foot.hidden = nameIn.value === startName && descIn.value === startDesc; };
+      const save = () => {
+        flowName = nameIn.value.trim() || 'Untitled rule'; flowDesc = descIn.value;
+        $('#pageTitle').textContent = flowName;
         document.title = flowName + ' — Workflow';
+        closeInfo(); toast('Workflow details saved');
       };
-      input.addEventListener('blur', commit);
-      input.addEventListener('keydown', ev => { if(ev.key === 'Enter' || ev.key === 'Escape') input.blur(); });
+      nameIn.addEventListener('input', dirty);
+      descIn.addEventListener('input', dirty);
+      nameIn.addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); descIn.focus(); } });
+      $('#flowSave').addEventListener('click', save);
+      nameIn.focus(); nameIn.select();
+      document.addEventListener('mousedown', offInfo, true);
+      document.addEventListener('keydown', escInfo, true);
     });
     $('#crumbRoot').addEventListener('click', () => toast('Workflow list is not part of this prototype'));
-
-    $('#descBtn').addEventListener('click', () => {
-      floatCard($('#descBtn'),
-        `<div class="fc-title">Description</div>`
-        + `<textarea class="fc-area" id="flowDesc" placeholder="What does this workflow do?">${flowDesc.replace(/</g,'&lt;')}</textarea>`);
-      const area = $('#flowDesc');
-      if(area){ area.focus(); area.addEventListener('input', e => { flowDesc = e.target.value; }); }
-    });
-
-    $('#verSelect').addEventListener('click', () => {
-      WFPop.open({
-        anchor: $('#verSelect'), noSearch:true, menu:true, width:190, align:'start',
-        selected: $('#verLabel').textContent,
-        items: [{ id:'Working', label:'Working' }, { id:'Published', label:'Published' }],
-        onPick(i){ $('#verLabel').textContent = i.id; toast('Showing the ' + i.id.toLowerCase() + ' version'); }
-      });
-    });
 
     $('#viewSwitch').addEventListener('click', e => {
       const b = e.target.closest('[data-view]'); if(!b || b.classList.contains('active')) return;
@@ -402,7 +412,11 @@
         ],
         onPick(i){
           if(i.id === 'dup'){ toast('Workflow duplicated'); return; }
-          app.resetFlow(); toast('Workflow deleted — undo to bring it back');
+          app.confirm({
+            title: 'Delete this workflow?', confirmLabel: 'Delete workflow',
+            body: 'Every step will be removed, including the trigger and all its settings. You can undo this right after.',
+            onConfirm(){ app.resetFlow(); syncHistory(); toast('Workflow deleted — undo to bring it back'); }
+          });
         }
       });
     });
@@ -477,7 +491,11 @@
     };
     $('#doUndo').addEventListener('click', () => { app.undo(); syncHistory(); });
     $('#doRedo').addEventListener('click', () => { app.redo(); syncHistory(); });
-    $('#doReset').addEventListener('click', () => { app.resetFlow(); syncHistory(); toast('Workflow reset — undo to bring it back'); });
+    $('#doReset').addEventListener('click', () => app.confirm({
+      title: 'Reset the whole workflow?', confirmLabel: 'Reset workflow',
+      body: 'Every step will be removed, including the trigger and all its settings. You can undo this right after.',
+      onConfirm(){ app.resetFlow(); syncHistory(); toast('Workflow reset — undo to bring it back'); }
+    }));
     app.onHistory(syncHistory);
     syncHistory();
 
