@@ -1,136 +1,178 @@
-# Handoff — 2026-09-22 11:50
+# Handoff — 2026-09-23 12:18
 
 ## Read first
 
-`CLAUDE.md` — the **"Key context"** section, all of it; a large chunk was
-rewritten this session (Branch/IF-Else redesign, parallel nodes, connector
-dragging, confirm dialogs, condition-error display, top bar). `BRANCHING-DEBATE.md`
-is now historical — its open questions were answered by explicit direction
-rather than by the two-agent research it recorded; skim it for context only.
+`CLAUDE.md`'s **"Key context"** section — almost all of it was rewritten this
+session. In particular: the node-type list (IF/Else is gone, replaced by
+Condition), the bottom-toolbar description (now two cards, not one merged
+one), the popover's theme (light, not dark — a same-session round trip), and
+the new "Sticky notes anchor to their nearest node" and "keyboard shortcuts are
+real" bullets.
 
 ## What we worked on this session
 
-Reshaped Branch and IF/Else to match the textual builder's reference screens
-(lanes/paths fan out from a Trigger-style card, no node-picker inside the card
-itself), added parallel nodes, a real grouped condition builder, then a long run
-of bug fixes and polish: connectors following dragged nodes, arrowheads, confirm
-dialogs before destructive deletes, a quiet one-line condition error instead of
-red field outlines, a cleaned-up top bar, and a workflow name/description popup
-with explicit Save.
+A long run of UI-polish requests, mostly on the picker popover, the bottom
+toolbar, and small UX problems the user asked to be *designed*, not just
+built — direction icon legibility, then a full rethink of that same control,
+then how sticky notes should behave when the layout direction flips.
 
 ## Completed
 
-- **Branch redesign** — `branch` node now holds `lanes: []`; each lane is its
-  own `lane` node (`kind:'if'|'else'`) with its own `groups`/drawer/Next-step.
-  Branch card is Trigger-style (tag/icon/title/description), no branches drawn
-  inside it. Lines fan **downward**: solid to each real lane, dotted "pending"
-  slot at the end whose `+` opens **Add branch: Or if / Or else**
-  (`openBranchType()`). Branch 1 (first `if` lane) can't be deleted.
-- **IF/Else redesign** — same Trigger-style card; exactly two fixed outputs
-  (Is True / Is False, no more Else-IF), same downward fan, condition read back
-  into the card's description.
-- **Grouped condition builder** — `groupsHTML()` / `bindBuilder()`, shared by
-  the branch-path drawer (`#lnCond`) and IF/Else (`#ifCond`): Condition Group
-  N cards, collapsible conditions, And/Or join chips (`cjoin`/`gjoin`), `fx`
-  expression toggle, Add Condition / Add Condition Group / Remove All
-  Condition. Matches the reference screenshots.
-- **Branch-path drawer** — name, conditions, Next step, back arrow to the
-  parent Branch, and a `‹ 1 of N ›` stepper in the header (hidden when N < 2,
-  per explicit request) to move between sibling branches.
-- **Parallel nodes** — Trigger and branch-path `next` outputs only. A dashed
-  "Add parallel node" slot (canvas + drawer Next-step block) adds a sibling
-  that runs alongside the first; 2+ fan out under a "Parallel" tag, same visual
-  language as a branch fan.
-- **Periodic trigger** — card shows a computed **Next execution time**
-  (`nextRun()`), pill reads "Periodic workflow". All node pills (Trigger,
-  Periodic workflow, IF/Else, Branch) lost their icon — text only, per request.
-- **Connector-follow-drag bug, fixed** — every line is now drawn to the child's
-  live position (`entry()`), not its original layout slot, so dragging a node
-  keeps its connector (and everything under it) attached. A node dragged above
-  its parent gets a smooth S-curve instead of a folded elbow.
-- **Arrowheads** — every connector that lands on a node ends in one
-  (`marker-end="url(#wf-arrow)"`, defined once in the SVG `<defs>`); lines that
-  end in a "+" don't get one.
-- **Tree-rail visuals** — the Branches list in the main Branch drawer and every
-  drawer's Next-step block now share one continuous-rail tree look
-  (`.br-rows`/`.nn-body`), replacing the earlier boxed rows.
-- **Confirm dialogs before destructive deletes** — `confirmDialog()` +
-  `.wf-modal-*`: deleting a branch (names the step count it would take with
-  it), Reset (bottom bar), and header ⋮ → Delete workflow all ask first.
-  Cancel/Esc/outside-click decline; undo still restores after confirming.
-- **Condition-error display fixed** — no more stale/incorrect red field
-  outlines. One line under the condition groups (`condError()`/`.cg-err`)
-  names the first incomplete condition and what it's missing; it updates live
-  as you type and clears the moment the condition is complete.
-- **Top bar cleanup** — removed the description icon and the Working/Published
-  version dropdown; Simple/Node view is now centred on the bar independent of
-  the breadcrumb.
-- **Workflow name/description popup** — clicking the workflow name opens a
-  card with Name + Description fields. Opens plain; a **Save** button appears
-  only once something has been edited (compared against the values when it
-  opened), and nothing reaches the top bar or tab title until Save is pressed.
-  Any other close (Esc/outside-click/re-click) discards the edit.
+- **Inline Condition reverted to one node** (from an earlier two-node
+  Condition+IF structure) — `cond` type, one drawer with Title/Source/
+  Condition Groups/Next step. "Next step" now shows by default in every
+  drawer that has one (Trigger, Branch path, Condition), not gated behind
+  completion.
+- **Popover dark reskin, then reverted back to light** — read the textual
+  builder's dark theme in full, rebuilt `workflow-popover.css` to match it
+  pixel-for-pixel, then on explicit direction reverted to this app's own
+  light palette (pulled from git history, not reinvented) since every other
+  panel here is light. Only the popover's *content/interaction* model
+  (search, drill-down, checkmark row, help bubble) carries over from the
+  reference now, never its colours.
+- **Branch fan-out connector bug, found and fixed.** The dashed "pending"
+  connector to the next branch slot looked like a plain straight line instead
+  of a proper rounded elbow matching its solid siblings. Root cause: the lane
+  row was centred on the Branch card's top-left corner instead of its true
+  centre (`cross = myCross - w.total/2 + ...` should have been
+  `(myCross + cHalf(key)) - w.total/2 + ...`). Fixed in both places this
+  formula appears (`workflow-app.js`'s branch fan-out and the general
+  parallel-node fan-out) — now symmetric, confirmed via exact path-geometry
+  comparison, not just eyeballing.
+- **Branch "‹ N of M ›" stepper is now also a quick-jump.** Clicking the
+  readout opens a popover listing every sibling branch with its live
+  condition summary and a checkmark on the current one — not just Prev/Next.
+- **"What happens next" and the Trigger popup fully restructured** to match
+  the textual builder's reference content: Quick chips (Notify/Create/
+  Update), Required→Add action (a new generic Record-management/Communicate
+  submenu, replacing the old per-module catalog), Flow control→Add condition
+  (Inline/Branching) + Merge paths, Timing & data→Add wait + Loop. Trigger
+  popup lost its Event/Periodic tabs in favour of one flat list, with "Time
+  based" itself collapsed to Once + a "Every time period" drill-down to
+  Hourly/Daily/Weekly/Monthly, plus a "Generate with AI" footer row.
+- **Direction control redesigned twice, on explicit user critique each time.**
+  Started as a single icon that rotated — user said it wasn't legible.
+  Rebuilt as a dropdown (Zoom-presets-style menu) after a round of UX options
+  presented via AskUserQuestion — user picked that, it got built and
+  verified... then the user asked for a *different* pattern instead: a
+  permanent two-button segmented switch using a specific fork/split icon they
+  reference-imaged. Final state: `forkV`/`forkH` icons, always both visible,
+  active one lit like the Note tool. The dropdown-era `layoutV.svg`/
+  `layoutH.svg` assets were deleted once superseded — don't recreate them.
+- **Minimap split into its own card**, pinned bottom-left, separate from the
+  main toolbar. Two distinct gestures built and verified: click-to-ease-pan
+  (animated) vs drag-the-rectangle-to-pan (live, clamped, no animation).
+- **Sticky notes now anchor to their nearest node** (`nearestNode()` /
+  `anchorSticky()` in `workflow-app.js`), fixing a real problem: notes used
+  to be pure absolute `{x,y}`, completely independent of the node layout, so
+  they'd separate from whatever they were annotating on *any* node move —
+  not just a direction switch, a plain drag did it too. Presented 4 solution
+  options via AskUserQuestion (anchor-to-node / warn-first / tidy-button /
+  geometric-transpose); user picked anchor-to-node. Verified: offset survives
+  a direction switch, survives a manual node drag, a genuinely far note
+  (>400px) stays put, dragging a note re-anchors it, deleting an anchored
+  node clears the anchor without crashing.
+- **Hand/Select toolbar buttons removed.** Since the canvas previously *only*
+  panned in Hand mode, removing the button without a replacement would have
+  removed the ability to pan by drag at all — instead, panning was merged
+  into the default behaviour (empty-canvas drag always pans, a node/note
+  under the cursor always drags itself), the same convention Figma/FigJam use
+  for their default tool. Wheel-scroll pan and the minimap are unaffected and
+  remain as alternatives. Dead `.tool-pan` CSS and the unused `hand`/`cursor`
+  icon defs were removed too.
+- **Bottom toolbar restructured twice this session**: first merged from four
+  separate floating pills into one card with dividers, then split again into
+  two cards (a bottom-left "view" card for zoom/fit/minimap, and the
+  original centred card for guide/shortcuts/note/direction/history) — the
+  direction switch ended up in the centre card, moved out of the view card,
+  per explicit request ("it's a workflow setting, not a view control"). The
+  divider between Note and Guide/Shortcuts was removed so those three read
+  as one group.
+- **Guide card replaced wholesale** with a "Node reference" list (icon-tile
+  rows grouped Start/Steps/Flow, matching a reference image) — old numbered
+  how-to text is gone.
+- **Shortcuts card rebuilt with real shortcuts**, not a copy-paste of a
+  reference list that assumed a different interaction model. Two *new*
+  shortcuts were actually implemented to back the list, not just described:
+  `Shift+R` (reset, via the existing confirm dialog) and `Delete`/`Backspace`
+  (remove the selected node, via `WFApp.deleteSelected()` → `removeNode()`,
+  inheriting its confirm-before-deleting-a-branch-with-steps guard). Verified
+  the Delete/Backspace guard doesn't fire while a picker is open (Backspace
+  already means "go back a level" there) or while any text field has focus.
+- **Tooltips upgraded to show shortcuts as key badges** (`tipKeys()` helper,
+  `<kbd>` markup, new `.wf-tip kbd` CSS) instead of plain "Label  Ctrl+Z"
+  text — matches a reference screenshot of the desired look. Applied only to
+  buttons with a real shortcut (Undo/Redo/Reset/Shortcuts); buttons with no
+  real shortcut keep a plain-text tooltip.
 
 ## In progress
 
-Nothing mid-flight; the build is consistent (checked in-browser after every
-change this session, no console errors in any of the runs).
-
-**Open question the teammate hasn't answered yet:** deleting a *non-branch*
-node (an IF/Else, or via the connector's insert/delete hover control) still
-removes everything after it with **no** confirmation — only branch deletes and
-the two resets got the dialog. Worth asking whether that should get the same
-treatment.
+Nothing mid-flight — every item above was implemented and verified live via
+Playwright (computed styles/geometry, console-error-free) before moving to
+the next.
 
 ## Next steps
 
-1. Decide whether non-branch node deletion (IF/Else delete icon, connector
-   hover-delete) should get the same confirm dialog as branches/reset.
-2. Trigger drawer still doesn't match the design screenshots' shape (see
-   `CLAUDE.md` → "Trigger drawer vs the design screenshots") — only the
-   periodic card's Next-execution-time and pill wording were pulled from those
-   screenshots so far, not the drawer layout itself.
-3. Field/operator/value lists in the condition builder (`FIELDS`, `OPS` in
-   `workflow-app.js`) are still placeholders — swap for the real per-module
-   lists when available.
-4. Consider whether a half-filled *second* condition/group (beyond Condition 1
-   of Group 1) should also surface in the one-line error, or stay silent as now.
-5. Fill in real second-level picker content for the still-placeholder module
-   rows (carried over from before this session).
+- No specific next task was requested. If picking this up cold: skim the
+  "Key context" bullets in CLAUDE.md above the Deployment section, they're
+  current as of this handoff.
+- The Trigger drawer vs. design-screenshot gap (Event/Periodic switch living
+  *inside* the drawer, Schedule Type/Frequency/Day-chips/Month/Start-At) is
+  still open — noted in CLAUDE.md, untouched this session.
+- If more of the reference site's content gets handed over for other node
+  types (Action, Wait, Loop), the same pattern used for Condition/Branch this
+  session — read the reference, adapt to what's real, verify with
+  Playwright — is the one to keep following.
 
 ## Decisions made
 
-- **Branch/IF-Else UX comes from the reference screens, not from first
-  principles.** Every shape decision (downward fan, dotted pending slot, Or
-  if/Or else popup, lane stepper position, parallel-node placeholder) was
-  confirmed against a screenshot or an explicit multiple-choice answer before
-  building — see the `AskUserQuestion` rounds in this session's transcript if a
-  "why this and not that" ever needs re-deriving.
-- **Confirm dialogs only where deletion is irreversible-feeling** (takes other
-  work with it, or wipes the whole flow) — not on every delete icon. Deliberately
-  narrower than "confirm everything".
-- **No per-field red outlines, ever, for conditions.** One quiet summary line
-  instead — explicit correction after the red-border-goes-stale bug.
-- **The workflow name/description popup is the one exception to "no Save
-  button anywhere"** — explicit request, kept narrowly scoped to that one popup.
+- **Inline Condition is one node, not two** — reverted an earlier two-node
+  design on direct user correction.
+- **Popover content from the reference, but this app's own light theme** —
+  not the reference's dark palette. A full dark pass was built, screenshotted,
+  and then explicitly reverted; don't redo it without being asked again.
+- **Direction control is a permanent two-button segmented switch**, not a
+  dropdown and not a single swapping icon — both earlier designs were
+  rejected in turn, this is the third and (so far) final one.
+- **Sticky notes anchor to their nearest node** rather than staying at an
+  absolute position, warning before a move, or being geometrically
+  transposed — chosen from 4 presented options.
+- **Panning has no separate mode any more** — merged into the default drag
+  behaviour once the Hand/Select toggle was asked to be removed, rather than
+  leaving panning-by-drag with no way to reach it.
+- **New keyboard shortcuts were implemented, not just documented** — when
+  asked to "show" a shortcuts list, rows that could be truthfully backed by
+  real behaviour got built (Shift+R, Delete); rows that only made sense in a
+  different (linear, textual-builder) interaction model were left out rather
+  than displayed as if they worked.
 
 ## Gotchas & notes
 
-- **Shell quoting broke a couple of inline JS-in-bash edits mid-session**
-  (nested backticks/template literals inside a `bash -c` heredoc). The fix each
-  time was to write the replacement as its own `.js` script file in the
-  scratchpad and run it with `node`, rather than trying to inline it — do that
-  from the start for any edit with template literals or nested quotes.
-- **`showPar`/`chainFans` (parallel-node layout) key off `selId`** — the dashed
-  "add parallel" slot only renders for the currently-selected node, so a
-  layout check right after a programmatic `selectNode()` needs a tick/`render()`
-  to settle before asserting on it.
-- **`.nns-branch` rows needed `position:relative` for the new tree rail**, which
-  fought a leftover `left:56px` from the old lane-tree layout — both are now
-  overridden with `!important` in `workflow-nodes.css`; if that rail ever looks
-  offset again, check for a third layer setting `left`/`top` on `.nns-branch`.
-- **Playwright text-selectors matching twice** is a recurring trap in this repo
-  (a popover's help bubble repeats the row title) — scope to `.wfpop-label`
-  rather than a bare `text=`.
-- **`.playwright-mcp/` keeps accumulating screenshots** from ad hoc verification
-  runs; it's gitignored, safe to delete anytime, not part of the app.
+- **A stale server on :8777 can silently serve an unrelated old project.**
+  Happened once this session — `curl`'d :8777, got HTTP 200, but the page
+  title was wrong ("Node Selection Sidebar" instead of "Workflow — Node
+  Canvas + Picker Popover"). Always check the title/content after confirming
+  the port responds, not just the status code; `taskkill` the stale PID and
+  restart `node server.js` if so.
+- **WFPop's icon system needs real files in `assets/`**, not inline SVG path
+  strings — `workflow-chrome.js` has its own separate inline stroke-icon set
+  (the `P` object + `svg()` helper) used for toolbar buttons directly, but any
+  icon referenced from a WFPop `items` array (`icon:'foo'`) resolves to
+  `assets/foo.svg` and 404s if that file doesn't exist. Hit this once when
+  the direction-dropdown's menu rows referenced chrome.js-only icon keys;
+  fixed by writing real `assets/*.svg` files. (Those specific files were
+  later deleted again once the dropdown itself was replaced by the segmented
+  switch — the lesson, not the files, is what's worth keeping.)
+- **Backspace is already claimed by WFPop** (navigates up a drill-down level
+  when search is empty) — any new global Backspace binding must check
+  `WFPop.isOpen()` first or it double-fires (WFPop's `preventDefault()`
+  doesn't stop other listeners, only `stopPropagation()` would).
+- **`ext()`/`laneWidths()`'s row-centring formula is easy to get subtly
+  wrong**: `myCross` passed into `layout()` is a node's top-left anchor, not
+  its centre — any new fan-out code that centres a row of siblings under a
+  parent card needs `myCross + cHalf(key)`, not bare `myCross`. The
+  already-correct reference for this is the "one kid + parallel slot" case
+  in `layout()`, which had it right all along; the branch-fan and general
+  parallel-fan blocks didn't, until this session.
+- Nothing was committed or pushed before this handoff — `/tatago` is about to
+  do that next.

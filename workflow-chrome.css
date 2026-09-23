@@ -229,18 +229,23 @@
 .edge-handle:hover{color:var(--primary);background:var(--chrome-hover);}
 .edge-handle svg{width:15px;height:15px;display:block;}
 
-/* ---------------- floating toolbar, centred on the canvas ---------------- */
+/* ---------------- floating toolbars ----------------
+   Two cards, each one boundary — a group's siblings are told apart by a
+   divider only, never by being separate floating pills. */
 .bottombar{
   position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:140;
-  display:flex;align-items:center;gap:8px;
+  display:flex;align-items:center;gap:2px;height:44px;padding:0 8px;
+  background:var(--white);border:1px solid var(--chrome-border);border-radius:12px;box-shadow:var(--shadow-card);
   transition:left .3s var(--ease);
 }
 /* the config drawer takes 400px off the right, so re-centre over what is left */
 body.dock-open .bottombar{left:calc(50% - 206px);}
-.bbar{
-  display:flex;align-items:center;gap:2px;height:44px;padding:0 8px;
-  background:var(--white);border:1px solid var(--chrome-border);border-radius:12px;box-shadow:var(--shadow-card);
-}
+/* the view card (zoom/fit/direction + the minimap above it) sits apart, in
+   the bottom-left corner — it doesn't share the centred bar's re-centring,
+   since a right-hand drawer never encroaches on the left edge */
+.bottombar.viewbar{left:18px;transform:none;}
+body.dock-open .bottombar.viewbar{left:18px;}
+.bbar{display:flex;align-items:center;gap:2px;}
 .bbar .cbtn{width:30px;height:30px;border-radius:7px;color:var(--page-text);}
 .bbar .cbtn svg{width:16px;height:16px;}
 .bbar .cbtn:disabled{opacity:.32;cursor:default;}
@@ -254,21 +259,49 @@ body.dock-open .bottombar{left:calc(50% - 206px);}
 }
 .bbar-text:hover{background:var(--chrome-hover);}
 .bbar-text svg{width:16px;height:16px;display:block;}
-/* zoom block: one pill that opens the zoom menu */
-.zoom-pill{
-  display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 6px 0 8px;
+/* view group: − / % / + / fit / direction — a single row, the percentage a
+   plain clickable label (still opens the preset menu), no chevron */
+.view-bbar{position:relative;}                         /* anchors the minimap above it */
+.zoom-label{
+  display:inline-flex;align-items:center;justify-content:center;height:30px;min-width:44px;padding:0 4px;
   border:none;border-radius:7px;background:none;cursor:pointer;
   font-family:inherit;font-size:12.5px;font-weight:500;color:var(--page-text);
   transition:background .15s;
 }
-.zoom-pill:hover{background:var(--chrome-hover);}
-.zoom-pill svg{width:16px;height:16px;display:block;}
-.zoom-pill #zoomLevel{min-width:38px;text-align:center;}
-.zoom-pill .zp-chev{width:13px;height:13px;color:var(--gray-label);}
+.zoom-label:hover{background:var(--chrome-hover);}
 
-/* hand / select tools */
+/* direction switch — two fork icons (the same split glyph this app already
+   uses elsewhere), always both visible; the active one lights up the same
+   way the Note tool's own button does when it's active, right next to it —
+   one convention for every "which mode is this" control. */
+.dir-switch{display:flex;align-items:center;gap:2px;}
+.dir-opt{
+  width:30px;height:30px;border:none;background:none;border-radius:7px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;padding:0;
+  color:var(--page-text);transition:background .15s,color .15s;
+}
+.dir-opt svg{width:16px;height:16px;display:block;}
+.dir-opt:hover{background:var(--chrome-hover);}
+.dir-opt.active{background:rgba(61,139,208,.14);color:var(--primary);}
+.dir-opt.active:hover{background:rgba(61,139,208,.2);}
+
+/* hand / select / note tools */
 .cbtn.tool.active{background:rgba(61,139,208,.14);color:var(--primary);}
 .cbtn.tool.active:hover{background:rgba(61,139,208,.2);}
+
+/* ---- minimap: floats above the view group, only while it's needed ---- */
+.minimap{
+  position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);
+  width:120px;height:78px;padding:0;cursor:pointer;
+  background:var(--white);border:1px solid var(--chrome-border);border-radius:10px;
+  box-shadow:var(--shadow-card);overflow:hidden;
+  animation:mmIn .16s var(--ease);
+}
+@keyframes mmIn{from{opacity:0;transform:translateX(-50%) translateY(4px);}to{opacity:1;transform:translateX(-50%);}}
+.minimap svg{display:block;width:100%;height:100%;}
+.minimap .mm-view{fill:rgba(61,139,208,.12);stroke:var(--primary);stroke-width:1.4;cursor:grab;}
+.minimap.dragging{cursor:grabbing;}
+.minimap.dragging .mm-view{cursor:grabbing;}
 
 /* ---------------- tooltips ----------------
    One fixed element on <body> rather than a pseudo-element per button: a
@@ -285,15 +318,30 @@ body.dock-open .bottombar{left:calc(50% - 206px);}
 .wf-tip::after{content:"";position:absolute;left:50%;transform:translateX(-50%);border:5px solid transparent;}
 .wf-tip:not(.below)::after{top:100%;border-top-color:var(--neutral-darker);}
 .wf-tip.below::after{bottom:100%;border-bottom-color:var(--neutral-darker);}
+/* a shortcut riding along in the same tooltip — its own small badge(s)
+   rather than plain text, so it reads as a key, not a description */
+.wf-tip kbd{
+  display:inline-block;margin-left:5px;padding:1px 5px;font-family:inherit;font-size:9.5px;font-weight:500;
+  background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);border-radius:4px;vertical-align:1px;
+}
+.wf-tip kbd + kbd{margin-left:3px;}
 
 /* ---------------- guide / shortcuts / description card ---------------- */
 .floatcard{
-  position:fixed;z-index:190;width:290px;padding:14px;
+  position:fixed;z-index:190;width:320px;padding:14px;
   background:var(--white);border:1px solid var(--border);border-radius:12px;
   box-shadow:var(--shadow-flyout),0 12px 34px -14px rgba(54,70,88,.4);
   animation:wfpopIn .14s var(--ease);
 }
-.fc-title{font-size:12.5px;font-weight:500;color:var(--ink);margin-bottom:10px;}
+.fc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.fc-title{font-size:12.5px;font-weight:500;color:var(--ink);}
+.fc-close{
+  width:20px;height:20px;flex-shrink:0;border:none;background:none;border-radius:5px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:var(--gray-label);
+  transition:background .15s,color .15s;
+}
+.fc-close:hover{background:var(--chrome-hover);color:var(--page-text);}
+.fc-close svg{width:13px;height:13px;display:block;}
 .fc-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;}
 .fc-list li{font-size:11.5px;line-height:1.45;color:var(--gray-label);}
 .fc-list b{font-weight:500;color:var(--page-text);}
@@ -304,6 +352,36 @@ body.dock-open .bottombar{left:calc(50% - 206px);}
   display:inline-block;font-family:'Inter',monospace;font-size:10.5px;color:var(--page-text);
   background:var(--chrome-hover);border:1px solid var(--chrome-border);border-radius:5px;padding:2px 6px;white-space:nowrap;
 }
+.fc-keys kbd + kbd{margin-left:4px;}
+
+/* node reference — one tinted-icon row per node concept, grouped exactly
+   like the node picker groups its own catalogue */
+.fc-noderef{display:flex;flex-direction:column;gap:1px;margin:0 -4px;}
+.fc-nr-group{
+  font-size:10px;font-weight:500;color:var(--light-gray-text);text-transform:uppercase;letter-spacing:.03em;
+  padding:10px 4px 3px;
+}
+.fc-nr-group:first-child{padding-top:0;}
+.fc-nr-row{display:flex;align-items:center;gap:10px;padding:5px 4px;border-radius:8px;transition:background .12s;}
+.fc-nr-row:hover{background:var(--chrome-hover);}
+.fc-nr-ico{
+  width:30px;height:30px;flex-shrink:0;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+}
+.fc-nr-ico svg{width:16px;height:16px;display:block;}
+.fc-nr-ico.tone-if{background:var(--major-bg);color:var(--major);}
+.fc-nr-ico.tone-split{background:var(--major-bg);color:var(--major);}
+.fc-nr-ico.tone-do{background:rgba(139,195,74,.16);color:#6a9a2a;}
+.fc-nr-ico.tone-util{background:rgba(61,139,208,.12);color:var(--primary);}
+.fc-nr-text{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.fc-nr-text b{font-size:12.5px;font-weight:500;color:var(--page-text);}
+.fc-nr-text span{font-size:11px;line-height:1.35;color:var(--gray-label);}
+.fc-walkthrough{
+  display:block;width:100%;margin-top:12px;padding:9px;border:none;border-radius:9px;cursor:pointer;
+  background:rgba(61,139,208,.12);color:var(--primary);font-family:inherit;font-size:12.5px;font-weight:500;
+  text-align:center;transition:background .15s;
+}
+.fc-walkthrough:hover{background:rgba(61,139,208,.18);}
 .fc-area{
   width:100%;height:82px;resize:none;outline:none;
   border:1px solid var(--border);border-radius:8px;padding:8px 10px;

@@ -44,12 +44,11 @@
 .nd{position:absolute;width:250px;cursor:grab;user-select:none;}
 .nd.dragging{cursor:grabbing;z-index:20;}
 .nd.dragging .card{box-shadow:0 10px 24px -10px rgba(54,70,88,.35);}
-/* select tool: the canvas is not a drag surface, only the nodes are */
+/* empty canvas is always a pan surface now — no separate Hand mode to
+   enter first; the grab hint only appears once a pan is actually underway,
+   matching how a plain "move" tool behaves elsewhere */
 .canvas{cursor:default;}
 .canvas.panning,.canvas.panning .nd{cursor:grabbing;}
-/* hand tool: everything becomes a pan surface */
-.canvas.tool-pan,.canvas.tool-pan .nd{cursor:grab;}
-.canvas.tool-pan.panning,.canvas.tool-pan.panning .nd{cursor:grabbing;}
 /* the controls sitting on the canvas keep a normal pointer */
 .t-plus,.ec,.nd .act,.nd .more{cursor:pointer;}
 .nd.enter{animation:ndIn .45s var(--ease) both;}
@@ -334,7 +333,12 @@
 .ls-btn:hover:not(:disabled){background:var(--grid-hover);}
 .ls-btn:disabled{opacity:.3;cursor:default;}
 .ls-btn img{width:12px;height:12px;display:block;}
-.lane-step .lane-pos{font-size:10px;font-weight:500;color:var(--gray-label);padding:0 2px;white-space:nowrap;min-width:32px;text-align:center;}
+.lane-step .lane-pos{
+  font-family:inherit;font-size:10px;font-weight:500;color:var(--gray-label);
+  padding:0 2px;height:22px;border:none;border-radius:5px;background:none;
+  white-space:nowrap;min-width:32px;text-align:center;cursor:pointer;transition:background .15s,color .15s;
+}
+.lane-step .lane-pos:hover{background:var(--grid-hover);color:var(--page-text);}
 
 /* pills carry text only; and the periodic card gets room around its schedule field */
 .nd .pill{padding:4px 9px;}
@@ -367,3 +371,32 @@
 .wf-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
 .wf-btn.danger{background:var(--critical);border-color:var(--critical);color:#fff;}
 .wf-btn.danger:hover{background:#e04b3d;border-color:#e04b3d;}
+
+/* ============ Sticky notes ============ */
+/* free-floating annotations on the canvas — not part of the workflow graph,
+   no connectors, don't affect node logic. Same drag/pan behaviour as a node. */
+.sticky{
+  position:absolute;width:180px;min-height:96px;cursor:grab;user-select:none;
+  background:#fef8e0;border:1px solid #f0dfa0;border-radius:10px;
+  box-shadow:0 2px 8px rgba(54,70,88,.1);padding:8px;
+  transition:box-shadow .15s;
+}
+.sticky:hover{box-shadow:0 4px 14px rgba(54,70,88,.16);}
+.sticky.dragging{cursor:grabbing;z-index:21;box-shadow:0 10px 24px -10px rgba(54,70,88,.35);}
+.canvas.tool-note .sticky{cursor:default;}
+.sticky-text{
+  width:100%;height:100%;min-height:80px;resize:none;border:none;outline:none;background:none;
+  font-family:inherit;font-size:12px;line-height:1.5;color:#6b5a1e;
+}
+.sticky-text::placeholder{color:#c9b876;}
+.sticky-del{
+  position:absolute;top:5px;right:5px;width:20px;height:20px;border:none;border-radius:5px;
+  background:rgba(255,255,255,.7);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .15s,background .15s;
+}
+.sticky:hover .sticky-del{opacity:1;}
+.sticky-del:hover{background:#fff;}
+.sticky-del img{width:11px;height:11px;display:block;opacity:.6;}
+/* cursor mode hint: note tool turns the empty canvas into a "place here" surface */
+.canvas.tool-note{cursor:crosshair;}
+.canvas.tool-note .nd{cursor:default;}

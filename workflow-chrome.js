@@ -4,8 +4,11 @@
    · page bar (row 2):  Workflows / <name> · state pill   (Simple|Node view centred)
                         · Simple|Node view switch          — left
                         Enabled · Save As Draft · Publish · history · ⋮ — right
-   · a floating toolbar centred at the bottom of the canvas: guide, shortcuts,
-     zoom, undo / redo / reset
+   · a floating toolbar centred at the bottom of the canvas, in priority order:
+       guide/shortcuts (rare) · view (zoom −/%/+/fit + direction, high-frequency,
+       minimap floats above this group when zoomed out/in far or content
+       overflows the viewport) · canvas mode (hand/select/note, high-frequency) ·
+       history (undo/redo/reset, high-frequency, Reset isolated last)
 
    Zoom and history are live — they drive the canvas transform and the snapshot
    history that workflow-app.js exposes on window.WFApp. */
@@ -27,6 +30,7 @@
     chevR:    '<path d="M9 6l6 6-6 6"/>',
     chevRR:   '<path d="M7 6l6 6-6 6M13 6l6 6-6 6"/>',
     chevD:    '<path d="M6 9l6 6 6-6"/>',
+    close:    '<path d="M6 6l12 12M18 6 6 18"/>',
     pencil:   '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5 12-12Z"/>',
     dots:     '<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>',
     lines:    '<path d="M4 7h16M4 12h11M4 17h7"/>',
@@ -58,11 +62,29 @@
     reset:    '<path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M21 4v5h-5"/>',
     bulb:     '<path d="M9.2 17h5.6M10 20.5h4"/><path d="M12 3a6 6 0 0 1 3.6 10.8c-.5.4-.8 1-.8 1.6H9.2c0-.6-.3-1.2-.8-1.6A6 6 0 0 1 12 3Z"/>',
     command:  '<path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6Z"/>',
-    hand:     '<path d="M9 11V4.6a1.6 1.6 0 1 1 3.2 0V11m0-.6V3.6a1.6 1.6 0 1 1 3.2 0V11m0-.4V5.6a1.6 1.6 0 1 1 3.2 0V14a6.5 6.5 0 0 1-6.5 6.5h-.8a6 6 0 0 1-4.6-2.2L3.7 14a1.7 1.7 0 0 1 2.6-2.1L9 14.6"/>',
-    cursor:   '<path d="M5.5 3.2 19 11.4l-6.2 1.5-2.6 5.9L5.5 3.2Z"/>',
+    note:     '<path d="M6 4h9l5 5v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M14.5 4.2V9a1 1 0 0 0 1 1h4.3"/><path d="M8.5 13h7M8.5 16.5h4.5"/>',
+    /* node-reference icons — one per row of the Guide card */
+    bolt:     '<path d="M13 3 5 13.5h5.5L10 21l8-10.5h-5.5L13 3Z"/>',
+    play2:    '<path d="M7 4.5v15l13-7.5-13-7.5Z"/>',
+    layers:   '<path d="M12 3.5 20.5 8 12 12.5 3.5 8 12 3.5Z"/><path d="M3.5 12.5 12 17l8.5-4.5"/><path d="M3.5 16.5 12 21l8.5-4.5"/>',
+    hourglass:'<path d="M6.5 3h11M6.5 21h11M7.5 3c0 4.2 3 5.4 4.5 6.5-1.5 1.1-4.5 2.3-4.5 6.5M16.5 3c0 4.2-3 5.4-4.5 6.5 1.5 1.1 4.5 2.3 4.5 6.5"/>',
+    diamond:  '<path d="M12 3.5 20.5 12 12 20.5 3.5 12 12 3.5Z"/>',
+    loop:     '<path d="M17 2.5l4 4-4 4"/><path d="M3 12.5v-2a4 4 0 0 1 4-4h14"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 11.5v2a4 4 0 0 1-4 4H3"/>',
+    /* direction switch — the same fork/branch glyph this app already uses for
+       a split, just pointed the way the canvas is currently running: one
+       trunk forking into two arrows, right for horizontal, down for
+       vertical. Two distinct icons living side by side as their own buttons
+       (see .dir-switch) — not one icon standing in for a hidden second
+       state, and not a control buried behind a click to even see the choice. */
+    forkH:    '<path d="M2 12h3.5c2.8 0 2.8-5 6-5H17"/><path d="M14 3.5 19 7l-5 3.5"/><path d="M2 12h3.5c2.8 0 2.8 5 6 5H17"/><path d="M14 20.5 19 17l-5-3.5"/>',
+    forkV:    '<path d="M12 2v3.5c0 2.8-5 2.8-5 6V17"/><path d="M3.5 14 7 19l3.5-5"/><path d="M12 2v3.5c0 2.8 5 2.8 5 6V17"/><path d="M20.5 14 17 19l-3.5-5"/>',
   };
   const svg = (k, cls) => `<svg${cls ? ` class="${cls}"` : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor"`
     + ` stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[k]}</svg>`;
+  /* a tooltip's data-tip, with its keyboard shortcut set as its own small
+     badges (matching the Shortcuts card's own <kbd> styling) instead of
+     buried in the label as plain text */
+  const tipKeys = (label, ...keys) => label + keys.map(k => `<kbd>${k}</kbd>`).join('');
 
   /* ---------------------------------------------------------- logo */
   function logoSVG(){
@@ -181,28 +203,50 @@
     handle.setAttribute('aria-label', 'Open navigation');
     handle.innerHTML = svg('chevRR');
 
-    /* one floating toolbar, centred under the canvas */
+    /* the view controls (zoom, fit) and the minimap that floats above them
+       get their own card, pinned to the bottom-left corner — high-frequency,
+       but a different KIND of high-frequency than the canvas-mode/history
+       bar, so it reads better standing apart. The direction switch lives in
+       the centred bar instead — it's a workflow-level setting, not a view
+       control, so it belongs with Undo/Redo/Reset, not with zoom. */
+    const viewBar = document.createElement('div');
+    viewBar.className = 'bottombar viewbar';
+    viewBar.innerHTML =
+      `<div class="bbar view-bbar" id="viewGroup">`
+        + `<div class="minimap" id="minimap" hidden><svg id="minimapSvg" viewBox="0 0 120 78"></svg></div>`
+        + `<button class="cbtn" id="zoomOutBtn" data-tip="Zoom out">${svg('zoomOut')}</button>`
+        + `<button class="zoom-label" id="zoomMenu" data-tip="Zoom presets"><span id="zoomLevel">100%</span></button>`
+        + `<button class="cbtn" id="zoomInBtn" data-tip="Zoom in">${svg('zoomIn')}</button>`
+        + `<span class="bbar-sep"></span>`
+        + `<button class="cbtn" id="fitBtn" data-tip="Fit to screen">${svg('fit')}</button>`
+      + `</div>`;
+
+    /* one floating toolbar, centred under the canvas — a single card. Guide,
+       Shortcuts and Note read as one continuous group (they're all "how do
+       I use this" affordances, so no divider between them); the direction
+       switch and Undo/Redo/Reset each get their own group, told apart by a
+       divider only, not by being separate floating pills. */
     const bar = document.createElement('div');
     bar.className = 'bottombar';
     bar.innerHTML =
       `<div class="bbar">`
         + `<button class="cbtn" id="guideBtn" data-tip="Guide">${svg('bulb')}</button>`
-        + `<button class="cbtn" id="shortcutsBtn" data-tip="Keyboard shortcuts&nbsp;&nbsp;?">${svg('command')}</button>`
+        + `<button class="cbtn" id="shortcutsBtn" data-tip="${tipKeys('Keyboard shortcuts', '?')}">${svg('command')}</button>`
+        + `<button class="cbtn tool" id="toolNote" data-tip="Note&nbsp;&nbsp;click the canvas to place one">${svg('note')}</button>`
       + `</div>`
-      + `<div class="bbar">`
-        + `<button class="zoom-pill" id="zoomMenu" data-tip="Zoom">${svg('zoomIn')}<span id="zoomLevel">100%</span>${svg('chevD', 'zp-chev')}</button>`
+      + `<span class="bbar-sep"></span>`
+      + `<div class="bbar dir-switch" role="group" aria-label="Layout direction">`
+        + `<button class="dir-opt active" id="dirV" data-tip="Vertical layout" aria-label="Vertical layout" aria-pressed="true">${svg('forkV')}</button>`
+        + `<button class="dir-opt" id="dirH" data-tip="Horizontal layout" aria-label="Horizontal layout" aria-pressed="false">${svg('forkH')}</button>`
       + `</div>`
+      + `<span class="bbar-sep"></span>`
       + `<div class="bbar">`
-        + `<button class="cbtn tool" id="toolPan" data-tip="Hand&nbsp;&nbsp;drag to move the canvas">${svg('hand')}</button>`
-        + `<button class="cbtn tool active" id="toolSelect" data-tip="Select&nbsp;&nbsp;drag nodes">${svg('cursor')}</button>`
-      + `</div>`
-      + `<div class="bbar">`
-        + `<button class="cbtn" id="doUndo" data-tip="Undo&nbsp;&nbsp;Ctrl+Z">${svg('undo')}</button>`
-        + `<button class="cbtn" id="doRedo" data-tip="Redo&nbsp;&nbsp;Ctrl+Shift+Z">${svg('redo')}</button>`
-        + `<button class="bbar-text" id="doReset">${svg('reset')}Reset</button>`
+        + `<button class="cbtn" id="doUndo" data-tip="${tipKeys('Undo', '⌘/Ctrl', 'Z')}">${svg('undo')}</button>`
+        + `<button class="cbtn" id="doRedo" data-tip="${tipKeys('Redo', '⌘/Ctrl', '⇧', 'Z')}">${svg('redo')}</button>`
+        + `<button class="bbar-text" id="doReset" data-tip="${tipKeys('Reset', '⇧', 'R')}">${svg('reset')}Reset</button>`
       + `</div>`;
 
-    document.body.append(hot, nav, handle, bar);
+    document.body.append(hot, nav, handle, viewBar, bar);
     return { nav, hot, handle };
   }
 
@@ -267,15 +311,41 @@
       if(card && !card.contains(e.target)){ closeCard(); document.removeEventListener('mousedown', off); }
     }), 0);
   }
-  const GUIDE = `<div class="fc-title">Building a workflow</div><ol class="fc-list">`
-    + `<li>Click the <b>Trigger</b> node to pick what starts the workflow.</li>`
-    + `<li>Fill its configuration in the right drawer — everything saves as you type.</li>`
-    + `<li>Use a <b>+</b> on the canvas, or <b>Next Node Selection</b> in the drawer, to add the next step.</li>`
-    + `<li>A node left with empty required fields turns red — click it to see what is missing.</li></ol>`;
-  const SHORTCUTS = `<div class="fc-title">Keyboard shortcuts</div><dl class="fc-keys">`
-    + [['Ctrl + Z','Undo'],['Ctrl + Shift + Z','Redo'],['↑ ↓','Move through a menu'],
-       ['Enter','Choose the highlighted row'],['Esc','Close the menu'],['?','This panel']]
-      .map(([k, v]) => `<dt><kbd>${k}</kbd></dt><dd>${v}</dd>`).join('') + `</dl>`;
+  /* one row per node this product has a concept for — Trigger and the two
+     that actually build (Condition, Split path) work today; the rest are
+     catalogued the same way the node picker catalogues them, so the guide
+     never claims more than the app can do. */
+  const NODE_REF = [
+    { group:'Start', rows:[
+      { icon:'bolt', tone:'util', title:'Trigger', desc:'The event that starts your workflow.' },
+    ] },
+    { group:'Steps', rows:[
+      { icon:'play2', tone:'do', title:'Action', desc:'The work your workflow actually does.' },
+      { icon:'layers', tone:'util', title:'Get', desc:'Pulls in records so later steps can use them.' },
+      { icon:'hourglass', tone:'util', title:'Wait', desc:'Pauses the workflow before moving on.' },
+    ] },
+    { group:'Flow', rows:[
+      { icon:'diamond', tone:'if', title:'Condition', desc:'A yes or no check that decides which steps run.' },
+      { icon:'forkH', tone:'split', title:'Split path', desc:'Runs several paths at once, each with its own check.' },
+      { icon:'loop', tone:'util', title:'Loop', desc:'Repeats the same steps for every item in a list.' },
+    ] },
+  ];
+  const fcHead = title => `<div class="fc-head"><span class="fc-title">${title}</span>`
+    + `<button class="fc-close" type="button" data-fc-close aria-label="Close">${svg('close')}</button></div>`;
+  const GUIDE = fcHead('Node reference')
+    + `<div class="fc-noderef">` + NODE_REF.map(g => `<div class="fc-nr-group">${g.group}</div>`
+      + g.rows.map(r => `<div class="fc-nr-row"><span class="fc-nr-ico tone-${r.tone}">${svg(r.icon)}</span>`
+        + `<span class="fc-nr-text"><b>${r.title}</b><span>${r.desc}</span></span></div>`).join('')).join('')
+    + `</div>`
+    + `<button class="fc-walkthrough" type="button" id="fcWalkthrough">Walkthrough</button>`;
+  /* every row here is a shortcut that actually works — see the keydown
+     handler below and Undo/Redo/Reset's own tooltips, which carry the same
+     badges so the two places never drift out of sync. */
+  const SHORTCUTS = fcHead('Keyboard shortcuts') + `<dl class="fc-keys">`
+    + [[['⌘/Ctrl','Z'],'Undo'],[['⌘/Ctrl','⇧','Z'],'Redo'],[['⇧','R'],'Reset the whole workflow'],
+       [['Delete'],'Delete the selected node'],[['↑','↓'],'Move through a menu'],
+       [['Enter'],'Choose the highlighted row'],[['Esc'],'Close a menu or panel'],[['?'],'This panel']]
+      .map(([keys, v]) => `<dt>${keys.map(k => `<kbd>${k}</kbd>`).join('')}</dt><dd>${v}</dd>`).join('') + `</dl>`;
 
   /* ---------------------------------------------------------- behaviour */
   function wire(parts){
@@ -428,6 +498,12 @@
     /* --- guide / shortcuts --- */
     $('#guideBtn').addEventListener('click', () => floatCard($('#guideBtn'), GUIDE));
     $('#shortcutsBtn').addEventListener('click', () => floatCard($('#shortcutsBtn'), SHORTCUTS));
+    /* the card's own × — delegated, since GUIDE/SHORTCUTS are rebuilt fresh
+       into a new element every time floatCard() opens */
+    document.addEventListener('click', e => {
+      if(e.target.closest('[data-fc-close]')) closeCard();
+      else if(e.target.closest('#fcWalkthrough')) toast('Walkthrough is not designed yet');
+    });
 
     /* --- zoom --- */
     const STEPS = [25, 50, 75, 100, 125, 150, 200];
@@ -453,6 +529,9 @@
       zoom = Math.max(STEPS[0], Math.min(100, Math.round(app.fitScale() * 100)));
       applyZoom(); app.scrollToStart();
     };
+    $('#zoomOutBtn').addEventListener('click', () => step(-1));
+    $('#zoomInBtn').addEventListener('click', () => step(1));
+    $('#fitBtn').addEventListener('click', fitToView);
     $('#zoomMenu').addEventListener('click', () => {
       WFPop.open({
         anchor: $('#zoomMenu'), noSearch:true, menu:true, width:224, align:'start',
@@ -475,14 +554,147 @@
     });
     applyZoom();
 
-    /* ---- hand vs select tool ---- */
-    const setTool = t => {
-      app.setTool(t);
-      $('#toolPan').classList.toggle('active', t === 'pan');
-      $('#toolSelect').classList.toggle('active', t === 'select');
+    /* ---- canvas mode: Note is the only one left to toggle — dragging a node
+       always moves it and dragging empty canvas always pans it now (see the
+       matching change in workflow-app.js), the way every other canvas tool's
+       default cursor already behaves, so there's no Hand/Select mode to pick
+       between any more. Note is still one-shot: placing a note hands control
+       back on its own (app.onToolChange below), so the app can drop the
+       highlight without a second click here. ---- */
+    const setTool = t => { app.setTool(t); $('#toolNote').classList.toggle('active', t === 'note'); };
+    $('#toolNote').addEventListener('click', () => setTool('note'));
+    app.onToolChange(setTool);
+
+    /* ---- direction: vertical (default) or horizontal layout ----
+       A single icon that swapped meaning on click was hard to read at a
+       glance — a lone button can only ever show ONE state, so there's no
+       telling whether it depicts "now" or "click for this instead". A
+       dropdown fixed that but buried the choice behind an extra click just
+       to see it. A segmented switch shows both options as their own
+       buttons, permanently, side by side, so the active one is always
+       visibly pressed and the other is always one click away. */
+    const setDir = h => {
+      app.setAxis(h ? 'h' : 'v');
+      $('#dirV').classList.toggle('active', !h); $('#dirV').setAttribute('aria-pressed', String(!h));
+      $('#dirH').classList.toggle('active', h); $('#dirH').setAttribute('aria-pressed', String(h));
     };
-    $('#toolPan').addEventListener('click', () => setTool('pan'));
-    $('#toolSelect').addEventListener('click', () => setTool('select'));
+    $('#dirV').addEventListener('click', () => setDir(false));
+    $('#dirH').addEventListener('click', () => setDir(true));
+
+    /* ---- minimap: only surfaces when the flow's own scale, or its reach
+       beyond the visible canvas, means some of it is genuinely out of sight —
+       not a permanent fixture. Two distinct gestures, same as a map app:
+       a click on the background eases the main view over to that point;
+       a drag that starts ON the viewport rectangle instead tracks the
+       pointer 1:1, live, with no easing — dragging IS panning, so it can't
+       lag behind the hand. */
+    const MM_W = 120, MM_H = 78, MM_PAD = 6;
+    const TYPE_FILL = { trigger:'#a9c3de', ifelse:'#f5c99a', branch:'#f5c99a', lane:'#f2b96b', note:'#e8cf6e' };
+    let mm = null;                                        // last draw's world→minimap mapping, for click/drag
+    let lastView = null;                                  // latest onViewChange payload, read at gesture start
+    const minimapEl = $('#minimap'), minimapSvg = $('#minimapSvg');
+    function drawMinimap(view){
+      const rects = app.overviewRects();
+      if(!rects.length){ mm = null; return; }
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      rects.forEach(r => { minX=Math.min(minX,r.x); minY=Math.min(minY,r.y); maxX=Math.max(maxX,r.x+r.w); maxY=Math.max(maxY,r.y+r.h); });
+      const w = Math.max(1, maxX-minX), h = Math.max(1, maxY-minY);
+      const scale = Math.min((MM_W-MM_PAD*2)/w, (MM_H-MM_PAD*2)/h);
+      const ox = MM_PAD + ((MM_W-MM_PAD*2)-w*scale)/2 - minX*scale;
+      const oy = MM_PAD + ((MM_H-MM_PAD*2)-h*scale)/2 - minY*scale;
+      mm = { minX, minY, scale, ox, oy };
+      /* a faint dot grid behind the nodes, echoing the real canvas's own —
+         purely decorative texture so the map never reads as a blank card */
+      let out = `<defs><pattern id="mmDots" width="7" height="7" patternUnits="userSpaceOnUse">`
+        + `<circle cx="1" cy="1" r="0.55" fill="#d8e0ea"/></pattern></defs>`
+        + `<rect x="0" y="0" width="${MM_W}" height="${MM_H}" fill="url(#mmDots)"/>`;
+      out += rects.map(r =>
+        `<rect x="${(r.x*scale+ox).toFixed(1)}" y="${(r.y*scale+oy).toFixed(1)}" width="${Math.max(1.4,r.w*scale).toFixed(1)}" height="${Math.max(1.4,r.h*scale).toFixed(1)}" rx="1" fill="${TYPE_FILL[r.type]||'#c7d0dc'}"/>`
+      ).join('');
+      const cs = app.canvasSize();
+      const vx = -view.panX/view.zoom, vy = -view.panY/view.zoom, vw = cs.w/view.zoom, vh = cs.h/view.zoom;
+      out += `<rect class="mm-view" x="${(vx*scale+ox).toFixed(1)}" y="${(vy*scale+oy).toFixed(1)}" width="${(vw*scale).toFixed(1)}" height="${(vh*scale).toFixed(1)}" rx="2"/>`;
+      minimapSvg.innerHTML = out;
+    }
+    app.onViewChange(view => {
+      lastView = view;
+      const cs = app.canvasSize();
+      let show = false;
+      if(view.content && cs.w && cs.h){
+        const cw = (view.content.maxX - view.content.minX) * view.zoom;
+        const ch = (view.content.maxY - view.content.minY) * view.zoom;
+        show = view.zoom <= .4 || view.zoom >= 1.5 || cw > cs.w * 1.15 || ch > cs.h * 1.15;
+      }
+      minimapEl.hidden = !show;
+      if(show) drawMinimap(view);
+    });
+
+    /* click-to-recenter: eases the world point under the click to the centre
+       of the main viewport. A fresh click cancels whatever ease is still
+       running so clicks never queue up or fight each other. */
+    let mmEase = null;
+    function mmEaseTo(wx, wy){
+      if(!lastView) return;
+      if(mmEase) cancelAnimationFrame(mmEase.raf);
+      const cs = app.canvasSize(), zoom = lastView.zoom;
+      const wx0 = (cs.w / 2 - lastView.panX) / zoom, wy0 = (cs.h / 2 - lastView.panY) / zoom;
+      const dur = 260, t0 = performance.now();
+      const ease = t => 1 - Math.pow(1 - t, 3);                       // ease-out cubic
+      const step = now => {
+        const t = Math.min(1, (now - t0) / dur), e = ease(t);
+        app.panTo(wx0 + (wx - wx0) * e, wy0 + (wy - wy0) * e);
+        mmEase = t < 1 ? { raf: requestAnimationFrame(step) } : null;
+      };
+      mmEase = { raf: requestAnimationFrame(step) };
+    }
+
+    /* drag-to-pan: mousedown ON the rectangle itself only. Tracked as a
+       pointer-delta from the rectangle's own start position (not "point
+       under cursor", which would jump the rectangle under the pointer on
+       the very first pixel of movement) and clamped so the rectangle can
+       never be dragged past the minimap's own padded edges. */
+    let mmDrag = null;
+    function mmDragStart(e){
+      if(!mm || !lastView) return;
+      if(mmEase){ cancelAnimationFrame(mmEase.raf); mmEase = null; }
+      const cs = app.canvasSize(), zoom = lastView.zoom;
+      const vw = cs.w / zoom, vh = cs.h / zoom;
+      const centerWx = (cs.w / 2 - lastView.panX) / zoom, centerWy = (cs.h / 2 - lastView.panY) / zoom;
+      const rectPxW = vw * mm.scale, rectPxH = vh * mm.scale;
+      const loX = (MM_PAD - mm.ox) / mm.scale + vw / 2, hiX = (MM_W - MM_PAD - rectPxW - mm.ox) / mm.scale + vw / 2;
+      const loY = (MM_PAD - mm.oy) / mm.scale + vh / 2, hiY = (MM_H - MM_PAD - rectPxH - mm.oy) / mm.scale + vh / 2;
+      mmDrag = {
+        startX: e.clientX, startY: e.clientY, centerWx, centerWy, scale: mm.scale,
+        clampX: [Math.min(loX, hiX), Math.max(loX, hiX)], clampY: [Math.min(loY, hiY), Math.max(loY, hiY)]
+      };
+      minimapEl.classList.add('dragging');
+      e.preventDefault(); e.stopPropagation();
+    }
+    function mmDragMove(e){
+      if(!mmDrag) return;
+      const r = minimapSvg.getBoundingClientRect();
+      const dMmX = (e.clientX - mmDrag.startX) * (MM_W / r.width), dMmY = (e.clientY - mmDrag.startY) * (MM_H / r.height);
+      const wx = mmDrag.centerWx + dMmX / mmDrag.scale, wy = mmDrag.centerWy + dMmY / mmDrag.scale;
+      app.panTo(
+        Math.min(mmDrag.clampX[1], Math.max(mmDrag.clampX[0], wx)),
+        Math.min(mmDrag.clampY[1], Math.max(mmDrag.clampY[0], wy))
+      );
+    }
+    function mmDragEnd(){
+      if(!mmDrag) return;
+      mmDrag = null;
+      minimapEl.classList.remove('dragging');
+    }
+    minimapEl.addEventListener('mousedown', e => {
+      if(e.target.classList.contains('mm-view')){ mmDragStart(e); return; }
+      if(!mm) return;
+      const r = minimapSvg.getBoundingClientRect();
+      const px = (e.clientX - r.left) * (MM_W / r.width), py = (e.clientY - r.top) * (MM_H / r.height);
+      mmEaseTo((px - mm.ox) / mm.scale, (py - mm.oy) / mm.scale);
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', mmDragMove);
+    window.addEventListener('mouseup', mmDragEnd);
 
     /* --- history --- */
     const syncHistory = () => {
@@ -502,8 +714,13 @@
     document.addEventListener('keydown', e => {
       if(e.target.matches('input,textarea,select')) return;
       if(e.key === '?'){ e.preventDefault(); floatCard($('#shortcutsBtn'), SHORTCUTS); return; }
-      if(!(e.ctrlKey || e.metaKey)) return;
+      if(e.key === 'Escape'){ if(card) closeCard(); return; }               // WFPop/confirm handle their own Esc
+      /* Backspace already means "go back a level" inside an open picker
+         (workflow-popover.js) — only read it as "delete" when nothing's open */
+      if((e.key === 'Delete' || e.key === 'Backspace') && !window.WFPop.isOpen()){ app.deleteSelected(); return; }
       const k = e.key.toLowerCase();
+      if(e.shiftKey && !(e.ctrlKey || e.metaKey) && k === 'r'){ e.preventDefault(); $('#doReset').click(); return; }
+      if(!(e.ctrlKey || e.metaKey)) return;
       if(k === 'z' && !e.shiftKey){ e.preventDefault(); app.undo(); syncHistory(); }
       else if((k === 'z' && e.shiftKey) || k === 'y'){ e.preventDefault(); app.redo(); syncHistory(); }
     });

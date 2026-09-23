@@ -267,9 +267,13 @@
     pop.style.visibility = 'hidden';
     layer.appendChild(pop);
 
+    /* inline, not <img> — these two need to recolour with the popover's own
+       dark palette, and a referenced .svg's baked fill can't be reached by CSS */
+    const backSVG = `<svg viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.64645 4.64645C2.84171 4.45118 3.15829 4.45118 3.35355 4.64645L6 7.29289L8.64645 4.64645C8.84171 4.45118 9.15829 4.45118 9.35355 4.64645C9.54882 4.84171 9.54882 5.15829 9.35355 5.35355L6.35355 8.35355C6.15829 8.54882 5.84171 8.54882 5.64645 8.35355L2.64645 5.35355C2.45118 5.15829 2.45118 4.84171 2.64645 4.64645Z"/></svg>`;
+    const searchSVG = `<svg viewBox="0 0 10.5 10.5" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M1.16667 4.66667C1.16667 2.73642 2.73642 1.16667 4.66667 1.16667C6.59692 1.16667 8.16667 2.73642 8.16667 4.66667C8.16667 6.59692 6.59692 8.16667 4.66667 8.16667C2.73642 8.16667 1.16667 6.59692 1.16667 4.66667M10.3291 9.50425L8.34867 7.52325C8.96292 6.73342 9.33333 5.7435 9.33333 4.66667C9.33333 2.09358 7.23975 0 4.66667 0C2.09358 0 0 2.09358 0 4.66667C0 7.23975 2.09358 9.33333 4.66667 9.33333C5.7435 9.33333 6.73342 8.96292 7.52325 8.34867L9.50425 10.3291C9.618 10.4428 9.76733 10.5 9.91667 10.5C10.066 10.5 10.2153 10.4428 10.3291 10.3291C10.5572 10.101 10.5572 9.73233 10.3291 9.50425"/></svg>`;
     const head = (opts.title || opts.back)
       ? `<div class="wfpop-head">`
-        + (opts.back ? `<button class="wfpop-back" type="button" aria-label="Back"><img src="assets/chevron-down.svg" alt=""></button>` : '')
+        + (opts.back ? `<button class="wfpop-back" type="button" aria-label="Back">${backSVG}</button>` : '')
         + `<span class="wfpop-title">${esc(opts.title || '')}</span></div>`
       : '';
     const tabs = (opts.tabs && opts.tabs.length)
@@ -277,7 +281,7 @@
           `<button class="wfpop-tab${t.id === (opts.tab || opts.tabs[0].id) ? ' active' : ''}" type="button" data-tab="${esc(t.id)}">${esc(t.label)}</button>`).join('') + `</div>`
       : '';
     const search = opts.noSearch ? '' :
-      `<label class="wfpop-search"><img src="assets/search.svg" alt="">`
+      `<label class="wfpop-search">${searchSVG}`
       + `<input type="text" placeholder="${esc(opts.searchPlaceholder || 'Search')}"></label>`;
     const foot = opts.footer
       ? `<div class="wfpop-foot"><button class="wfpop-item" type="button" data-foot="1">`

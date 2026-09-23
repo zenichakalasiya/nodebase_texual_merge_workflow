@@ -13,17 +13,17 @@
 (function(){
   const $ = (s, r=document) => r.querySelector(s);
   const world = $('#world'), edgesSvg = $('#edges'), dock = $('#dock'), canvasEl = $('#canvas');
-  const panels = { trigger: $('#triggerCfg'), ifelse: $('#ifelseConfig'), branch: $('#branchCfg'), lane: $('#laneCfg') };
+  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg') };
 
   /* ---------------------------------------------------------- catalogs */
   const MODULES = ['Request','Incident','Problem','Change','Release','Task','Hardware Asset','Software Asset','User'];
   const ATTRS = ['Status is Changed','Department is Changed','Incident is Changed','Priority is Updated','Assignee is Added','Category is Changed','Impact is Changed'];
   const WEEKDAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const TYPE_LABEL = { trigger:'Trigger', ifelse:'IF/Else', branch:'Branch', lane:'Branch path' };
+  const TYPE_LABEL = { trigger:'Trigger', branch:'Branch', lane:'Branch path', cond:'Condition' };
 
-  /* Trigger types — the textual builder's two groups, re-cut as the two tabs the
-     node builder uses (Event | Periodic). Same rows, same help copy. */
-  const TRIGGER_TABS = [{ id:'event', label:'Event' }, { id:'periodic', label:'Periodic' }];
+  /* Trigger types — the textual builder's two groups (Record events | Time
+     based), shown as one flat list, group headers only — no tab switcher.
+     Same rows, same help copy either way. */
   const TRIGGER_ITEMS = {
     event: [
       { header:'Record events' },
@@ -54,6 +54,17 @@
   };
   const trigTab = id => TRIGGER_ITEMS.event.some(i => i.id === id) ? 'event' : 'periodic';
   const isEventTrig = id => trigTab(id) === 'event';
+  /* the picker's own flat view — used only while searching, so a query can
+     still reach a recurring type that the top level below keeps collapsed */
+  const TRIGGER_FLAT = TRIGGER_ITEMS.event.concat(TRIGGER_ITEMS.periodic);
+  /* Time based, collapsed: the top level offers just "Once" and one drill row
+     for everything that repeats — its four concrete schedules (same items,
+     same help copy) sit one level down, reached by picking that row. */
+  const TRIGGER_RECUR = TRIGGER_ITEMS.periodic.slice(2);          // hourly, daily, weekly, monthly
+  const TRIGGER_EVERY = { id:'recur', label:'Every time period', icon:'repeat', tone:'util', chevron:true,
+    keywords:'hourly daily weekly monthly recurring repeat schedule periodic',
+    help:{ title:'Every time period', body:'Runs on a repeating schedule — hourly, daily, weekly, or monthly, whichever you pick next.' } };
+  const TRIGGER_TOP = TRIGGER_ITEMS.event.concat([TRIGGER_ITEMS.periodic[0], TRIGGER_ITEMS.periodic[1], TRIGGER_EVERY]);
 
   /* Schedule shapes per periodic trigger type. Every field listed is required. */
   const SCHED = {
@@ -70,87 +81,33 @@
   const DOC = 'https://docs.motadata.com/serviceops-docs/admin-section/automation/workflow/#purpose-audience-and-scope';
   const NODE_CATALOG = [
     { label:'Quick', chips:[
-      { id:'cond-inline', make:'ifelse', label:'Condition', icon:'split' },
-      { id:'route-field', make:'branch', label:'Route', icon:'branch' },
-      { id:'notify-email', label:'Notify', icon:'n-trig-blue' },
+      { id:'q-notify', label:'Notify', icon:'n-trig-blue' },
+      { id:'q-create', label:'Create', icon:'n-plus' },
+      { id:'q-update', label:'Update', icon:'refresh-ccw' },
     ] },
+    { header:'Required' },
+    { id:'action', label:'Add action', tag:'do', tone:'do', icon:'play', chevron:true,
+      keywords:'action do create update assign close archive record notify send',
+      sub:'Do something automatically — assign, notify, update…',
+      help:{ eyebrow:'Action', title:'Add action', body:'Do something automatically to the record — assign it, update a field, or send a notification.', more:DOC } },
     { header:'Flow control' },
-    { id:'ifelse', label:'Check a condition', tag:'if', tone:'if', icon:'split', chevron:true,
-      keywords:'if else condition true false split check',
+    { id:'ifelse', label:'Add condition', tag:'if', tone:'if', icon:'split', chevron:true,
+      keywords:'if else condition true false split check branch inline add condition',
       sub:'Continue only when a check is true',
-      help:{ eyebrow:'IF / Else', title:'Check a condition', body:'Splits the workflow in two — one path runs when your condition is true, the other when it is not.', eg:'Like — priority is High goes to the escalation path.', more:DOC } },
-    { id:'branch', label:'Route by value', tag:'split', tone:'split', icon:'branch', chevron:true,
-      keywords:'branch route many paths switch category team',
-      sub:'Route the flow by a field value',
-      help:{ eyebrow:'Branch', title:'Route by value', body:'Routes the record to one of many paths based on what a field holds — with a Default path for everything else.', eg:'Like — sorting tickets to the right team by category.', more:DOC } },
+      help:{ eyebrow:'Condition', title:'Add condition', body:'Add a check on the flow — a single gate (Inline) that continues only when it passes, or several paths at once (Branching).', eg:'Like — priority is High goes to the escalation path.', more:DOC } },
     { id:'merge', label:'Merge paths', tag:'merge', tone:'util', icon:'split2', chevron:true, soon:true,
       keywords:'merge join combine converge',
       sub:'Bring split paths back into one flow',
       help:{ eyebrow:'Merge', title:'Merge paths', body:'Waits for the paths of a split to finish, then carries on down one shared flow.', more:DOC } },
     { header:'Timing & data' },
-    { id:'wait', label:'Wait', tag:'wait', tone:'util', icon:'refresh-ccw', chevron:true, soon:true,
-      keywords:'wait pause delay sleep until time date',
+    { id:'wait', label:'Add wait', tag:'wait', tone:'util', icon:'refresh-ccw', chevron:true, soon:true,
+      keywords:'wait pause delay sleep until time date add wait',
       sub:'Pause for a time, a date, or a condition',
-      help:{ title:'Wait', body:'Holds the workflow here — for a fixed duration, until a date arrives, or until a condition becomes true.', more:DOC } },
+      help:{ title:'Add wait', body:'Holds the workflow here — for a fixed duration, until a date arrives, or until a condition becomes true.', more:DOC } },
     { id:'loop', label:'Loop over records', tag:'loop', tone:'util', icon:'loop-repeat', chevron:true, soon:true,
       keywords:'loop repeat each iterate for every list',
       sub:'Repeat the steps below for each item',
       help:{ eyebrow:'Loop', title:'Loop over records', body:'Runs everything below it once per item — each linked asset, approver, or child ticket.', more:DOC } },
-    { header:'ITSM modules' },
-    { id:'m-request', label:'Service Request', tag:'do', tone:'do', icon:'split', chevron:true, soon:true,
-      keywords:'request service raise ticket',
-      sub:'Raise, update, or close a request',
-      help:{ eyebrow:'Request', title:'Service Request', body:'Acts on a service request — create one, change its fields, or close it out.', more:DOC } },
-    { id:'m-problem', label:'Problem Record', tag:'do', tone:'do', icon:'branch', chevron:true, soon:true,
-      keywords:'problem root cause known error',
-      sub:'Log or update a problem record',
-      help:{ eyebrow:'Problem', title:'Problem Record', body:'Creates or updates a problem record and links the incidents behind it.', more:DOC } },
-    { id:'m-change', label:'Change Request', tag:'do', tone:'do', icon:'split', chevron:true, soon:true,
-      keywords:'change cab approval release window',
-      sub:'Raise a change and run its approvals',
-      help:{ eyebrow:'Change', title:'Change Request', body:'Raises a change request, sets its type and window, and starts the approval chain.', more:DOC } },
-    { id:'m-release', label:'Release', tag:'do', tone:'do', icon:'loop-repeat', chevron:true, soon:true,
-      keywords:'release deployment rollout',
-      sub:'Create or update a release record',
-      help:{ title:'Release', body:'Creates or updates a release record so deployments stay tied to their changes.', more:DOC } },
-    { id:'m-task', label:'Task', tag:'do', tone:'do', icon:'split', chevron:true, soon:true,
-      keywords:'task assign technician group todo',
-      sub:'Create a task and assign it out',
-      help:{ title:'Task', body:'Adds a task to the record and hands it to the right technician or group.', more:DOC } },
-    { id:'m-approval', label:'Approval', tag:'if', tone:'if', icon:'split', chevron:true, soon:true,
-      keywords:'approval approve reject verdict sign off',
-      sub:'Send for approval, wait for the verdict',
-      help:{ title:'Approval', body:'Sends the record to approvers and pauses the workflow until they approve or reject.', more:DOC } },
-    { header:'Asset & CMDB' },
-    { id:'a-hw', label:'Hardware Asset', tag:'do', tone:'data', icon:'split', chevron:true, soon:true,
-      keywords:'hardware asset laptop server device',
-      sub:'Assign, update, or look up an asset',
-      help:{ title:'Hardware Asset', body:'Works with physical assets — laptops, servers, phones: assign them, update them, or read their fields.', more:DOC } },
-    { id:'a-sw', label:'Software Asset', tag:'do', tone:'data', icon:'branch', chevron:true, soon:true,
-      keywords:'software license install entitlement',
-      sub:'Manage licenses and entitlements',
-      help:{ title:'Software Asset', body:'Manages software licenses, installs, and who is entitled to what.', more:DOC } },
-    { id:'a-nonit', label:'Non-IT Asset', tag:'do', tone:'data', icon:'split', chevron:true, soon:true,
-      keywords:'non-it facilities furniture inventory',
-      sub:'Manage facilities and other inventory',
-      help:{ title:'Non-IT Asset', body:'Covers everything outside IT — facilities, furniture, and other tracked inventory.', more:DOC } },
-    { id:'a-cmdb', label:'CMDB Item', tag:'get', tone:'data', icon:'loop-repeat', chevron:true, soon:true,
-      keywords:'cmdb ci configuration item relationship dependency',
-      sub:'Read or update CIs and relationships',
-      help:{ eyebrow:'CMDB', title:'CMDB Item', body:'Reads or updates configuration items and the relationships that tie them together.', more:DOC } },
-    { id:'a-move', label:'Asset Movement', tag:'do', tone:'data', icon:'split', chevron:true, soon:true,
-      keywords:'movement transfer location custody handover',
-      sub:'Record a transfer between people or sites',
-      help:{ title:'Asset Movement', body:'Logs an asset changing hands or moving site, so custody stays accurate.', more:DOC } },
-    { header:'Communication & Integration' },
-    { id:'c-user', label:'User Lookup', tag:'get', tone:'util', icon:'split', chevron:true, soon:true,
-      keywords:'user requester technician department manager profile',
-      sub:'Look up or update a user or their team',
-      help:{ eyebrow:'User', title:'User Lookup', body:'Fetches a user\'s profile — department, manager, group — or updates their record.', more:DOC } },
-    { id:'c-notify', label:'Send Notification', tag:'notify', tone:'util', icon:'branch', chevron:true, soon:true,
-      keywords:'notify notification email sms alert message teams',
-      sub:'Send an email, SMS, or in-app alert',
-      help:{ eyebrow:'Notification', title:'Send Notification', body:'Tells someone what happened — by email, SMS, or an in-app alert.', more:DOC } },
   ];
 
   /* Second level for every row that shows a chevron: pick the kind of step, then
@@ -159,40 +116,39 @@
   const SUBMENUS = {
     ifelse: [
       { header:'Condition type' },
-      { id:'cond-inline', make:'ifelse', label:'Inline condition', tag:'if', tone:'if', icon:'split',
-        sub:'Continue only when a check is true',
-        help:{ eyebrow:'IF / Else', title:'Inline condition', body:'One check, two ways out — the workflow carries on down the true path or the false one.', more:DOC } },
-      { id:'cond-branch', make:'branch', label:'Branching condition', tag:'split', tone:'split', icon:'branch',
-        sub:'Several paths, each with its own check',
-        help:{ eyebrow:'Branch', title:'Branching condition', body:'More than two outcomes: each path carries its own check, with a Default for anything that matches none.', more:DOC } },
+      { id:'cond-inline', make:'cond', label:'Inline condition', tag:'if', tone:'if', icon:'split',
+        sub:'Continue only when a check passes',
+        help:{ eyebrow:'Condition', title:'Inline', body:'A single check that gates the steps after it — they run only when it passes. Adjacent conditions stack into an AND/OR group.', more:DOC } },
+      { id:'cond-branch', make:'branch', label:'Branching', tag:'split', tone:'split', icon:'branch',
+        sub:'Branch into separate paths, each with its own check',
+        help:{ eyebrow:'Branch', title:'Branching', body:'More than two outcomes: each path carries its own check, with a Default for anything that matches none.', more:DOC } },
     ],
-    branch: [
-      { header:'Route by' },
-      { id:'route-field', make:'branch', label:'A field value', tag:'split', tone:'split', icon:'branch',
-        sub:'Send each value down its own path',
-        help:{ eyebrow:'Branch', title:'Route by a field value', body:'Reads one field and sends the record down the path matching its value.', more:DOC } },
-      { id:'route-expr', label:'An expression', tag:'split', tone:'split', icon:'split', soon:true,
-        sub:'Route on a computed result',
-        help:{ eyebrow:'Branch', title:'Route by an expression', body:'Route on something calculated rather than a plain field.', more:DOC } },
-    ],
-    'm-request': [
-      { header:'Service request' },
-      { id:'req-create', label:'Create a request', tag:'do', tone:'do', icon:'split', soon:true, sub:'Raise a new service request' },
-      { id:'req-update', label:'Update a request', tag:'do', tone:'do', icon:'split', soon:true, sub:'Change fields on the request' },
-      { id:'req-assign', label:'Assign a request', tag:'do', tone:'do', icon:'split', soon:true, sub:'Hand it to a technician or group' },
-      { id:'req-close',  label:'Close a request', tag:'do', tone:'do', icon:'split', soon:true, sub:'Resolve and close it out' },
-    ],
-    'm-change': [
-      { header:'Change request' },
-      { id:'chg-create',  label:'Raise a change', tag:'do', tone:'do', icon:'split', soon:true, sub:'Create a change record' },
-      { id:'chg-approve', label:'Send for approval', tag:'if', tone:'if', icon:'split', soon:true, sub:'Start the approval chain' },
-      { id:'chg-close',   label:'Close a change', tag:'do', tone:'do', icon:'split', soon:true, sub:'Mark the change complete' },
-    ],
-    'c-notify': [
-      { header:'Channel' },
-      { id:'notify-email', label:'Email', tag:'notify', tone:'util', icon:'branch', soon:true, sub:'Send an email to people or a group' },
-      { id:'notify-sms',   label:'SMS', tag:'notify', tone:'util', icon:'branch', soon:true, sub:'Send a text message' },
-      { id:'notify-app',   label:'In-app alert', tag:'notify', tone:'util', icon:'branch', soon:true, sub:'Notify inside the product' },
+    /* generic, module-agnostic actions — which record/module they act on is
+       chosen inside the node once it's built; the picker only chooses the verb */
+    action: [
+      { header:'Record management' },
+      { id:'act-create', label:'Create record', tag:'do', tone:'do', icon:'n-plus', soon:true,
+        sub:'Create a new record in a module',
+        help:{ eyebrow:'Action', title:'Create record', body:'Creates a new record in the module you choose, with the fields you set.', more:DOC } },
+      { id:'act-update', label:'Update record', tag:'do', tone:'do', icon:'refresh-ccw', soon:true,
+        sub:'Change fields on an existing record',
+        help:{ eyebrow:'Action', title:'Update record', body:'Changes one or more fields on a record already in the system.', more:DOC } },
+      { id:'act-assign', label:'Assign record', tag:'do', tone:'do', icon:'branch', soon:true,
+        sub:'Hand it to a technician or group',
+        help:{ eyebrow:'Action', title:'Assign record', body:'Assigns the record to a technician, a group, or by a rule.', more:DOC } },
+      { id:'act-close', label:'Close record', tag:'do', tone:'do', icon:'n-act-delete', soon:true,
+        sub:'Resolve and close it out',
+        help:{ eyebrow:'Action', title:'Close record', body:'Marks the record resolved and closes it out.', more:DOC } },
+      { id:'act-archive', label:'Archive record', tag:'do', tone:'do', icon:'n-act-delete', soon:true,
+        sub:'Move it out of active use',
+        help:{ eyebrow:'Action', title:'Archive record', body:'Archives the record — soft-deletes it out of active use.', more:DOC } },
+      { id:'act-link', label:'Link & add', tag:'do', tone:'do', icon:'split2', chevron:true, soon:true,
+        sub:'Link records or add a child item',
+        help:{ eyebrow:'Action', title:'Link & add', body:'Links this record to another, or adds a child item under it.', more:DOC } },
+      { header:'Communicate' },
+      { id:'act-notify', label:'Send notification', tag:'notify', tone:'util', icon:'branch', soon:true,
+        sub:'Send an email, SMS, or in-app alert',
+        help:{ eyebrow:'Communicate', title:'Send notification', body:'Tells someone what happened — by email, SMS, or an in-app alert.', more:DOC } },
     ],
   };
   /* while searching, the sub-levels fold into the results so a leaf is reachable
@@ -202,7 +158,7 @@
     if(SUBMENUS[i.id]) return out.concat([{ header:i.label }], SUBMENUS[i.id].filter(c => !c.header));
     return out.concat([i]);
   }, []);
-  const IMPLEMENTED = { ifelse:1, branch:1 };
+  const IMPLEMENTED = { cond:1, branch:1 };
 
   /* ---------------------------------------------------------- state */
   const nodes = {};           // id -> node
@@ -218,7 +174,6 @@
     return nodes[id];
   }
   function newTrigger(){ return mk('trigger', { trigType:null, module:'', attrs:[''], sched:{} }); }
-  function newIfElse(){ return mk('ifelse', { title:'IF / Else', groups:[newGroup()] }); }
   /* A Branch node is a trigger-style card that FANS OUT sideways into lanes. Each
      lane is a real node of its own (type 'lane'): an "if" lane carries a name and
      conditions, the single "else" lane is the Default. Whatever runs after a lane
@@ -230,6 +185,10 @@
     addLane(b, 'if');                              // Branch 1 — mandatory, solid line
     return b;
   }
+  /* Inline Condition — a single check gating what comes after it. One card,
+     no branching: title, source node, grouped conditions, next step — the
+     same shape as Trigger, just with a condition instead of an event. */
+  function newCondition(){ return mk('cond', { title:'Condition', groups:[newGroup()] }); }
   let brSeq = 0;                                    // kept for history snapshots
   const FIELDS = ['Category','Priority','Status','Department','Assignee','Impact','Urgency'];
   const OPS = ['is','is not','contains','is one of'];
@@ -270,15 +229,11 @@
   /* Every node hanging off a Trigger / branch path's single output: the first one
      (slots.next), then any parallel siblings. They all run at the same time. */
   const kidsOf = n => (n.slots.next ? [n.slots.next] : []).concat(n.parallel || []);
-  const canParallel = n => n.type === 'trigger' || n.type === 'lane';
+  const canParallel = n => n.type === 'trigger' || n.type === 'lane' || n.type === 'cond';
 
   /* ports = output connection points of a node, in top→bottom order */
   function portsOf(n){
-    if(n.type === 'trigger' || n.type === 'lane') return [{ key:'next', label:'', cls:'' }];
-    if(n.type === 'ifelse'){
-      /* exactly two ways out — a condition is either true or it is not */
-      return [{ key:'g0', label:'Is True', cls:'t' }, { key:'else', label:'Is False', cls:'f' }];
-    }
+    if(n.type === 'trigger' || n.type === 'lane' || n.type === 'cond') return [{ key:'next', label:'', cls:'' }];
     return [];          // a Branch card has no ports of its own — its lanes do
   }
   /* every port, including the ones the collapsed card hides — used by the drawer */
@@ -304,7 +259,7 @@
     } else {
       if(!n.title.trim()) miss.push('title');
       if(!n.source) miss.push('source');
-      if(n.type === 'ifelse' && !n.groups.some(g => g.conds.some(condDone))) miss.push('conds');
+      if(n.type === 'cond' && !n.groups.some(g => g.conds.some(condDone))) miss.push('conds');
     }
     return miss;
   }
@@ -428,22 +383,21 @@
     return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="${icoCls}">${icoImg}</div><span class="nm ${empty?'':'set'}">${esc(name)}</span></div>${actsHTML}</div>${bottom}</div>`;
   }
 
-  /* IF/Else wears the same clothes as the trigger and the Branch: a tag above,
-     icon + title, and a description line — here read-only, and showing the
-     condition. Its two outputs (Is True / Is False) are drawn as lines below. */
-  function ifelseHTML(n, st){
-    const pill = `<div class="pill-row"><span class="pill">IF / Else</span>${badgeHTML(st)}</div>`;
-    const sum = condSummary(n);
-    return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major flip">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'IF / Else')}</span></div>${actsHTML}</div>`
-      + `<div class="card-bot ro ${sum ? 'set' : ''}">${esc(sum || 'Set up the condition')}</div></div>`;
-  }
-
   /* The Branch card wears the same clothes as the trigger: a small tag above, then
      icon + title + a description line. The branches themselves are NOT drawn
      inside it any more — they fan out below as lanes. */
   function branchHTML(n, st){
     const pill = `<div class="pill-row"><span class="pill">Branch</span>${badgeHTML(st)}</div>`;
     return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major rot">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'Branch')}</span></div>${actsHTML}</div>${descLine(n)}</div>`;
+  }
+
+  /* Inline Condition — one card, read-only description showing the check
+     itself once it's set ("If Priority is High"), same as a lane's card. */
+  function condNodeHTML(n, st){
+    const sum = condSummary(n);
+    const pill = `<div class="pill-row"><span class="pill">Condition</span>${badgeHTML(st)}</div>`;
+    return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major flip">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'Condition')}</span></div>${actsHTML}</div>`
+      + `<div class="card-bot ro ${sum ? 'set' : ''}">${esc(sum || 'Set up the condition')}</div></div>`;
   }
 
   /* A lane card: its name, and — once filled — its conditions as the description.
@@ -501,7 +455,7 @@
     })(rootId);
 
     // 1. inner HTML + class
-    const HTML = { trigger:triggerHTML, ifelse:ifelseHTML, branch:branchHTML, lane:laneHTML };
+    const HTML = { trigger:triggerHTML, branch:branchHTML, lane:laneHTML, cond:condNodeHTML };
     list.forEach(item => {
       seen.add(item.key);
       const el = getEl(item.key), n = item.n, st = stateOf(n);
@@ -514,6 +468,7 @@
 
   /* Positions + edges only. A drag runs this on every frame — rebuilding all the
      card markup at 60fps would stutter, and the markup has not changed anyway. */
+  let lastPos = {};                                        // world-space {x,y} of every node, from the last relayout
   function relayout(){
     // 2. layout
     const pos = {}; const edges = []; let maxX = 0, maxY = 0, minX = Infinity, minY = Infinity;
@@ -524,23 +479,38 @@
       minX = Math.min(minX, x); minY = Math.min(minY, y - 30);   // -30 leaves room for the state badge
       return { h };
     }
-    /* How far a node's subtree reaches to the left / right of its card's centre.
-       A Branch fans its lanes out sideways, so it needs this to know how much
-       room each lane's own subtree (which may fan out again) claims. */
-    const LANE_GAP = 56, LANE_DY = 118, BUS_DY = 52;
+    /* How far a node's subtree reaches to either side of its own centre-line,
+       along the CROSS axis (the axis a fan spreads on — X in vertical mode, Y
+       in horizontal). A Branch fans its lanes across this axis, so it needs
+       this to know how much room each lane's own subtree claims.
+
+       AXIS ABSTRACTION: this whole geometry pass thinks in "how far along the
+       chain" (main) and "how far off to the side" (cross), never x/y directly.
+       mSize/cHalf read a card's real size; P() is the ONE place that turns
+       (main,cross) into a real screen point — vertical maps main→y, cross→x;
+       horizontal maps main→x, cross→y. Cards themselves never rotate: only
+       where they land on the canvas changes. */
+    const LANE_GAP = 56, LANE_DY = 118, BUS_DY = 52, CARD_W = 250;
+    const horiz = axis === 'h';
+    const mSize = k => horiz ? CARD_W : els[k].offsetHeight;
+    const cHalf = k => horiz ? els[k].offsetHeight / 2 : CARD_W / 2;
+    const P   = (main, cross) => horiz ? { x:main, y:cross } : { x:cross, y:main };
+    const mOf = pt => horiz ? pt.x : pt.y;
+    const cOf = pt => horiz ? pt.y : pt.x;
     function ext(key){
       const n = nodes[key];
+      const own = cHalf(key);
       if(canParallel(n) && kidsOf(n).length === 1 && showPar(n)){
         /* the slot sits beside the child's CARD; the child's own fan starts lower, so it need not clear that */
-        const e = ext(kidsOf(n)[0]);
-        return { l:Math.max(125, e.l), r:Math.max(e.r, 306 + 125) };
+        const e = ext(kidsOf(n)[0]), slotHalf = horiz ? 22 : 125;
+        return { l:Math.max(own, e.l), r:Math.max(e.r, own + LANE_GAP + slotHalf * 2) };
       }
       if((n.type === 'trigger' || n.type === 'lane') && !chainFans(n)){
-        const c = n.slots.next, e = c ? ext(c) : { l:125, r:125 };
-        return { l:Math.max(125, e.l), r:Math.max(125, e.r) };
+        const c = n.slots.next, e = c ? ext(c) : { l:own, r:own };
+        return { l:Math.max(own, e.l), r:Math.max(own, e.r) };
       }
       const w = laneWidths(n);                            // branch + if/else: outputs fan out below
-      return { l:Math.max(125, w.total / 2), r:Math.max(125, w.total / 2) };
+      return { l:Math.max(own, w.total / 2), r:Math.max(own, w.total / 2) };
     }
     /* the row of outputs: a Branch's lanes then its dotted "pending" slot; an IF/Else's
        Is True / Is False (each holding whatever node was added there, or nothing yet) */
@@ -550,13 +520,13 @@
     function chainFans(n){ return kidsOf(n).length > 1 || !!showPar(n); }
     function laneItems(n){
       if(canParallel(n)) return kidsOf(n).map(id => ({ id })).concat(showPar(n) ? [{ par:true }] : []);
-      if(n.type === 'ifelse') return portsOf(n).map(p => ({ id:n.slots[p.key], port:p }));
       return n.lanes.map(id => ({ id })).concat([{ pending:true }]);
     }
     function laneWidths(n){
       const items = laneItems(n); let cur = 0;
+      const slotHalf = horiz ? 22 : 125;
       const cs = items.map(it => {
-        const e = it.id ? ext(it.id) : { l:125, r:125 };
+        const e = it.id ? ext(it.id) : { l:slotHalf, r:slotHalf };
         const c = cur + e.l; cur += e.l + e.r + LANE_GAP; return c;
       });
       const total = cur - LANE_GAP;
@@ -569,73 +539,76 @@
       if(o){ x += o.x; y += o.y; }
       const { h } = place(key, x, y);
       const n = nodes[key];
-      let bottom = y + h;
+      const main = mSize(key), myMain = mOf({ x, y }), myCross = cOf({ x, y });
+      let bottom = myMain + main;                           // farthest reach along the primary axis so far
       if(canParallel(n) && kidsOf(n).length === 1 && showPar(n)){
-        /* one node so far: it stays put, and the dashed slot waits to its right */
-        const mid = x + 125, rowY = y + h + LANE_DY, kid = kidsOf(n)[0];
-        const parCx = mid + 306;
-        bottom = Math.max(bottom, layout(kid, x, rowY));
-        edges.push({ kind:'pfan', from:key, to:kid, cx:mid, y:rowY });
-        edges.push({ kind:'ppar', from:key, cx:parCx, y:rowY });
-        maxX = Math.max(maxX, parCx + 125); maxY = Math.max(maxY, rowY + 44); bottom = Math.max(bottom, rowY + 44);
+        /* one node so far: it stays in line, and the dashed slot waits beside it */
+        const kid = kidsOf(n)[0], rowMain = myMain + main + LANE_DY, slotHalf = horiz ? 22 : 125;
+        const kidPt = P(rowMain, myCross);
+        const slotPt = P(rowMain, myCross + cHalf(key) + LANE_GAP + slotHalf);
+        bottom = Math.max(bottom, layout(kid, kidPt.x, kidPt.y));
+        edges.push({ kind:'pfan', from:key, to:kid, cx:kidPt.x, y:kidPt.y });
+        edges.push({ kind:'ppar', from:key, cx:slotPt.x, y:slotPt.y });
+        minX = Math.min(minX, slotPt.x - 125); maxX = Math.max(maxX, slotPt.x + 125);
+        minY = Math.min(minY, slotPt.y - 30); maxY = Math.max(maxY, slotPt.y + 44);
+        bottom = Math.max(bottom, rowMain + 44);
         return bottom;
       }
       if(canParallel(n) && chainFans(n)){
-        /* parallel nodes: one line splits, the nodes sit side by side under it */
-        const w = laneWidths(n), mid = x + 125, rowY = y + h + LANE_DY;
+        /* parallel nodes: one line splits, the nodes sit side by side under it.
+           myCross is this card's own top-left edge, not its centre — the row
+           must centre on the card's MIDDLE, so its own half-width goes in first. */
+        const w = laneWidths(n), rowMain = myMain + main + LANE_DY, mid = myCross + cHalf(key);
         w.items.forEach((it, i) => {
-          const cx = mid - w.total / 2 + w.centres[i];
+          const cross = mid - w.total / 2 + w.centres[i], pt = P(rowMain, cross);
           if(it.id){
-            bottom = Math.max(bottom, layout(it.id, cx - 125, rowY));
-            edges.push({ kind:'pfan', from:key, to:it.id, cx, y:rowY });
+            /* pt is this item's CENTRE-line; a real card's own top-left corner
+               is that centre minus half ITS OWN cross-size — 125 always in
+               vertical mode, but the child's real height in horizontal mode */
+            const cardPt = P(rowMain, cross - cHalf(it.id));
+            bottom = Math.max(bottom, layout(it.id, cardPt.x, cardPt.y));
+            edges.push({ kind:'pfan', from:key, to:it.id, cx:cardPt.x, y:cardPt.y });
           } else {
-            edges.push({ kind:'ppar', from:key, cx, y:rowY });
-            minX = Math.min(minX, cx - 125); maxX = Math.max(maxX, cx + 125);
-            maxY = Math.max(maxY, rowY + 44); bottom = Math.max(bottom, rowY + 44);
+            edges.push({ kind:'ppar', from:key, cx:pt.x, y:pt.y });
+            minX = Math.min(minX, pt.x - 125); maxX = Math.max(maxX, pt.x + 125);
+            minY = Math.min(minY, pt.y - 30); maxY = Math.max(maxY, pt.y + 44);
+            bottom = Math.max(bottom, rowMain + 44);
           }
         });
         return bottom;
       }
-      if(n.type === 'trigger' || n.type === 'lane'){
+      if(n.type === 'trigger' || n.type === 'lane' || n.type === 'cond'){
         const c = n.slots.next;
         if(c){
-          bottom = layout(c, x, y + h + 64);
+          const pt = P(myMain + main + 64, myCross);
+          bottom = layout(c, pt.x, pt.y);
           edges.push({ kind:'trig', from:key, to:c });
         }
         return bottom;
       }
       if(n.type === 'branch'){
-        /* lanes fan out below the card, centred on it, side by side */
-        const w = laneWidths(n), mid = x + 125, rowY = y + h + LANE_DY;
+        /* lanes fan out across the cross axis, centred on the card. myCross is
+           this card's own top-left edge, not its centre — the row must centre
+           on the card's MIDDLE, so its own half-width goes in first (otherwise
+           the row drifts a whole half-card toward the top-left corner, robbing
+           the pending slot of the room its elbow needs to bend cleanly). */
+        const w = laneWidths(n), rowMain = myMain + main + LANE_DY, mid = myCross + cHalf(key);
         w.items.forEach((it, i) => {
-          const cx = mid - w.total / 2 + w.centres[i];
+          const cross = mid - w.total / 2 + w.centres[i], pt = P(rowMain, cross);
           if(it.pending){
-            edges.push({ kind:'pending', from:key, cx, y:rowY });
-            minX = Math.min(minX, cx - 125); maxX = Math.max(maxX, cx + 125); maxY = Math.max(maxY, rowY + 70);
-            bottom = Math.max(bottom, rowY + 70);
+            edges.push({ kind:'pending', from:key, cx:pt.x, y:pt.y });
+            minX = Math.min(minX, pt.x - 125); maxX = Math.max(maxX, pt.x + 125); minY = Math.min(minY, pt.y - 30); maxY = Math.max(maxY, pt.y + 70);
+            bottom = Math.max(bottom, rowMain + 70);
           } else {
-            bottom = Math.max(bottom, layout(it.id, cx - 125, rowY));
-            edges.push({ kind:'lane', from:key, to:it.id, cx, y:rowY });
+            const cardPt = P(rowMain, cross - cHalf(it.id));    // centre → this card's own top-left corner
+            bottom = Math.max(bottom, layout(it.id, cardPt.x, cardPt.y));
+            edges.push({ kind:'lane', from:key, to:it.id, cx:cardPt.x, y:cardPt.y });
           }
         });
         return bottom;
       }
-      if(n.type === 'ifelse'){
-        /* two outputs fan out below the card: Is True on the left, Is False on the right */
-        const w = laneWidths(n), mid = x + 125, rowY = y + h + LANE_DY;
-        w.items.forEach((it, i) => {
-          const cx = mid - w.total / 2 + w.centres[i];
-          if(it.id){
-            bottom = Math.max(bottom, layout(it.id, cx - 125, rowY));
-            edges.push({ kind:'fan', from:key, to:it.id, port:it.port, cx, y:rowY });
-          } else {
-            edges.push({ kind:'fanplus', from:key, slot:it.port.key, port:it.port, cx, y:rowY });
-            minX = Math.min(minX, cx - 125); maxX = Math.max(maxX, cx + 125); maxY = Math.max(maxY, rowY + 70);
-            bottom = Math.max(bottom, rowY + 70);
-          }
-        });
-        return bottom;
-      }
+      // legacy fallback — no current node type reaches this (portsOf() is empty
+      // or handled above for trigger/lane/branch); left vertical-only
       let cursor = y;
       portsOf(n).forEach(p => {
         const cid = n.slots[p.key];
@@ -643,20 +616,22 @@
         if(dy == null) dy = h - 20;
         if(!cid){ edges.push({ kind:'plus', from:key, slot:p.key, port:p, dy }); return; }
         const cy = Math.max(y + dy - 24, cursor);
-        /* 240px of clear connector — enough for the port label AND the hover
-           controls to sit side by side without touching. A child that itself fans
-           out sideways is pushed further right so its left-most lane clears us. */
         const cb = layout(cid, x + 250 + 240 + Math.max(0, ext(cid).l - 125), cy);
         cursor = cb + 20; bottom = Math.max(bottom, cb);
         edges.push({ kind:'port', from:key, to:cid, port:p, dy });
       });
       return bottom;
     }
-    /* The flow starts in the middle of the canvas and grows to the right.
-       Centred on the STAGE, not the visible canvas, so opening the config
-       drawer slides the panel in without shifting the whole diagram. */
+    /* The flow starts near one edge of the canvas and grows across it: from the
+       left in horizontal mode, from the top in vertical. Centred on the STAGE,
+       not the visible canvas, so opening the config drawer slides the panel in
+       without shifting the whole diagram. */
     const stageEl = document.querySelector('.stage') || canvasEl;
-    layout(rootId, Math.max(120, Math.round((stageEl.clientWidth - 250) / 2)), 110);
+    const rootH = els[rootId] ? els[rootId].offsetHeight : 94;
+    const startPt = horiz
+      ? { x:110, y:Math.max(80, Math.round((stageEl.clientHeight - rootH) / 2)) }
+      : { x:Math.max(120, Math.round((stageEl.clientWidth - 250) / 2)), y:110 };
+    layout(rootId, startPt.x, startPt.y);
 
     // 3. apply positions (new nodes get the entrance animation)
     Object.keys(pos).forEach(k => {
@@ -672,13 +647,13 @@
     /* Hover controls on a LIVE connection: insert a step, or drop this step and
        everything after it. They lay themselves out along the line — stacked for a
        vertical connector, side by side for a horizontal one. */
-    function edgeControls(pid, slot, childId, x, y, axis, ekey){
+    function edgeControls(pid, slot, childId, x, y, ctlAxis, ekey){
       const on = picking && picking.parentId === pid && picking.slot === slot;
       const hot = document.createElement('div');
-      hot.className = 'edge-hot ' + axis + (on ? ' open' : '');
+      hot.className = 'edge-hot ' + ctlAxis + (on ? ' open' : '');
       hot.dataset.pid = pid; hot.dataset.slot = slot;
       hot.style.left = x + 'px'; hot.style.top = y + 'px';
-      hot.innerHTML = `<div class="edge-ctl ${axis}">`
+      hot.innerHTML = `<div class="edge-ctl ${ctlAxis}">`
         + `<button class="ec" data-a="ins" data-tip="Insert a step here">${img('n-plus')}</button>`
         + `<button class="ec del" data-a="del" data-tip="Remove this step and the ones after it">${img('n-act-delete')}</button>`
         + `</div>`;
@@ -710,51 +685,57 @@
       world.appendChild(b);
       return b;
     }
-    /* Branch → lanes: one trunk down from the card, then a rounded elbow out to
-       each lane. Solid where a lane exists, dotted for the pending slot. */
-    /* `end` adds the arrowhead — only on a line that actually ENTERS a node */
-    function elbow(x0, y0, x1, y1, busY, dashed, end){
-      const r = 12, dx = x1 - x0, s = dx > 0 ? 1 : -1, mk = end ? ' marker-end="url(#wf-arrow)"' : '';
+    /* One rounded elbow shape, in either axis: straight along the primary axis
+       to a shared "bus" position, a jog across the cross axis, then straight
+       the rest of the way in. Vertical mode: down, across, down. Horizontal
+       mode: across, down/up, across. `end` adds the arrowhead — only on a
+       line that actually ENTERS a node. Built entirely from real (x,y) points
+       via P(), so every original pixel constant keeps its old meaning. */
+    function elbow(x0, y0, x1, y1, busPos, dashed, end){
+      const r = 12, mk = end ? ' marker-end="url(#wf-arrow)"' : '';
+      const m0 = mOf({ x:x0, y:y0 }), c0 = cOf({ x:x0, y:y0 }), m1 = mOf({ x:x1, y:y1 }), c1 = cOf({ x:x1, y:y1 });
+      const s = (c1 - c0) > 0 ? 1 : -1;
       let d;
-      if(Math.abs(dx) < 2) d = `M${x0} ${y0} V${y1}`;
-      else if(y1 - y0 < BUS_DY + 34){
-        /* the node was dragged up beside/above its parent: a smooth S-curve keeps the
-           link intact where a square elbow would fold back on itself */
-        const c = Math.max(40, Math.abs(y1 - y0) / 2);
-        d = `M${x0} ${y0} C${x0} ${y0 + c}, ${x1} ${y1 - c}, ${x1} ${y1}`;
-      } else d = `M${x0} ${y0} V${busY - r} Q${x0} ${busY} ${x0 + s * r} ${busY} H${x1 - s * r} Q${x1} ${busY} ${x1} ${busY + r} V${y1}`;
+      if(Math.abs(c1 - c0) < 2){
+        d = `M${x0} ${y0} L${x1} ${y1}`;
+      } else if(m1 - m0 < BUS_DY + 34){
+        /* the node was dragged back beside/before its parent: a smooth curve keeps
+           the link intact where a square elbow would fold back on itself */
+        const c = Math.max(40, Math.abs(m1 - m0) / 2), p1 = P(m0 + c, c0), p2 = P(m1 - c, c1);
+        d = `M${x0} ${y0} C${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${x1} ${y1}`;
+      } else {
+        const b0 = P(busPos - r, c0), bQ0 = P(busPos, c0), b1 = P(busPos, c0 + s * r);
+        const b2 = P(busPos, c1 - s * r), bQ1 = P(busPos, c1), b3 = P(busPos + r, c1);
+        d = `M${x0} ${y0} L${b0.x} ${b0.y} Q${bQ0.x} ${bQ0.y} ${b1.x} ${b1.y} L${b2.x} ${b2.y} Q${bQ1.x} ${bQ1.y} ${b3.x} ${b3.y} L${x1} ${y1}`;
+      }
       return `<path class="edge${dashed ? ' dashed' : ''}" d="${d}"${mk}/>`;
     }
-    /* where a line should land on a node: centre of its card's top edge, not the
+    /* where a line should land on a node: the centre of the card's LEADING
+       edge — its top in vertical mode, its left side in horizontal — not the
        top of its wrapper (which starts at the state tag above the card) */
     const entry = key => {
-      const c = els[key].querySelector('.card');
-      return { x: pos[key].x + 125, y: pos[key].y + (c ? c.offsetTop : 0) };
+      const c = els[key].querySelector('.card'), top = c ? c.offsetTop : 0, ch = c ? c.offsetHeight : els[key].offsetHeight;
+      return horiz ? { x:pos[key].x, y:pos[key].y + top + ch / 2 } : { x:pos[key].x + 125, y:pos[key].y + top };
+    };
+    /* where a line LEAVES a node: the centre of its trailing edge — bottom in
+       vertical mode, right side in horizontal — of the whole wrapper (pill tag
+       included), matching what `entry()` reads on the receiving end */
+    const exitPt = key => {
+      const p = pos[key], h = els[key].offsetHeight;
+      return horiz ? { x:p.x + CARD_W, y:p.y + h / 2 } : { x:p.x + 125, y:p.y + h };
     };
     Object.keys(nodes).forEach(id => {
-      const n = nodes[id]; if((n.type !== 'branch' && n.type !== 'ifelse') || !pos[id]) return;
-      const p = pos[id], h = els[id].offsetHeight, mx = p.x + 125, by = p.y + h, busY = by + BUS_DY;
+      const n = nodes[id]; if(n.type !== 'branch' || !pos[id]) return;
+      const from = exitPt(id), start = P(mOf(from) + 6, cOf(from)), busPos = mOf(from) + BUS_DY;
       const dot = document.createElement('div'); dot.className = 't-dot';
-      dot.style.left = (mx - 5) + 'px'; dot.style.top = (by - 4) + 'px'; world.appendChild(dot);
-      edges.filter(e => ['lane', 'pending', 'fan', 'fanplus'].includes(e.kind) && e.from === id).forEach(e => {
-        const open = e.kind === 'pending' || e.kind === 'fanplus';       // no node at the end of this line yet
+      dot.style.left = (from.x - 5) + 'px'; dot.style.top = (from.y - 4) + 'px'; world.appendChild(dot);
+      edges.filter(e => ['lane', 'pending'].includes(e.kind) && e.from === id).forEach(e => {
+        const open = e.kind === 'pending';                                // no node at the end of this line yet
         /* a line that ends in a node follows THAT node wherever it has been dragged */
         const to = open ? null : entry(e.to);
-        svg += open ? elbow(mx, by + 6, e.cx, e.y + 10, busY, e.kind === 'pending', false)
-                    : elbow(mx, by + 6, to.x, to.y, busY, false, true);
-        if(e.kind === 'fan' || e.kind === 'fanplus'){
-          /* IF/Else: the tag sits on the line; an empty output ends in a solid "+" */
-          const tag = document.createElement('div');
-          tag.className = 'elabel ' + (e.port.cls || '');
-          tag.textContent = e.port.label;
-          tag.style.left = (open ? e.cx : to.x) + 'px'; tag.style.top = (open ? e.y + 14 : Math.max(by + BUS_DY + 18, to.y - 30)) + 'px';
-          world.appendChild(tag);
-          if(e.kind === 'fanplus'){
-            svg += `<path class="edge" d="M${e.cx} ${e.y + 24} V${e.y + 48}"/>`;
-            plusBtn(id, e.slot, e.cx - 10, e.y + 48, e.port.label);
-          }
-          return;
-        }
+        const openTarget = P(mOf({ x:e.cx, y:e.y }) + 10, cOf({ x:e.cx, y:e.y }));
+        svg += open ? elbow(start.x, start.y, openTarget.x, openTarget.y, busPos, true, false)
+                    : elbow(start.x, start.y, to.x, to.y, busPos, false, true);
         if(e.kind !== 'pending') return;
         /* the dotted slot: a pill naming what it would become, then the "+" */
         const lab = document.createElement('div');
@@ -765,44 +746,51 @@
       });
     });
     Object.keys(nodes).forEach(id => {
-      const n = nodes[id]; if((n.type !== 'trigger' && n.type !== 'lane') || !pos[id]) return;
-      const p = pos[id], h = els[id].offsetHeight;
-      const cx = p.x + 125, by = p.y + h;
+      const n = nodes[id]; if((n.type !== 'trigger' && n.type !== 'lane' && n.type !== 'cond') || !pos[id]) return;
+      const from = exitPt(id), start = P(mOf(from) + 6, cOf(from));
       const dot = document.createElement('div'); dot.className = 't-dot';
-      dot.style.left = (cx - 5) + 'px'; dot.style.top = (by - 4) + 'px'; world.appendChild(dot);
+      dot.style.left = (from.x - 5) + 'px'; dot.style.top = (from.y - 4) + 'px'; world.appendChild(dot);
       const fan = edges.filter(e => (e.kind === 'pfan' || e.kind === 'ppar') && e.from === id);
       if(fan.length){
         /* the split: one trunk, a "Parallel" tag on it, an elbow to each node */
-        const busY = by + BUS_DY;
+        const busPos = mOf(from) + BUS_DY;
         fan.forEach(e => {
-          if(e.kind === 'pfan'){ const to = entry(e.to); svg += elbow(cx, by + 6, to.x, to.y, busY, false, true); return; }
-          svg += elbow(cx, by + 6, e.cx, e.y, busY, false, false);
+          if(e.kind === 'pfan'){ const to = entry(e.to); svg += elbow(start.x, start.y, to.x, to.y, busPos, false, true); return; }
+          svg += elbow(start.x, start.y, e.cx, e.y, busPos, false, false);
           const slot = document.createElement('button');
           slot.type = 'button'; slot.className = 'par-slot' + (picking && picking.parentId === id && picking.slot === 'par' ? ' on' : '');
           slot.dataset.pid = id; slot.dataset.slot = 'par';
           slot.innerHTML = img('plus-square') + '<span>Add parallel node</span>';
-          slot.style.left = (e.cx - 125) + 'px'; slot.style.top = e.y + 'px';
+          /* a fixed 250×~40 box that never rotates: centre it on the CROSS
+             coordinate (its own width in vertical mode, its own height in
+             horizontal), flush against the MAIN coordinate on the other axis */
+          { const lt = horiz ? { x:e.cx, y:e.y - 20 } : { x:e.cx - 125, y:e.y };
+            slot.style.left = lt.x + 'px'; slot.style.top = lt.y + 'px'; }
           slot.addEventListener('click', ev => { ev.stopPropagation(); openNodePicker(id, 'par'); });
           world.appendChild(slot);
         });
+        const tagPt = P(mOf(from) + 26, cOf(from));
         const tag = document.createElement('div');
         tag.className = 'elabel par'; tag.textContent = 'Parallel';
-        tag.style.left = cx + 'px'; tag.style.top = (by + 26) + 'px'; world.appendChild(tag);
+        tag.style.left = tagPt.x + 'px'; tag.style.top = tagPt.y + 'px'; world.appendChild(tag);
         return;
       }
       if(n.slots.next){
-        const kid = n.slots.next, ekey = id + ':next';
-        const to = entry(kid), dx = to.x - cx;
-        if(Math.abs(dx) < 2){
-          svg += `<path class="edge" data-ekey="${ekey}" d="M${cx} ${by+6} L${cx} ${to.y}" marker-end="url(#wf-arrow)"/>`;
-        } else {                                       // dragged sideways: keep the link, curve it
-          const c = Math.max(40, Math.abs(to.y - by) / 2);
-          svg += `<path class="edge" data-ekey="${ekey}" d="M${cx} ${by+6} C${cx} ${by+6+c}, ${to.x} ${to.y-c}, ${to.x} ${to.y}" marker-end="url(#wf-arrow)"/>`;
+        const kid = n.slots.next, ekey = id + ':next', to = entry(kid);
+        if(Math.abs(cOf(to) - cOf(from)) < 2){
+          svg += `<path class="edge" data-ekey="${ekey}" d="M${start.x} ${start.y} L${to.x} ${to.y}" marker-end="url(#wf-arrow)"/>`;
+        } else {                                       // dragged off-line: keep the link, curve it
+          const c = Math.max(40, Math.abs(mOf(to) - mOf(start)) / 2);
+          const p1 = P(mOf(start) + c, cOf(start)), p2 = P(mOf(to) - c, cOf(to));
+          svg += `<path class="edge" data-ekey="${ekey}" d="M${start.x} ${start.y} C${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${to.x} ${to.y}" marker-end="url(#wf-arrow)"/>`;
         }
-        edgeControls(id, 'next', kid, (cx + to.x) / 2, (by + 6 + to.y) / 2, 'v', ekey);   // vertical line → stacked icons
+        const midPt = P((mOf(start) + mOf(to)) / 2, (cOf(start) + cOf(to)) / 2);
+        edgeControls(id, 'next', kid, midPt.x, midPt.y, horiz ? 'h' : 'v', ekey);
       } else {
-        svg += `<path class="edge" d="M${cx} ${by+6} L${cx} ${by+38}"/>`;
-        plusBtn(id, 'next', cx - 10, by + 38, '');
+        const stubEnd = P(mOf(start) + 32, cOf(start));
+        svg += `<path class="edge" d="M${start.x} ${start.y} L${stubEnd.x} ${stubEnd.y}"/>`;
+        const btnPt = horiz ? { x:stubEnd.x, y:stubEnd.y - 10 } : { x:stubEnd.x - 10, y:stubEnd.y };
+        plusBtn(id, 'next', btnPt.x, btnPt.y, '');
       }
     });
     edges.filter(e => e.kind === 'port').forEach(e => {
@@ -843,6 +831,18 @@
       + '<path d="M1 1.5 L9 5 L1 8.5 z" fill="#a5bad0"/></marker></defs>' + svg;
     world.style.width = (maxX + 200) + 'px'; world.style.height = (maxY + 200) + 'px';
     content = { minX, minY, maxX, maxY };      // what "fit to screen" and centring work from
+    lastPos = pos;
+    /* anchored notes ride along with whatever node they're pinned to — same
+       fixed offset, recomputed against that node's fresh position, so a note
+       never drifts away from what it's annotating, whether the node moved
+       because it was dragged or because the layout direction just flipped */
+    Object.keys(stickies).forEach(id => {
+      const s = stickies[id]; if(!s.anchor) return;
+      if(!nodes[s.anchor] || !lastPos[s.anchor]){ s.anchor = null; return; }   // its node is gone — stop tracking it
+      s.x = Math.round(lastPos[s.anchor].x + s.ax);
+      s.y = Math.round(lastPos[s.anchor].y + s.ay);
+      renderSticky(id);
+    });
     applyView();
     pushHistory();               // every mutation funnels through render()
   }
@@ -898,8 +898,8 @@
       if(!n.trigType){ render(); openTriggerPicker(); return; }
       openTrigger(n);
     }
-    else if(n.type === 'ifelse') openIfElse(n);
     else if(n.type === 'lane') openLane(n);
+    else if(n.type === 'cond') openCondition(n);
     else openBranch(n);
     render();
   }
@@ -919,36 +919,60 @@
   function openTriggerPicker(){
     const n = nodes[rootId];
     closeDrawer();
-    WFPop.open({
-      anchor: nodeAnchor(rootId),
-      title: 'Trigger',
-      wide: true,
-      tabs: TRIGGER_TABS,
-      tab: n.trigType ? trigTab(n.trigType) : 'event',
-      searchPlaceholder: 'Search an event or module — e.g. Incident',
-      items: tab => TRIGGER_ITEMS[tab],
-      selected: n.trigType,
-      helpEyebrow: 'Trigger',
-      help: { title:'Trigger', body:'Pick the event that fires this workflow — everything else runs after it.' },
-      onPick(item){
-        const changedShape = n.trigType && trigTab(item.id) !== trigTab(n.trigType);
-        const wasDefault = !n.title.trim() || (n.trigType && n.title === TRIG_LABEL(n.trigType));
-        n.trigType = item.id;
-        if(wasDefault) n.title = TRIG_LABEL(item.id);
-        if(changedShape){ n.module = ''; n.attrs = ['']; n.sched = {}; }
-        if(!isEventTrig(item.id)) n.sched = n.sched || {};
-        n.checked = false;
-        selId = rootId;
-        render();
-        openTrigger(n);
-      },
-      onClose(reason){
-        if(reason !== 'pick'){
-          render();
-          if(nodes[rootId].trigType && selId) selectNode(selId);   // cancelled → put the drawer back
-        }
-      }
-    });
+    /* two levels: the top offers "Every time period" as one row; picking it
+       drills to its four concrete schedules. Mirrors openNodePicker's own
+       drill pattern — `navigating` stops the level-swap from reading as a
+       cancel, `back` returns to the top without losing the trigger's state. */
+    let navigating = false;
+    function commit(item){
+      const changedShape = n.trigType && trigTab(item.id) !== trigTab(n.trigType);
+      const wasDefault = !n.title.trim() || (n.trigType && n.title === TRIG_LABEL(n.trigType));
+      n.trigType = item.id;
+      if(wasDefault) n.title = TRIG_LABEL(item.id);
+      if(changedShape){ n.module = ''; n.attrs = ['']; n.sched = {}; }
+      if(!isEventTrig(item.id)) n.sched = n.sched || {};
+      n.checked = false;
+      selId = rootId;
+      render();
+      openTrigger(n);
+    }
+    function onClosed(reason){
+      if(reason === 'pick' || navigating) return;
+      render();
+      if(nodes[rootId].trigType && selId) selectNode(selId);        // cancelled → put the drawer back
+    }
+    function openRecur(){
+      navigating = true;
+      WFPop.open({
+        anchor: nodeAnchor(rootId), title:'Every time period', back: () => openTop(),
+        wide: true, searchPlaceholder: 'Search an event or module — e.g. Incident',
+        items: () => TRIGGER_RECUR,
+        selected: n.trigType,
+        helpEyebrow: 'Trigger',
+        onPick: commit,
+        onClose: onClosed
+      });
+      navigating = false;
+    }
+    function openTop(){
+      navigating = true;
+      WFPop.open({
+        anchor: nodeAnchor(rootId), title: 'Trigger',
+        wide: true, searchPlaceholder: 'Search an event or module — e.g. Incident',
+        items: (tab, q) => q ? TRIGGER_FLAT : TRIGGER_TOP,
+        selected: TRIGGER_RECUR.some(i => i.id === n.trigType) ? 'recur' : n.trigType,
+        helpEyebrow: 'Trigger',
+        help: { title:'Trigger', body:'Pick the event that fires this workflow — everything else runs after it.' },
+        footer: { label:'Generate with AI', icon:'sparkle', onClick: () => toast('Generate with AI is not designed yet') },
+        onPick(item){
+          if(item.id === 'recur'){ openRecur(); return true; }      // drill in rather than commit
+          commit(item);
+        },
+        onClose: onClosed
+      });
+      navigating = false;
+    }
+    openTop();
   }
 
   /* opts.insert = the slot already holds a node; the pick goes BETWEEN the two
@@ -996,7 +1020,7 @@
         const make = item.make;
         if(!make || !IMPLEMENTED[make]){ toast(item.label + ' is not designed yet'); return true; }
         picking = null;
-        const node = make === 'ifelse' ? newIfElse() : newBranch();
+        const node = make === 'cond' ? newCondition() : newBranch();
         node.parent = parentId;
         /* Source Node is left for the user to choose. Pre-selecting it — now
            that the title arrives pre-filled too — would make a brand-new node
@@ -1207,7 +1231,6 @@
     });
   }
   bindHeadName('tr', '#trTitle');
-  bindHeadName('if', '#ifTitle');
   bindHeadName('br', '#brTitle');
   bindHeadName('ln', '#lnName');
 
@@ -1270,9 +1293,7 @@
     setHeadName('tr', n);
     const mb = $('#trModuleBox'); if(mb) mb.classList.toggle('invalid', show && miss.includes('module'));
     $('#trSched').querySelectorAll('[data-box]').forEach(b => b.classList.toggle('invalid', show && miss.includes('sched:' + b.dataset.box)));
-    const done = miss.length === 0;
-    $('#trNextWrap').classList.toggle('hidden', !done);
-    if(done) $('#trNext').innerHTML = nextRowsHTML(n);
+    $('#trNext').innerHTML = nextRowsHTML(n);
     renderAlert($('#trAlert'), n);
   }
 
@@ -1309,44 +1330,6 @@
   $('#trClose').addEventListener('click', deselect);
   bindNext($('#trNext'));
 
-  /* ------------------ IF/Else drawer */
-  function syncIfValidity(n){
-    $('#ifTitleBox').classList.toggle('invalid', n.checked && !n.title.trim());
-    setHeadName('if', n);
-    $('#ifSourceBox').classList.toggle('invalid', n.checked && !n.source);
-    showCondError('#ifCondErr', n);
-    renderAlert($('#ifAlert'), n);
-  }
-  function openIfElse(n){
-    openDrawer('ifelse');
-    $('#ifTitle').value = n.title; setDesc($('#ifDesc'), n.desc);
-    setHeadName('if', n);
-    gotoLabel(n, $('#ifGoto'));
-    fillSource(n, $('#ifSource'), $('#ifSourceBox'));
-    $('#ifCond').innerHTML = groupsHTML(n);
-    $('#ifNext').innerHTML = nextRowsHTML(n);
-    syncIfValidity(n);
-    $('#cfgScroll').scrollTop = 0; $('#cfgHead').classList.remove('collapsed');
-  }
-  $('#ifTitle').addEventListener('input', e => {
-    const n = nodes[selId]; if(!n) return;
-    n.title = e.target.value;
-    syncIfValidity(n);
-    $('#ifNext').innerHTML = nextRowsHTML(n); render();
-  });
-  $('#ifDesc').addEventListener('input', e => { const n = nodes[selId]; if(n){ n.desc = e.target.value; autoGrow(e.target); render(); } });
-  $('#ifSource').addEventListener('change', e => {
-    const n = nodes[selId]; if(!n) return;
-    n.source = e.target.value; syncIfValidity(n); render();
-  });
-  /* the same grouped builder the branches use — one check, exactly two outputs */
-  bindBuilder('#ifCond', '#ifAddGroup', '#ifClearAll', () => { const n = nodes[selId]; if(n && n.type === 'ifelse'){ syncIfValidity(n); render(); } });
-  $('#cfgClose').addEventListener('click', deselect);
-  $('#ifGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p) selectNode(p); });
-  $('#ifDelete').addEventListener('click', () => removeNode(selId));
-  $('#ifReplace').addEventListener('click', () => replaceNode(selId));
-  $('#ifMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#ifMore')));
-  bindNext($('#ifNext'));
 
   /* ------------------ Branch drawer
      The Branch node's own settings, then the list of its branches. Each row opens
@@ -1361,7 +1344,8 @@
         + `<span class="br-row-sum${condSummary(l) ? '' : ' ph'}">${esc(sum)}</span></button>${del}`
         + `<span class="br-row-chev">${img('chevron-down')}</span></div>`;
     }).join('')
-      /* the add button rides the same rail, as the last leaf of the tree */
+      /* the add button rides the same rail, as the last leaf of the tree —
+         Inline Condition (single) never gets one, it's capped at its one IF */
       + `<div class="br-row-add"><button class="btn-ghost" type="button" data-add><img src="assets/n-plus.svg" alt="">Add branch</button></div>`;
   }
   function syncBrValidity(n){
@@ -1462,9 +1446,7 @@
     showCondError('#lnCondErr', n);
     setHeadName('ln', n);
     renderAlert($('#lnAlert'), n);
-    const done = miss.length === 0;
-    $('#lnNextWrap').classList.toggle('hidden', !done);
-    if(done) $('#lnNext').innerHTML = nextRowsHTML(n);
+    $('#lnNext').innerHTML = nextRowsHTML(n);
   }
   function openLane(n){
     openDrawer('lane');
@@ -1530,10 +1512,72 @@
   }
   $('#lnPrev').addEventListener('click', () => stepLane(-1));
   $('#lnNextBtn').addEventListener('click', () => stepLane(1));
+  /* the "1 of N" readout is also a quick-jump: click it for the full list of
+     sibling branches, so a workflow with many branches doesn't need N clicks
+     of Prev/Next to reach the far one */
+  function openLaneJump(){
+    const n = nodes[selId]; if(!n || n.type !== 'lane') return;
+    const b = nodes[n.parent];
+    const items = b.lanes.map(id => {
+      const l = nodes[id];
+      return {
+        id, icon:'split', tone:'split',
+        label: l.title || (l.kind === 'else' ? 'Default' : 'Add name...'),
+        sub: l.kind === 'else' ? 'Runs when no other branch matches' : (condSummary(l) || 'Set up conditions'),
+      };
+    });
+    WFPop.open({
+      anchor: $('#lnPos'), noSearch:true, wide:true, title:'Jump to branch', selected:n.id,
+      items,
+      onPick(item){ selectNode(item.id); focusNode(item.id); }
+    });
+  }
+  $('#lnPos').addEventListener('click', openLaneJump);
   $('#lnGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p){ selectNode(p); focusNode(p); } });
   $('#lnClose').addEventListener('click', deselect);
   $('#lnDelete').addEventListener('click', () => removeNode(selId));
   bindNext($('#lnNext'));
+
+  /* ------------------ Condition (Inline) drawer
+     One card: title, source node, the grouped And/Or condition builder, and
+     what runs next — always visible, same as Trigger's, not gated behind
+     completion (the canvas already offers the "+" before the node is filled
+     in, so the drawer shouldn't lag behind that). */
+  function syncConditionValidity(n){
+    $('#cdTitleBox').classList.toggle('invalid', n.checked && !n.title.trim());
+    setHeadName('cd', n);
+    $('#cdSourceBox').classList.toggle('invalid', n.checked && !n.source);
+    showCondError('#cdCondErr', n);
+    renderAlert($('#cdAlert'), n);
+    $('#cdNext').innerHTML = nextRowsHTML(n);
+  }
+  function openCondition(n){
+    openDrawer('cond');
+    $('#cdTitle').value = n.title; setDesc($('#cdDesc'), n.desc);
+    setHeadName('cd', n);
+    gotoLabel(n, $('#cdGoto'));
+    fillSource(n, $('#cdSource'), $('#cdSourceBox'));
+    $('#cdCond').innerHTML = groupsHTML(n);
+    syncConditionValidity(n);
+    $('#cdScroll').scrollTop = 0; $('#cdHead').classList.remove('collapsed');
+  }
+  const condEdited = () => { const n = nodes[selId]; if(n && n.type === 'cond'){ syncConditionValidity(n); render(); } };
+  $('#cdTitle').addEventListener('input', e => {
+    const n = nodes[selId]; if(!n) return;
+    n.title = e.target.value; condEdited();
+  });
+  $('#cdDesc').addEventListener('input', e => { const n = nodes[selId]; if(n){ n.desc = e.target.value; autoGrow(e.target); render(); } });
+  $('#cdSource').addEventListener('change', e => {
+    const n = nodes[selId]; if(!n) return;
+    n.source = e.target.value; condEdited();
+  });
+  bindBuilder('#cdCond', '#cdAddGroup', '#cdClearAll', condEdited);
+  $('#cdGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p){ selectNode(p); focusNode(p); } });
+  $('#cdClose').addEventListener('click', deselect);
+  $('#cdDelete').addEventListener('click', () => removeNode(selId));
+  $('#cdReplace').addEventListener('click', () => replaceNode(selId));
+  $('#cdMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#cdMore')));
+  bindNext($('#cdNext'));
 
   /* ------------------ node lifecycle */
   function dropSubtree(id){
@@ -1546,7 +1590,10 @@
     const n = nodes[id]; if(!n || !n.parent) return;
     const parent = nodes[n.parent];
     if(n.type === 'lane'){
-      if(ifLanes(parent)[0] === n){ toast('Branch 1 is required — it cannot be deleted'); return; }
+      if(ifLanes(parent)[0] === n){
+        toast('Branch 1 is required — it cannot be deleted');
+        return;
+      }
       /* deleting a branch takes everything built after it — so ask first */
       if(!confirmed){
         const k = stepsBelow(id);
@@ -1580,6 +1627,79 @@
     openNodePicker(parent.id, slot);
   }
 
+  /* ---------------------------------------------------------- sticky notes
+     A lightweight sibling to the node model: { id, x, y, text, anchor, ax, ay }
+     in world space, no slots/parent/ports. Placed by the Note tool (click empty
+     canvas), then dragged/edited/deleted like any other canvas object. Included
+     in undo history alongside the node graph.
+
+     `anchor` is the id of whichever node the note landed nearest at the moment
+     it was placed (or last manually dragged) — a note is almost always commentary
+     ABOUT something nearby, so it should travel with that node: when the node
+     moves, whether from a plain drag or a layout-direction switch, relayout()
+     re-derives the note's x/y from the node's new position plus the fixed
+     offset (`ax`,`ay`) captured at anchor time. A note dropped far from
+     anything gets `anchor: null` and simply stays where it was put. The anchor
+     itself only ever changes on an explicit user action (placing or re-dragging
+     the note) — relayout never silently re-pins a note to a different node. */
+  let stickies = {}, stickySeq = 0;
+  const stickyEls = {};
+  const toolCbs = [];
+  const STICKY_ANCHOR_MAX = 400;             // beyond this, nothing is "nearby" enough to pin to
+
+  /* the closest node to a world point, or null if nothing is within reach */
+  function nearestNode(wx, wy){
+    let best = null, bestD = Infinity;
+    Object.keys(lastPos).forEach(k => {
+      const p = lastPos[k], el = els[k]; if(!p || !el) return;
+      const d = Math.hypot(wx - (p.x + el.offsetWidth / 2), wy - (p.y + el.offsetHeight / 2));
+      if(d < bestD){ bestD = d; best = k; }
+    });
+    return best != null && bestD <= STICKY_ANCHOR_MAX ? best : null;
+  }
+  /* (re)pin a note to whatever node is nearest its CURRENT position — called
+     when it's first placed, and again after the user finishes dragging it */
+  function anchorSticky(id){
+    const s = stickies[id]; if(!s) return;
+    const near = nearestNode(s.x + 90, s.y + 48);            // the note's own rough centre
+    if(near){ s.anchor = near; s.ax = s.x - lastPos[near].x; s.ay = s.y - lastPos[near].y; }
+    else s.anchor = null;
+  }
+
+  function stickyHTML(){
+    return `<button class="sticky-del" type="button" aria-label="Delete note">${img('close2')}</button>`
+      + `<textarea class="sticky-text" placeholder="Note…" spellcheck="false"></textarea>`;
+  }
+  function renderSticky(id){
+    const s = stickies[id]; if(!s) return;
+    let el = stickyEls[id];
+    if(!el){
+      el = document.createElement('div');
+      el.className = 'sticky'; el.dataset.key = id;
+      el.innerHTML = stickyHTML();
+      const ta = el.querySelector('.sticky-text');
+      ta.value = s.text;
+      ta.addEventListener('input', () => { s.text = ta.value; pushHistory(); });
+      world.appendChild(el);
+      stickyEls[id] = el;
+    }
+    el.style.left = s.x + 'px'; el.style.top = s.y + 'px';
+  }
+  function addSticky(wx, wy){
+    const id = 'note' + (++stickySeq);
+    stickies[id] = { id, x: Math.round(wx - 90), y: Math.round(wy - 18), text:'', anchor:null, ax:0, ay:0 };
+    anchorSticky(id);
+    renderSticky(id);
+    pushHistory();
+    return stickies[id];
+  }
+  function removeSticky(id){
+    delete stickies[id];
+    if(stickyEls[id]){ stickyEls[id].remove(); delete stickyEls[id]; }
+    pushHistory();
+  }
+  function renderAllStickies(){ Object.keys(stickies).forEach(renderSticky); }
+
   /* ------------------ canvas interactions */
   /* ---- dragging: nodes move themselves (and their subtree), empty canvas pans ----
      A node drag stores an offset that `layout` adds on top of the computed
@@ -1590,20 +1710,29 @@
   canvasEl.addEventListener('mousedown', e => {
     if(e.button !== 0) return;
     if(e.target.closest('.t-plus,.par-slot,.edge-hot,[data-act],.card-bot:not(.ro)')) return;   // those have their own jobs
-    /* The hand tool pans, from anywhere — including from on top of a node.
-       The select tool only moves nodes: dragging the empty canvas does nothing,
-       so the flow is never shifted by accident. */
-    const el = tool === 'pan' ? null : e.target.closest('.nd');
+    /* No more Hand/Select mode to pick between: a node or sticky under the
+       cursor drags itself, and empty canvas always pans — the one exception
+       is the Note tool, where an empty-canvas press is left alone so the
+       click handler below can place a note there instead. */
+    const stickyEl = e.target.closest('.sticky');
+    if(stickyEl && !e.target.closest('.sticky-text,.sticky-del')){
+      const id = stickyEl.dataset.key, s = stickies[id]; if(!s) return;
+      drag = { kind:'sticky', id, sx:e.clientX, sy:e.clientY, ox:s.x, oy:s.y, moved:0 };
+      stickyEl.classList.add('dragging');
+      dragged = false; e.preventDefault();
+      return;
+    }
+    const el = e.target.closest('.nd');
     if(el && nodes[el.dataset.key]){
       const n = nodes[el.dataset.key];
       n.off = n.off || { x:0, y:0 };
       drag = { kind:'node', id:n.id, sx:e.clientX, sy:e.clientY, ox:n.off.x, oy:n.off.y, moved:0, raf:0 };
       el.classList.add('dragging');
-    } else if(tool === 'pan'){
+    } else if(tool !== 'note'){
       drag = { kind:'pan', sx:e.clientX, sy:e.clientY, px:panX, py:panY, moved:0, raf:0 };
       canvasEl.classList.add('panning');
     } else {
-      return;                                            // empty canvas, select tool → not a drag
+      return;                                            // empty canvas, note tool → the click places it instead
     }
     dragged = false;
     e.preventDefault();                                  // no text selection while dragging
@@ -1619,6 +1748,12 @@
       applyView();
       return;
     }
+    if(drag.kind === 'sticky'){
+      const s = stickies[drag.id]; if(!s) return;
+      s.x = Math.round(drag.ox + dx / zoom); s.y = Math.round(drag.oy + dy / zoom);
+      renderSticky(drag.id);
+      return;
+    }
     const n = nodes[drag.id]; if(!n) return;
     n.off.x = drag.ox + dx / zoom;                       // screen pixels → world units
     n.off.y = drag.oy + dy / zoom;
@@ -1629,6 +1764,11 @@
     if(!drag) return;
     if(drag.raf) cancelAnimationFrame(drag.raf);
     if(drag.kind === 'node'){ const el = els[drag.id]; if(el) el.classList.remove('dragging'); }
+    else if(drag.kind === 'sticky'){
+      const el = stickyEls[drag.id]; if(el) el.classList.remove('dragging');
+      anchorSticky(drag.id);       // dropped here → (re)pin to whatever's nearest now
+      pushHistory();
+    }
     else canvasEl.classList.remove('panning');
     drag = null;
     relayout();
@@ -1641,7 +1781,7 @@
     const n = nodes[f.dataset.desc]; if(!n) return;
     n.desc = f.value;
     if(n.id === selId){                       // keep the open drawer in step
-      const d = $({ trigger:'#trDesc', ifelse:'#ifDesc', branch:'#brDesc' }[n.type]);
+      const d = $({ trigger:'#trDesc', branch:'#brDesc' }[n.type]);
       if(d) d.value = n.desc;
     }
   });
@@ -1669,7 +1809,16 @@
      a background click, closing the drawer it had just opened. */
   canvasEl.addEventListener('click', e => {
     if(dragged) return;                                  // that was a drag, not a click
+    const del = e.target.closest('.sticky-del');
+    if(del){ removeSticky(del.closest('.sticky').dataset.key); return; }
+    if(e.target.closest('.sticky')) return;               // its textarea handles itself
     if(e.target.closest('.t-plus,.par-slot,.card-bot:not(.ro)')) return;     // handle themselves
+    if(tool === 'note'){
+      const c = canvasEl.getBoundingClientRect();
+      addSticky((e.clientX - c.left - panX) / zoom, (e.clientY - c.top - panY) / zoom);
+      tool = 'select'; toolCbs.forEach(cb => cb(tool));   // one note per click, then back to normal
+      return;
+    }
     const el = e.target.closest('.nd');
     if(!el){ deselect(); return; }                       // empty canvas → drop the selection
     const n = nodes[el.dataset.key]; if(!n) return;
@@ -1721,10 +1870,10 @@
       else if(c && st < 8){ head.classList.remove('collapsed'); syncTip(); }
     }, { passive:true });
   }
-  bindCollapse($('#cfgScroll'), $('#cfgHead'));
   bindCollapse($('#brScroll'), $('#brHead'));
   bindCollapse($('#trScroll'), $('#trHead'));
   bindCollapse($('#lnScroll'), $('#lnHead'));
+  bindCollapse($('#cdScroll'), $('#cdHead'));
 
   document.querySelectorAll('.switch-tabs').forEach(group => {
     group.querySelectorAll('.switch-tab').forEach(btn => btn.addEventListener('click', () => {
@@ -1737,12 +1886,22 @@
      by a transform, so you can drag in any direction whether the flow overflows
      the viewport or fits inside it. The dot grid rides along with the pan, which
      is what makes the movement read as the canvas itself moving. */
-  let zoom = 1, panX = 0, panY = 0;
-  const zoomCbs = [];
+  let zoom = 1, panX = 0, panY = 0, axis = 'v';           // axis: 'v' vertical (default) | 'h' horizontal
+  const zoomCbs = [], viewCbs = [];
   world.style.transformOrigin = '0 0';
   function applyView(){
     world.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
     canvasEl.style.backgroundPosition = panX + 'px ' + panY + 'px';
+    /* one hook for "the view changed" — pan, zoom, or a relayout after an edit —
+       so the minimap can stay in sync without polling */
+    viewCbs.forEach(cb => cb({ zoom, panX, panY, content }));
+  }
+  /* centre the viewport on a WORLD point at the current zoom — what a minimap
+     click/drag, or "jump to this node", pans to */
+  function panTo(wx, wy){
+    panX = canvasEl.clientWidth / 2 - wx * zoom;
+    panY = canvasEl.clientHeight / 2 - wy * zoom;
+    applyView();
   }
   /* keep the point under (px,py) — viewport coords — fixed across a zoom change */
   function zoomAt(z, px, py){
@@ -1781,7 +1940,7 @@
      keystrokes collapses into one undo step. */
   let hist = [], hi = -1, histT = null, restoring = false;
   const histCbs = [];
-  const snapshot = () => JSON.stringify({ nodes, rootId, selId, seq, brSeq });
+  const snapshot = () => JSON.stringify({ nodes, rootId, selId, seq, brSeq, stickies, stickySeq });
   function pushHistory(){
     if(restoring) return;
     clearTimeout(histT);
@@ -1801,6 +1960,11 @@
     rootId = s.rootId; seq = s.seq; brSeq = s.brSeq;
     Object.keys(els).forEach(k => { els[k].remove(); delete els[k]; });
     born.clear(); born.add(rootId);
+    Object.keys(stickies).forEach(k => delete stickies[k]);
+    Object.assign(stickies, s.stickies || {});
+    stickySeq = s.stickySeq || 0;
+    Object.keys(stickyEls).forEach(k => { stickyEls[k].remove(); delete stickyEls[k]; });
+    renderAllStickies();
     picking = null;
     selId = s.selId && nodes[s.selId] ? s.selId : null;
     render();
@@ -1825,6 +1989,25 @@
       return Math.min((canvasEl.clientWidth - 90) / w, (canvasEl.clientHeight - 90) / h, 1);
     },
     scrollToStart(){ centerContent(); },
+    onViewChange(cb){ viewCbs.push(cb); },
+    setAxis(a){ axis = a === 'h' ? 'h' : 'v'; render(); },
+    getAxis(){ return axis; },
+    panTo(wx, wy){ panTo(wx, wy); },
+    canvasSize(){ return { w: canvasEl.clientWidth, h: canvasEl.clientHeight }; },
+    /* everything the minimap draws: node cards (by type) and sticky notes, all
+       in world space, taken straight from the last committed layout */
+    overviewRects(){
+      const out = Object.keys(lastPos).map(k => {
+        const n = nodes[k]; if(!n) return null;
+        const el = els[k]; if(!el) return null;
+        return { x: lastPos[k].x, y: lastPos[k].y, w: 250, h: el.offsetHeight, type: n.type };
+      }).filter(Boolean);
+      Object.values(stickies).forEach(s => {
+        const el = stickyEls[s.id];
+        out.push({ x: s.x, y: s.y, w: el ? el.offsetWidth : 180, h: el ? el.offsetHeight : 90, type:'note' });
+      });
+      return out;
+    },
     canUndo: () => hi > 0,
     canRedo: () => hi < hist.length - 1,
     undo(){ if(hi > 0){ hi--; restore(hist[hi]); } },
@@ -1833,11 +2016,19 @@
       Object.keys(nodes).forEach(k => delete nodes[k]);
       Object.keys(els).forEach(k => { els[k].remove(); delete els[k]; });
       born.clear(); seq = 0; brSeq = 0; selId = null; picking = null;
+      Object.keys(stickies).forEach(k => delete stickies[k]);
+      Object.keys(stickyEls).forEach(k => { stickyEls[k].remove(); delete stickyEls[k]; });
       const fresh = newTrigger(); rootId = fresh.id; born.add(rootId);
       closeDrawer(); render();
     },
     onHistory(cb){ histCbs.push(cb); },
-    setTool(t){ tool = t; canvasEl.classList.toggle('tool-pan', t === 'pan'); },
+    setTool(t){ tool = t; canvasEl.classList.toggle('tool-note', t === 'note'); },
+    onToolChange(cb){ toolCbs.push(cb); },
+    /* the Delete/Backspace shortcut — same removeNode() the canvas's own
+       delete icon calls, so it inherits the same confirm-before-deleting-a-
+       branch-with-steps-after-it and can't-delete-Branch-1 guards for free.
+       A no-op if nothing is selected, or the selection is the trigger. */
+    deleteSelected(){ if(selId) removeNode(selId); },
   };
 
   /* the root stays centred, so a window resize has to re-lay-out */

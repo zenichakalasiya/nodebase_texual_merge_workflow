@@ -1,11 +1,13 @@
 /* ============================================================
    Anchored picker popover.
 
-   Ported from the textual (linear) workflow builder's menu —
-   same chrome and proportions: 12px semibold title, a rounded
-   search box, grouped rows with a leading icon, a keyboard
-   highlight, and a caret help bubble that tracks the active row.
-   Repainted in the node builder's light Motadata palette.
+   Ported from the textual (linear) workflow builder's menu — same chrome and
+   proportions: 12px semibold title, a rounded search box, grouped rows with
+   a leading icon, a keyboard highlight, a checkmark on the already-picked
+   row, and a caret help bubble that tracks the active row. Repainted in the
+   node builder's own light Motadata palette — the one thing NOT carried over
+   from the reference site is its dark theme; every other panel in this app
+   is light, so the popover reads as part of the same product.
    ============================================================ */
 :root{
   --pop-hover:rgba(223,229,237,.45);
@@ -33,13 +35,13 @@
 .wfpop-head{display:flex;align-items:center;gap:6px;padding:12px 14px 8px;flex-shrink:0;}
 .wfpop-back{
   width:20px;height:20px;flex-shrink:0;border:none;background:none;border-radius:5px;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:var(--gray-label);
 }
-.wfpop-back:hover{background:var(--pop-hover);}
-.wfpop-back img{width:14px;height:14px;display:block;transform:rotate(90deg);}
+.wfpop-back:hover{background:var(--pop-hover);color:var(--page-text);}
+.wfpop-back svg{width:14px;height:14px;display:block;transform:rotate(90deg);}
 .wfpop-title{font-size:12px;font-weight:500;color:var(--page-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-/* ---- segmented tabs (Event | Periodic) ---- */
+/* ---- segmented tabs (only the plain ⋮ menus still use these) ---- */
 .wfpop-tabs{
   display:flex;gap:4px;align-items:center;padding:4px;margin:0 10px 2px;
   background:var(--switch-bg);border-radius:6px;flex-shrink:0;
@@ -59,7 +61,7 @@
   transition:border-color .15s;
 }
 .wfpop-search:focus-within{border-color:var(--primary);}
-.wfpop-search img{width:14px;height:14px;display:block;flex-shrink:0;opacity:.7;}
+.wfpop-search svg{width:14px;height:14px;display:block;flex-shrink:0;color:var(--gray-label);}
 .wfpop-search input{
   flex:1 1 0;min-width:0;border:none;outline:none;background:none;
   font-family:inherit;font-size:12px;color:var(--page-text);
@@ -136,6 +138,8 @@
 /* ---- footer ---- */
 .wfpop-foot{border-top:1px solid var(--light-border);padding:6px;flex-shrink:0;}
 .wfpop-foot .wfpop-item{font-size:12px;}
+.wfpop-ico.blue{background:rgba(61,139,208,.12);}
+.wfpop-ico.blue img{width:11px;height:11px;display:block;}
 
 /* ---- caret help bubble (tracks the highlighted row) ---- */
 .wfpop-help{

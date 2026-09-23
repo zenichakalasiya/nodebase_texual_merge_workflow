@@ -380,7 +380,7 @@
                   <div id="trSched" style="display:flex;flex-direction:column;gap:8px"></div>
                 </div>
               </div>
-              <div class="next-node hidden" id="trNextWrap">
+              <div class="next-node" id="trNextWrap">
                 <button class="next-node-head" type="button" data-nn-toggle>
                   <span class="nn-text"><h3>Next step</h3><p>Define what happens after this block</p></span>
                   <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
@@ -394,97 +394,6 @@
       </aside>
 
       <!-- --------- IF/Else configuration --------- -->
-      <aside class="sidebar hidden" id="ifelseConfig">
-        <div class="cfg-container">
-          <div class="cfg-inner">
-
-            <!-- Collapsing header -->
-            <div class="cfg-head" id="cfgHead">
-              <div class="head-top">
-                <div class="head-left">
-                  <button class="goto-pill" id="ifGoto" aria-label="Go to previous node">
-                    <img src="assets/chevron-down.svg" alt="">
-                    <span class="pill-text">Go to Trigger Node</span>
-                  </button>
-                  <div class="title-inline">
-                    <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
-                    <span class="cfg-node-name" data-name="if" title="Click to rename">IF/Else</span>
-                  </div>
-                </div>
-                <div class="head-right">
-                  <div class="cfg-actions">
-                    <button class="hover-box" data-tip="Documentation" aria-label="Documentation"><img src="assets/book.svg" alt=""></button>
-                    <button class="hover-box" id="ifReplace" data-tip="Replace node" aria-label="Replace node"><img src="assets/repeat.svg" alt=""></button>
-                    <button class="hover-box" id="ifDelete" data-tip="Delete" aria-label="Delete"><img src="assets/delete.svg" alt=""></button>
-                    <button class="hover-box" id="ifMore" data-tip="More" aria-label="More"><img src="assets/more-vertical.svg" alt=""></button>
-                  </div>
-                  <button class="hover-box" id="cfgClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
-                </div>
-              </div>
-
-              <div class="head-expanded">
-                <div class="cfg-node-title">
-                  <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
-                  <span class="cfg-node-name" data-name="if" title="Click to rename">IF/Else</span>
-                </div>
-                <p class="cfg-desc">Define a condition to split this workflow into two paths — one for when it's true, one for when it's not.</p>
-                <textarea class="desc-inline" id="ifDesc" rows="1" placeholder="Add a description..."></textarea>
-              </div>
-              <div class="head-divider"></div>
-            </div>
-
-            <!-- Scrollable content -->
-            <div class="cfg-scroll" id="cfgScroll">
-              <div class="cfg-alert hidden" id="ifAlert"></div>
-              <div class="cfg-form">
-                <div class="field">
-                  <div class="field-label">Title <span class="req">*</span></div>
-                  <div class="input-box" id="ifTitleBox"><input id="ifTitle" type="text" placeholder="Add title..."></div>
-                </div>
-                <div class="field">
-                  <div class="field-label">Select Source Node <span class="req">*</span></div>
-                  <div class="input-box select" id="ifSourceBox">
-                    <select id="ifSource"></select>
-                    <img src="assets/chevron-down2.svg" alt="">
-                  </div>
-                  <div class="field-help">The previous step/node whose data you want to use in this node</div>
-                </div>
-                <div class="field">
-                  <div class="field-label">Select Type <span class="req">*</span></div>
-                  <div class="switch-tabs">
-                    <button class="switch-tab active">Condition</button>
-                    <button class="switch-tab">Expression</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="cond-builder">
-                <div class="cond-group">
-
-                  <div class="cg-wrap" id="ifCondCard">
-                    <div id="ifCond" class="cg-list"></div>
-                    <div class="cg-err hidden" id="ifCondErr"></div>
-                    <div class="cg-foot">
-                      <button class="btn-ghost dark" id="ifAddGroup" type="button"><img src="assets/n-plus.svg" alt="">Add Condition Group</button>
-                      <button class="btn-clear" id="ifClearAll" type="button"><img src="assets/close2.svg" alt="">Remove All Condition</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="next-node">
-                <button class="next-node-head" type="button" data-nn-toggle>
-                  <span class="nn-text"><h3>Next step</h3><p>Define what happens after this block</p></span>
-                  <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
-                </button>
-                <div class="nn-body" id="ifNext"></div>
-              </div>
-            </div>
-
-            <div class="autosave"><i></i>All changes are saved automatically</div>
-          </div>
-        </div>
-      </aside>
 
       <!-- --------- Branch configuration --------- -->
       <aside class="sidebar hidden" id="branchCfg">
@@ -517,7 +426,7 @@
                   <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
                   <span class="cfg-node-name" data-name="br" title="Click to rename">Branch</span>
                 </div>
-                <p class="cfg-desc">Send the workflow down different paths depending on what the value is — like sorting tickets into the right team.</p>
+                <p class="cfg-desc" id="brDescStatic">Send the workflow down different paths depending on what the value is — like sorting tickets into the right team.</p>
                 <textarea class="desc-inline" id="brDesc" rows="1" placeholder="Add a description..."></textarea>
               </div>
               <div class="head-divider"></div>
@@ -539,7 +448,7 @@
                 </div>
               </div>
               <div class="br-section">
-                <div class="br-section-head"><h3>Branches</h3><p>Pick a branch to set up its conditions and what runs next</p></div>
+                <div class="br-section-head"><h3 id="brSecTitle">Branches</h3><p id="brSecSub">Pick a branch to set up its conditions and what runs next</p></div>
                 <div class="br-rows" id="brRows"></div>
               </div>
             </div>
@@ -569,7 +478,7 @@
                     <!-- step through the sibling branches: ‹ 1 of 3 › -->
                     <div class="lane-step" role="group" aria-label="Branches">
                       <button class="ls-btn" id="lnPrev" type="button" data-tip="Previous branch" aria-label="Previous branch"><img src="assets/chevron-down.svg" alt="" style="transform:rotate(90deg)"></button>
-                      <span class="lane-pos" id="lnPos"></span>
+                      <button class="lane-pos" id="lnPos" type="button" data-tip="Jump to a branch" aria-label="Jump to a branch"></button>
                       <button class="ls-btn" id="lnNextBtn" type="button" data-tip="Next branch" aria-label="Next branch"><img src="assets/chevron-down.svg" alt="" style="transform:rotate(-90deg)"></button>
                     </div>
                     <button class="hover-box" data-tip="Documentation" aria-label="Documentation"><img src="assets/book.svg" alt=""></button>
@@ -611,12 +520,87 @@
                   </div>
                 </div>
               </div>
-              <div class="next-node hidden" id="lnNextWrap">
+              <div class="next-node" id="lnNextWrap">
                 <button class="next-node-head" type="button" data-nn-toggle>
                   <span class="nn-text"><h3>Next step</h3><p>Define what happens after this branch</p></span>
                   <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
                 </button>
                 <div class="nn-body" id="lnNext"></div>
+              </div>
+            </div>
+            <div class="autosave"><i></i>All changes are saved automatically</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- --------- Condition (Inline) configuration --------- -->
+      <aside class="sidebar hidden" id="conditionCfg">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+            <div class="cfg-head" id="cdHead">
+              <div class="head-top">
+                <div class="head-left">
+                  <button class="goto-pill" id="cdGoto" aria-label="Go to previous node">
+                    <img src="assets/chevron-down.svg" alt="">
+                    <span class="pill-text">Go to Trigger Node</span>
+                  </button>
+                  <div class="title-inline">
+                    <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                    <span class="cfg-node-name" data-name="cd" title="Click to rename">Condition</span>
+                  </div>
+                </div>
+                <div class="head-right">
+                  <div class="cfg-actions">
+                    <button class="hover-box" data-tip="Documentation" aria-label="Documentation"><img src="assets/book.svg" alt=""></button>
+                    <button class="hover-box" id="cdReplace" data-tip="Replace node" aria-label="Replace node"><img src="assets/repeat.svg" alt=""></button>
+                    <button class="hover-box" id="cdDelete" data-tip="Delete" aria-label="Delete"><img src="assets/delete.svg" alt=""></button>
+                    <button class="hover-box" id="cdMore" data-tip="More" aria-label="More"><img src="assets/more-vertical.svg" alt=""></button>
+                  </div>
+                  <button class="hover-box" id="cdClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+              <div class="head-expanded">
+                <div class="cfg-node-title">
+                  <div class="cfg-node-badge"><img src="assets/split2.svg" alt=""></div>
+                  <span class="cfg-node-name" data-name="cd" title="Click to rename">Condition</span>
+                </div>
+                <p class="cfg-desc">A single check that gates what runs after it — the steps below only run when it passes.</p>
+                <textarea class="desc-inline" id="cdDesc" rows="1" placeholder="Add a description..."></textarea>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+            <div class="cfg-scroll" id="cdScroll">
+              <div class="cfg-alert hidden" id="cdAlert"></div>
+              <div class="cfg-form">
+                <div class="field">
+                  <div class="field-label">Title <span class="req">*</span></div>
+                  <div class="input-box" id="cdTitleBox"><input id="cdTitle" type="text" placeholder="Add title..."></div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Select Source Node <span class="req">*</span></div>
+                  <div class="input-box select" id="cdSourceBox">
+                    <select id="cdSource"></select>
+                    <img src="assets/chevron-down2.svg" alt="">
+                  </div>
+                  <div class="field-help">The previous step/node whose data you want to use in this node</div>
+                </div>
+              </div>
+              <div class="cond-group">
+                <div class="cg-wrap" id="cdCondCard">
+                  <div id="cdCond" class="cg-list"></div>
+                  <div class="cg-err hidden" id="cdCondErr"></div>
+                  <div class="cg-foot">
+                    <button class="btn-ghost dark" id="cdAddGroup" type="button"><img src="assets/n-plus.svg" alt="">Add Condition Group</button>
+                    <button class="btn-clear" id="cdClearAll" type="button"><img src="assets/close2.svg" alt="">Remove All Condition</button>
+                  </div>
+                </div>
+              </div>
+              <div class="next-node" id="cdNextWrap">
+                <button class="next-node-head" type="button" data-nn-toggle>
+                  <span class="nn-text"><h3>Next step</h3><p>Define what happens after this block</p></span>
+                  <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
+                </button>
+                <div class="nn-body" id="cdNext"></div>
               </div>
             </div>
             <div class="autosave"><i></i>All changes are saved automatically</div>
