@@ -608,6 +608,48 @@
         </div>
       </aside>
 
+      <!-- --------- Run History (replaces the drawer, read-only while open) --------- -->
+      <aside class="sidebar hidden" id="runHistoryCfg">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+            <div class="cfg-head">
+              <div class="head-top">
+                <div class="head-left"><span class="cfg-node-name">Run History</span></div>
+                <div class="head-right">
+                  <button class="hover-box" id="rhClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+            <div class="cfg-scroll" id="rhScroll">
+              <div class="rh-lock-note">Read-only — pan and click around freely, but the workflow can't be edited until you close this.</div>
+              <div id="rhList"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- --------- Version History (replaces the drawer, read-only while open) --------- -->
+      <aside class="sidebar hidden" id="versionHistoryCfg">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+            <div class="cfg-head">
+              <div class="head-top">
+                <div class="head-left"><span class="cfg-node-name">Version History</span></div>
+                <div class="head-right">
+                  <button class="hover-box" id="vhClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+            <div class="cfg-scroll" id="vhScroll">
+              <div class="rh-lock-note">Read-only — pan and click around freely, but the workflow can't be edited until you close this.</div>
+              <div id="vhList"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
     </div>
   </div>
   </div>

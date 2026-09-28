@@ -372,6 +372,60 @@
 .wf-btn.danger{background:var(--critical);border-color:var(--critical);color:#fff;}
 .wf-btn.danger:hover{background:#e04b3d;border-color:#e04b3d;}
 
+/* ============ Version History / Run History panels ============
+   Both replace the drawer (see #versionHistoryCfg/#runHistoryCfg in
+   workflow-canvas.html) rather than opening a modal — .wfm-empty is the one
+   class still shared between their two row shapes (.vh-*, .rh-*) for the
+   empty state. */
+.wfm-empty{padding:48px 12px;text-align:center;font-size:12.5px;color:var(--gray-label);}
+
+/* Version History row */
+.vh-row{padding:14px 0;border-bottom:1px solid var(--light-border);}
+.vh-row:last-child{border-bottom:none;}
+.vh-row-top{display:flex;align-items:center;gap:10px;margin-bottom:3px;}
+.vh-title{font-size:13.5px;font-weight:500;color:var(--neutral-darker);}
+.vh-meta{font-size:11.5px;color:var(--gray-label);}
+.vh-actions{display:flex;gap:14px;margin-top:8px;}
+.vh-act{
+  display:inline-flex;align-items:center;gap:5px;border:none;background:none;cursor:pointer;padding:0;
+  font-family:inherit;font-size:12px;font-weight:500;color:var(--primary);
+}
+.vh-act:hover{text-decoration:underline;}
+.vh-act svg{width:14px;height:14px;display:block;}
+
+/* Run History row */
+.rh-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--light-border);}
+.rh-row:last-child{border-bottom:none;}
+.rh-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.rh-dot.success{background:#4a7a1e;}
+.rh-dot.warning{background:var(--major);}
+.rh-dot.error{background:var(--critical);}
+.rh-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.rh-title{font-size:13px;font-weight:500;color:var(--neutral-darker);}
+.rh-meta{font-size:11.5px;color:var(--gray-label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rh-status{flex-shrink:0;font-size:11.5px;font-weight:500;padding:2px 9px;border-radius:10px;}
+.rh-status.success{background:rgba(139,195,74,.2);color:#4a7a1e;}
+.rh-status.warning{background:var(--major-bg);color:var(--major);}
+.rh-status.error{background:rgba(242,92,78,.14);color:var(--critical);}
+.rh-view{
+  flex-shrink:0;border:none;background:none;cursor:pointer;padding:0;
+  font-family:inherit;font-size:12px;font-weight:500;color:var(--primary);
+}
+.rh-view:hover{text-decoration:underline;}
+.rh-lock-note{
+  font-size:11px;line-height:1.45;color:var(--gray-label);
+  background:var(--grid-hover);border-radius:8px;padding:9px 11px;margin:14px 0 4px;
+}
+/* Run History mode — the drawer is showing runs, not a node's config, so
+   the canvas itself signals "look, don't touch": add-node affordances go
+   inert, nodes lose their drag cursor, and a click just highlights instead
+   of opening anything (see the `readOnly` checks in workflow-app.js). */
+.canvas.read-only .t-plus,
+.canvas.read-only .par-slot{opacity:.3;pointer-events:none;}
+.canvas.read-only .nd,
+.canvas.read-only .nd .card{cursor:pointer;}
+.canvas.read-only .nd.rh-peek .card{box-shadow:0 0 0 4px rgba(61,139,208,.14),0 6px 18px -8px rgba(61,139,208,.35);}
+
 /* ============ Sticky notes ============ */
 /* free-floating annotations on the canvas — not part of the workflow graph,
    no connectors, don't affect node logic. Same drag/pan behaviour as a node. */

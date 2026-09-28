@@ -101,9 +101,12 @@
 .pill-select:hover{background:var(--chrome-hover);}
 .pill-select svg{width:14px;height:14px;display:block;color:var(--gray-label);}
 
-/* Simple | Node view switch */
+/* Simple | Node view switch — centred, but its `left` is a real px value set
+   by positionViewSwitch() in workflow-chrome.js, computed from the left/right
+   zones' actual widths so it can never be covered by either as the header
+   grows. left:50% here is only the pre-JS fallback for the first paint. */
 .viewswitch{
-  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  position:absolute;left:50%;top:50%;transform:translateY(-50%);
   flex-shrink:0;display:flex;align-items:center;gap:2px;padding:3px;
   background:var(--chrome-hover);border-radius:9px;
 }
@@ -155,12 +158,23 @@
 .split-caret:hover{filter:brightness(1.07);}
 .split-caret svg{width:14px;height:14px;display:block;}
 .btn-outline{
+  display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
   height:32px;padding:0 16px;border:1px solid var(--chrome-border);border-radius:8px;
   background:var(--white);color:var(--ink);
   font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:background .15s;
 }
 .btn-outline:hover{background:var(--chrome-hover);}
+.btn-outline svg{width:15px;height:15px;display:block;}
 .pagebar-sep{width:1px;height:20px;background:var(--chrome-border);}
+
+/* Run History icon's health badge — a dot only, no separate element */
+#runHistBtn{position:relative;}
+.run-badge{
+  position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;
+  border:1.5px solid var(--white);
+}
+.run-badge.warn{background:var(--major);}
+.run-badge.err{background:var(--critical);}
 
 /* ---------------- left navigation flyout ---------------- */
 /* invisible strip along the left edge that reveals the nav on hover */
@@ -240,11 +254,6 @@
 }
 /* the config drawer takes 400px off the right, so re-centre over what is left */
 body.dock-open .bottombar{left:calc(50% - 206px);}
-/* the view card (zoom/fit/direction + the minimap above it) sits apart, in
-   the bottom-left corner — it doesn't share the centred bar's re-centring,
-   since a right-hand drawer never encroaches on the left edge */
-.bottombar.viewbar{left:18px;transform:none;}
-body.dock-open .bottombar.viewbar{left:18px;}
 .bbar{display:flex;align-items:center;gap:2px;}
 .bbar .cbtn{width:30px;height:30px;border-radius:7px;color:var(--page-text);}
 .bbar .cbtn svg{width:16px;height:16px;}
@@ -269,21 +278,6 @@ body.dock-open .bottombar.viewbar{left:18px;}
   transition:background .15s;
 }
 .zoom-label:hover{background:var(--chrome-hover);}
-
-/* direction switch — two fork icons (the same split glyph this app already
-   uses elsewhere), always both visible; the active one lights up the same
-   way the Note tool's own button does when it's active, right next to it —
-   one convention for every "which mode is this" control. */
-.dir-switch{display:flex;align-items:center;gap:2px;}
-.dir-opt{
-  width:30px;height:30px;border:none;background:none;border-radius:7px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;padding:0;
-  color:var(--page-text);transition:background .15s,color .15s;
-}
-.dir-opt svg{width:16px;height:16px;display:block;}
-.dir-opt:hover{background:var(--chrome-hover);}
-.dir-opt.active{background:rgba(61,139,208,.14);color:var(--primary);}
-.dir-opt.active:hover{background:rgba(61,139,208,.2);}
 
 /* hand / select / note tools */
 .cbtn.tool.active{background:rgba(61,139,208,.14);color:var(--primary);}

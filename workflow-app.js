@@ -13,7 +13,7 @@
 (function(){
   const $ = (s, r=document) => r.querySelector(s);
   const world = $('#world'), edgesSvg = $('#edges'), dock = $('#dock'), canvasEl = $('#canvas');
-  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg') };
+  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg'), runHistory: $('#runHistoryCfg'), versionHistory: $('#versionHistoryCfg') };
 
   /* ---------------------------------------------------------- catalogs */
   const MODULES = ['Request','Incident','Problem','Change','Release','Task','Hardware Asset','Software Asset','User'];
@@ -681,7 +681,7 @@
       b.dataset.pid = pid; b.dataset.slot = slot;
       b.innerHTML = img('n-plus');
       b.style.left = x + 'px'; b.style.top = y + 'px';
-      b.addEventListener('click', ev => { ev.stopPropagation(); slot === 'pending' ? openBranchType(pid) : openNodePicker(pid, slot); });
+      b.addEventListener('click', ev => { ev.stopPropagation(); if(readOnly) return; slot === 'pending' ? openBranchType(pid) : openNodePicker(pid, slot); });
       world.appendChild(b);
       return b;
     }
@@ -766,7 +766,7 @@
              horizontal), flush against the MAIN coordinate on the other axis */
           { const lt = horiz ? { x:e.cx, y:e.y - 20 } : { x:e.cx - 125, y:e.y };
             slot.style.left = lt.x + 'px'; slot.style.top = lt.y + 'px'; }
-          slot.addEventListener('click', ev => { ev.stopPropagation(); openNodePicker(id, 'par'); });
+          slot.addEventListener('click', ev => { ev.stopPropagation(); if(readOnly) return; openNodePicker(id, 'par'); });
           world.appendChild(slot);
         });
         const tagPt = P(mOf(from) + 26, cOf(from));
@@ -1579,6 +1579,33 @@
   $('#cdMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#cdMore')));
   bindNext($('#cdNext'));
 
+  /* ------------------ Run History / Version History — both replace the
+     drawer instead of opening a popup; the canvas goes read-only while
+     either is open (see `readOnly` above) so "look at what happened" never
+     gets confused with "edit the workflow". Deliberately does NOT go
+     through selectNode()/selId — closing should put the drawer back exactly
+     how it was, not leave the history panel's own state tangled up with
+     node selection. Shared by both panels so they stay one mechanism. */
+  function openHistoryPanel(panelKey, listSel, bodyHtml){
+    if(selId) markChecked(selId);
+    selId = null;
+    readOnly = true;
+    canvasEl.classList.add('read-only');
+    $(listSel).innerHTML = bodyHtml;
+    openDrawer(panelKey);
+    render();          // clears the previous selection's blue ring — nodeClass() reads selId fresh
+  }
+  function closeHistoryPanel(){
+    readOnly = false;
+    canvasEl.classList.remove('read-only');
+    document.querySelectorAll('.nd.rh-peek').forEach(x => x.classList.remove('rh-peek'));
+    closeDrawer();
+  }
+  function openRunHistory(bodyHtml){ openHistoryPanel('runHistory', '#rhList', bodyHtml); }
+  function openVersionHistory(bodyHtml){ openHistoryPanel('versionHistory', '#vhList', bodyHtml); }
+  $('#rhClose').addEventListener('click', closeHistoryPanel);
+  $('#vhClose').addEventListener('click', closeHistoryPanel);
+
   /* ------------------ node lifecycle */
   function dropSubtree(id){
     const n = nodes[id]; if(!n) return;
@@ -1706,6 +1733,12 @@
      position, so the automatic layout still runs — the offset just nudges it. */
   let drag = null, dragged = false, tool = 'select';
   const DRAG_SLOP = 4;                                   // below this it counts as a click
+  /* Run History mode — the drawer is showing runs instead of a node's
+     config, so editing has to stop making sense while it's up: no node
+     drag, no "+" add-node picker (both are also pointer-events:none in CSS,
+     this is the belt-and-braces JS check). Panning, zooming and clicking a
+     node to look at it all stay live — see openRunHistory()/closeRunHistory(). */
+  let readOnly = false;
 
   canvasEl.addEventListener('mousedown', e => {
     if(e.button !== 0) return;
@@ -1724,6 +1757,7 @@
     }
     const el = e.target.closest('.nd');
     if(el && nodes[el.dataset.key]){
+      if(readOnly) return;                                // no drag while inspecting — the click below still highlights it
       const n = nodes[el.dataset.key];
       n.off = n.off || { x:0, y:0 };
       drag = { kind:'node', id:n.id, sx:e.clientX, sy:e.clientY, ox:n.off.x, oy:n.off.y, moved:0, raf:0 };
@@ -1820,8 +1854,15 @@
       return;
     }
     const el = e.target.closest('.nd');
-    if(!el){ deselect(); return; }                       // empty canvas → drop the selection
+    if(!el){ if(!readOnly) deselect(); return; }         // empty canvas → drop the selection
     const n = nodes[el.dataset.key]; if(!n) return;
+    if(readOnly){
+      /* looking, not editing — a plain highlight, deliberately NOT selId/
+         selectNode() so the real selection just resumes once Run History closes */
+      document.querySelectorAll('.nd.rh-peek').forEach(x => x.classList.remove('rh-peek'));
+      el.classList.add('rh-peek');
+      return;
+    }
     const act = e.target.closest('[data-act]');
     if(act){
       const a = act.dataset.act;
@@ -1886,7 +1927,11 @@
      by a transform, so you can drag in any direction whether the flow overflows
      the viewport or fits inside it. The dot grid rides along with the pan, which
      is what makes the movement read as the canvas itself moving. */
-  let zoom = 1, panX = 0, panY = 0, axis = 'v';           // axis: 'v' vertical (default) | 'h' horizontal
+  /* Horizontal-only for now — the vertical layout code path (and setAxis/
+     getAxis themselves) is left intact, just unreachable from the UI, since
+     the toolbar's own direction switch was removed rather than the
+     underlying axis-abstraction engine. */
+  let zoom = 1, panX = 0, panY = 0, axis = 'h';           // axis: 'v' vertical | 'h' horizontal (default)
   const zoomCbs = [], viewCbs = [];
   world.style.transformOrigin = '0 0';
   function applyView(){
@@ -2029,6 +2074,15 @@
        branch-with-steps-after-it and can't-delete-Branch-1 guards for free.
        A no-op if nothing is selected, or the selection is the trigger. */
     deleteSelected(){ if(selId) removeNode(selId); },
+    /* Run History — chrome.js owns the run data/row rendering, this side owns
+       the drawer/read-only mechanics; bodyHtml is the already-rendered list
+       (or empty-state) markup, built the same way for the sidebar as it was
+       for the old modal, just handed to a different container. */
+    openRunHistory(bodyHtml){ openRunHistory(bodyHtml); },
+    closeRunHistory(){ closeHistoryPanel(); },
+    openVersionHistory(bodyHtml){ openVersionHistory(bodyHtml); },
+    closeVersionHistory(){ closeHistoryPanel(); },
+    isReadOnly(){ return readOnly; },
   };
 
   /* the root stays centred, so a window resize has to re-lay-out */

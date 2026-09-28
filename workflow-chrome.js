@@ -70,14 +70,18 @@
     hourglass:'<path d="M6.5 3h11M6.5 21h11M7.5 3c0 4.2 3 5.4 4.5 6.5-1.5 1.1-4.5 2.3-4.5 6.5M16.5 3c0 4.2-3 5.4-4.5 6.5 1.5 1.1 4.5 2.3 4.5 6.5"/>',
     diamond:  '<path d="M12 3.5 20.5 12 12 20.5 3.5 12 12 3.5Z"/>',
     loop:     '<path d="M17 2.5l4 4-4 4"/><path d="M3 12.5v-2a4 4 0 0 1 4-4h14"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 11.5v2a4 4 0 0 1-4 4H3"/>',
-    /* direction switch — the same fork/branch glyph this app already uses for
-       a split, just pointed the way the canvas is currently running: one
-       trunk forking into two arrows, right for horizontal, down for
-       vertical. Two distinct icons living side by side as their own buttons
-       (see .dir-switch) — not one icon standing in for a hidden second
-       state, and not a control buried behind a click to even see the choice. */
+    /* fork/split glyph — one trunk forking into two arrows. Used for the
+       Guide card's "Split path" row (the layout-direction switch this icon
+       was originally built for is gone; the builder is horizontal-only now). */
     forkH:    '<path d="M2 12h3.5c2.8 0 2.8-5 6-5H17"/><path d="M14 3.5 19 7l-5 3.5"/><path d="M2 12h3.5c2.8 0 2.8 5 6 5H17"/><path d="M14 20.5 19 17l-5-3.5"/>',
-    forkV:    '<path d="M12 2v3.5c0 2.8-5 2.8-5 6V17"/><path d="M3.5 14 7 19l3.5-5"/><path d="M12 2v3.5c0 2.8 5 2.8 5 6V17"/><path d="M20.5 14 17 19l-3.5-5"/>',
+    /* Run History — a bulleted log/list, distinct from Version History's
+       circular clock-with-arrow so the two never get confused at a glance
+       even sitting right next to each other. (A thin pulse-trace was tried
+       first and read as noise at 16px — too close to Version History's own
+       curved shape once shrunk down.) */
+    activity: '<circle cx="4" cy="6" r="1.4" fill="currentColor" stroke="none"/><path d="M9 6h11"/><circle cx="4" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M9 12h11"/><circle cx="4" cy="18" r="1.4" fill="currentColor" stroke="none"/><path d="M9 18h11"/>',
+    eye:      '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    restore:  '<path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/>',
   };
   const svg = (k, cls) => `<svg${cls ? ` class="${cls}"` : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor"`
     + ` stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[k]}</svg>`;
@@ -175,11 +179,14 @@
       + `<div class="pagebar-right">`
         + `<div class="enable-row"><span>Enabled</span>`
           + `<button class="switch on" id="enableSw" role="switch" aria-checked="true"><span>ON</span><i></i></button></div>`
+        + `<button class="btn-outline" id="runHistBtn" data-tip="Run history&nbsp;&nbsp;read-only while open">${svg('activity')}Run history<span class="run-badge" id="runBadge" hidden></span></button>`
         + `<div class="split">`
           + `<button class="btn-blue" id="publishFlow">Publish</button>`
           + `<button class="split-caret" id="publishOpts" data-tip="Save options" aria-label="Save options">${svg('chevD')}</button>`
         + `</div>`
-        + `<button class="cbtn bordered" data-soon="Version history" data-tip="Version history" aria-label="Version history">${svg('history')}</button>`
+        + `<span class="pagebar-sep"></span>`
+        + `<button class="cbtn bordered" id="versionHistBtn" data-tip="Version history" aria-label="Version history">${svg('history')}</button>`
+        + `<span class="pagebar-sep"></span>`
         + `<button class="cbtn bordered" id="moreMenu" data-tip="More" aria-label="More">${svg('dots')}</button>`
       + `</div>`;
 
@@ -203,29 +210,14 @@
     handle.setAttribute('aria-label', 'Open navigation');
     handle.innerHTML = svg('chevRR');
 
-    /* the view controls (zoom, fit) and the minimap that floats above them
-       get their own card, pinned to the bottom-left corner — high-frequency,
-       but a different KIND of high-frequency than the canvas-mode/history
-       bar, so it reads better standing apart. The direction switch lives in
-       the centred bar instead — it's a workflow-level setting, not a view
-       control, so it belongs with Undo/Redo/Reset, not with zoom. */
-    const viewBar = document.createElement('div');
-    viewBar.className = 'bottombar viewbar';
-    viewBar.innerHTML =
-      `<div class="bbar view-bbar" id="viewGroup">`
-        + `<div class="minimap" id="minimap" hidden><svg id="minimapSvg" viewBox="0 0 120 78"></svg></div>`
-        + `<button class="cbtn" id="zoomOutBtn" data-tip="Zoom out">${svg('zoomOut')}</button>`
-        + `<button class="zoom-label" id="zoomMenu" data-tip="Zoom presets"><span id="zoomLevel">100%</span></button>`
-        + `<button class="cbtn" id="zoomInBtn" data-tip="Zoom in">${svg('zoomIn')}</button>`
-        + `<span class="bbar-sep"></span>`
-        + `<button class="cbtn" id="fitBtn" data-tip="Fit to screen">${svg('fit')}</button>`
-      + `</div>`;
-
-    /* one floating toolbar, centred under the canvas — a single card. Guide,
+    /* One floating toolbar, centred under the canvas — a single card. Guide,
        Shortcuts and Note read as one continuous group (they're all "how do
-       I use this" affordances, so no divider between them); the direction
-       switch and Undo/Redo/Reset each get their own group, told apart by a
-       divider only, not by being separate floating pills. */
+       I use this" affordances, so no divider between them); Undo/Redo/Reset
+       and the view controls (zoom, fit) each get their own group, told
+       apart by a divider only, not by being separate floating pills.
+       The layout-direction switch that used to sit here is gone — this
+       workflow builder is horizontal-only now, so there's nothing to
+       switch, and zoom moved into the room that freed up. */
     const bar = document.createElement('div');
     bar.className = 'bottombar';
     bar.innerHTML =
@@ -235,18 +227,22 @@
         + `<button class="cbtn tool" id="toolNote" data-tip="Note&nbsp;&nbsp;click the canvas to place one">${svg('note')}</button>`
       + `</div>`
       + `<span class="bbar-sep"></span>`
-      + `<div class="bbar dir-switch" role="group" aria-label="Layout direction">`
-        + `<button class="dir-opt active" id="dirV" data-tip="Vertical layout" aria-label="Vertical layout" aria-pressed="true">${svg('forkV')}</button>`
-        + `<button class="dir-opt" id="dirH" data-tip="Horizontal layout" aria-label="Horizontal layout" aria-pressed="false">${svg('forkH')}</button>`
-      + `</div>`
-      + `<span class="bbar-sep"></span>`
       + `<div class="bbar">`
         + `<button class="cbtn" id="doUndo" data-tip="${tipKeys('Undo', '⌘/Ctrl', 'Z')}">${svg('undo')}</button>`
         + `<button class="cbtn" id="doRedo" data-tip="${tipKeys('Redo', '⌘/Ctrl', '⇧', 'Z')}">${svg('redo')}</button>`
         + `<button class="bbar-text" id="doReset" data-tip="${tipKeys('Reset', '⇧', 'R')}">${svg('reset')}Reset</button>`
+      + `</div>`
+      + `<span class="bbar-sep"></span>`
+      + `<div class="bbar view-bbar" id="viewGroup">`
+        + `<div class="minimap" id="minimap" hidden><svg id="minimapSvg" viewBox="0 0 120 78"></svg></div>`
+        + `<button class="cbtn" id="zoomOutBtn" data-tip="Zoom out">${svg('zoomOut')}</button>`
+        + `<button class="zoom-label" id="zoomMenu" data-tip="Zoom presets"><span id="zoomLevel">100%</span></button>`
+        + `<button class="cbtn" id="zoomInBtn" data-tip="Zoom in">${svg('zoomIn')}</button>`
+        + `<span class="bbar-sep"></span>`
+        + `<button class="cbtn" id="fitBtn" data-tip="Fit to screen">${svg('fit')}</button>`
       + `</div>`;
 
-    document.body.append(hot, nav, handle, viewBar, bar);
+    document.body.append(hot, nav, handle, bar);
     return { nav, hot, handle };
   }
 
@@ -353,6 +349,31 @@
     const app = window.WFApp;
     const toast = app.toast;
 
+    /* Simple/Node view stays visually centred on the page bar — but "centred"
+       is computed from the LEFT and RIGHT zones' actual rendered widths, not
+       assumed via CSS 50%. Left grows with a longer workflow name; right
+       grows every time a new action earns a permanent header slot (Run
+       history is the one that lives there now). Recomputed whenever
+       either can plausibly have changed, so the switch slides toward
+       whichever side has room instead of ever being covered by it. */
+    const GAP = 16;
+    function positionViewSwitch(){
+      const bar = $('.pagebar'), left = $('.pagebar-left'), right = $('.pagebar-right'), vs = $('#viewSwitch');
+      if(!bar || !left || !right || !vs) return;
+      const barW = bar.getBoundingClientRect().width;
+      const leftW = left.getBoundingClientRect().width, rightW = right.getBoundingClientRect().width;
+      const vsW = vs.getBoundingClientRect().width;
+      const trueCenter = (barW - vsW) / 2;
+      const safeLeft = Math.max(leftW + GAP, Math.min(trueCenter, barW - rightW - GAP - vsW));
+      vs.style.left = Math.round(safeLeft) + 'px';
+      /* only the horizontal position is ours to set — top:50%/translateY(-50%)
+         (in CSS) still does the vertical centring; overwriting the whole
+         transform here (an earlier bug) cancelled that Y-offset and pushed
+         the switch half its own height downward, clipping it against the bar */
+    }
+    let posT;
+    window.addEventListener('resize', () => { clearTimeout(posT); posT = setTimeout(positionViewSwitch, 100); });
+
     /* --- navigation: hover to peek, toggle to pin --- */
     let pinned = false, closeT = null, openT = null;
     const open = () => { clearTimeout(closeT); closeT = null; nav.classList.add('open'); };
@@ -427,6 +448,7 @@
         $('#pageTitle').textContent = flowName;
         document.title = flowName + ' — Workflow';
         closeInfo(); toast('Workflow details saved');
+        positionViewSwitch();          // the name's new length may have changed the left zone's width
       };
       nameIn.addEventListener('input', dirty);
       descIn.addEventListener('input', dirty);
@@ -455,8 +477,113 @@
 
     const pill = $('#statePill');
     $('#goBack').addEventListener('click', () => toast('Back to the workflow list — not part of this prototype'));
-    const publish = () => { pill.className = 'state-pill live'; pill.textContent = 'Published'; };
-    const saveOnly = () => { pill.className = 'state-pill draft'; pill.textContent = 'Draft'; };
+
+    /* ---------------------------------------------------------------------
+       Version history + Run history. This prototype has no backend, so both
+       are simulated locally — a version snapshot is captured on every
+       Publish (never on a plain edit, since there's no Save step to hang it
+       off), and a handful of plausible run rows are seeded alongside it so
+       the panel isn't permanently empty in a demo. Run history itself is
+       real in structure (paginated list, status per row) even though the
+       runs themselves are mocked — see CLAUDE.md for why. */
+    const AUTHOR = 'Zeni Chakalasiya';                    // matches the "ZE" avatar already in the top bar
+    let versions = [], versionSeq = 0;                    // newest first
+    let runs = [], runSeq = 0;                            // newest first
+    let everPublished = false;
+    const RUN_TRIGGERS = ['Incident #4521 created', 'Incident #4498 priority updated', 'Service Request #1187 created', 'Incident #4512 status changed'];
+    const fmtDate = ts => new Date(ts).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
+    const timeAgo = ts => {
+      const s = Math.round((Date.now() - ts) / 1000);
+      if(s < 60) return 'just now';
+      if(s < 3600) return Math.round(s / 60) + 'm ago';
+      if(s < 86400) return Math.round(s / 3600) + 'h ago';
+      return Math.round(s / 86400) + 'd ago';
+    };
+    function updateRunBadge(){
+      const badge = $('#runBadge'), recent = runs.slice(0, 10);
+      const bad = recent.some(r => r.status === 'error') ? 'err' : recent.some(r => r.status === 'warning') ? 'warn' : null;
+      badge.hidden = !bad;
+      badge.className = 'run-badge' + (bad ? ' ' + bad : '');
+    }
+    function addMockRuns(n){
+      const statuses = ['success','success','success','warning','error'];
+      for(let i = 0; i < n; i++){
+        runSeq++;
+        runs.unshift({
+          n: runSeq,
+          trigger: RUN_TRIGGERS[Math.floor(Math.random() * RUN_TRIGGERS.length)],
+          ts: Date.now() - Math.floor(Math.random() * 3 * 86400000),
+          duration: (0.4 + Math.random() * 2.2).toFixed(1) + 's',
+          status: statuses[Math.floor(Math.random() * statuses.length)],
+        });
+      }
+      runs.sort((a, b) => b.ts - a.ts);
+      updateRunBadge();
+    }
+
+    /* Version History replaces the drawer instead of opening a modal, same
+       mechanism as Run History right below: app.openVersionHistory() swaps
+       the drawer's content and puts the canvas into read-only mode; this
+       function only builds the row markup. Restore still runs through
+       app.confirm() as a deliberate, explicit action — the read-only lock
+       only blocks direct canvas manipulation (drag, +, Undo/Redo/Reset), not
+       a panel's own buttons. */
+    function versionHistoryRowsHtml(){
+      if(!versions.length) return `<div class="wfm-empty">No versions yet — publish your workflow to create the first one.</div>`;
+      return versions.map(v => `<div class="vh-row">`
+        + `<div class="vh-row-top"><span class="vh-title">Version v${v.n}</span>${v.published ? '<span class="state-pill live">Published</span>' : ''}</div>`
+        + `<div class="vh-meta">${v.author} · ${fmtDate(v.ts)}</div>`
+        + `<div class="vh-actions">`
+          + `<button class="vh-act" type="button" data-a="view" data-i="${v.n}">${svg('eye')}View</button>`
+          + `<button class="vh-act" type="button" data-a="restore" data-i="${v.n}">${svg('restore')}Restore</button>`
+        + `</div>`
+      + `</div>`).join('');
+    }
+    $('#vhList').addEventListener('click', e => {
+      const b = e.target.closest('[data-a]'); if(!b) return;
+      const v = versions.find(x => x.n === +b.dataset.i); if(!v) return;
+      if(b.dataset.a === 'view') toast('Viewing Version v' + v.n + ' — read-only preview is not part of this prototype');
+      else app.confirm({
+        title: 'Restore Version v' + v.n + '?',
+        body: 'This replaces the current draft with this version’s configuration. You can undo this right after.',
+        confirmLabel: 'Restore version',
+        onConfirm(){ toast('Restored Version v' + v.n); }
+      });
+    });
+    /* Run History replaces the drawer instead of opening a modal (per
+       explicit decision — see CLAUDE.md): app.openRunHistory() swaps the
+       drawer's content and puts the canvas into read-only mode; this
+       function only builds the row markup, the same shape the old modal
+       used, just handed to a different container. No pagination here —
+       the sidebar is a scroll list, matching every other drawer panel. */
+    function runHistoryRowsHtml(){
+      if(!runs.length) return `<div class="wfm-empty">${everPublished ? 'No runs yet — this workflow hasn’t been triggered.' : 'No runs yet — publish your workflow to start collecting run history.'}</div>`;
+      return runs.map(r => `<div class="rh-row">`
+        + `<span class="rh-dot ${r.status}"></span>`
+        + `<div class="rh-main"><span class="rh-title">Run #${r.n}</span><span class="rh-meta">${r.trigger} · ${timeAgo(r.ts)} · ${r.duration}</span></div>`
+        + `<span class="rh-status ${r.status}">${r.status[0].toUpperCase() + r.status.slice(1)}</span>`
+        + `<button class="rh-view" type="button" data-a="detail">View details</button>`
+      + `</div>`).join('');
+    }
+    $('#versionHistBtn').addEventListener('click', () => app.openVersionHistory(versionHistoryRowsHtml()));
+    $('#runHistBtn').addEventListener('click', () => app.openRunHistory(runHistoryRowsHtml()));
+    $('#rhList').addEventListener('click', e => {
+      if(e.target.closest('[data-a="detail"]')) toast('Run detail view is not part of this prototype');
+    });
+    /* #rhClose/#vhClose's own clicks are wired in workflow-app.js, right
+       alongside the other drawers' close buttons — they own the
+       drawer/read-only mechanics */
+
+    const publish = () => {
+      pill.className = 'state-pill live'; pill.textContent = 'Published';
+      const firstTime = !everPublished; everPublished = true;
+      versions.forEach(v => v.published = false);
+      versionSeq++;
+      versions.unshift({ n: versionSeq, author: AUTHOR, ts: Date.now(), published: true });
+      addMockRuns(firstTime ? 4 : 1);
+      positionViewSwitch();            // "Draft" → "Published" changes the pill's width
+    };
+    const saveOnly = () => { pill.className = 'state-pill draft'; pill.textContent = 'Draft'; positionViewSwitch(); };
     $('#publishFlow').addEventListener('click', () => { publish(); toast('Workflow published'); });
     $('#publishOpts').addEventListener('click', () => {
       WFPop.open({
@@ -564,22 +691,6 @@
     const setTool = t => { app.setTool(t); $('#toolNote').classList.toggle('active', t === 'note'); };
     $('#toolNote').addEventListener('click', () => setTool('note'));
     app.onToolChange(setTool);
-
-    /* ---- direction: vertical (default) or horizontal layout ----
-       A single icon that swapped meaning on click was hard to read at a
-       glance — a lone button can only ever show ONE state, so there's no
-       telling whether it depicts "now" or "click for this instead". A
-       dropdown fixed that but buried the choice behind an extra click just
-       to see it. A segmented switch shows both options as their own
-       buttons, permanently, side by side, so the active one is always
-       visibly pressed and the other is always one click away. */
-    const setDir = h => {
-      app.setAxis(h ? 'h' : 'v');
-      $('#dirV').classList.toggle('active', !h); $('#dirV').setAttribute('aria-pressed', String(!h));
-      $('#dirH').classList.toggle('active', h); $('#dirH').setAttribute('aria-pressed', String(h));
-    };
-    $('#dirV').addEventListener('click', () => setDir(false));
-    $('#dirH').addEventListener('click', () => setDir(true));
 
     /* ---- minimap: only surfaces when the flow's own scale, or its reach
        beyond the visible canvas, means some of it is genuinely out of sight —
@@ -701,20 +812,28 @@
       $('#doUndo').disabled = !app.canUndo();
       $('#doRedo').disabled = !app.canRedo();
     };
-    $('#doUndo').addEventListener('click', () => { app.undo(); syncHistory(); });
-    $('#doRedo').addEventListener('click', () => { app.redo(); syncHistory(); });
-    $('#doReset').addEventListener('click', () => app.confirm({
-      title: 'Reset the whole workflow?', confirmLabel: 'Reset workflow',
-      body: 'Every step will be removed, including the trigger and all its settings. You can undo this right after.',
-      onConfirm(){ app.resetFlow(); syncHistory(); toast('Workflow reset — undo to bring it back'); }
-    }));
+    $('#doUndo').addEventListener('click', () => { if(app.isReadOnly()) return; app.undo(); syncHistory(); });
+    $('#doRedo').addEventListener('click', () => { if(app.isReadOnly()) return; app.redo(); syncHistory(); });
+    $('#doReset').addEventListener('click', () => {
+      if(app.isReadOnly()) return;
+      app.confirm({
+        title: 'Reset the whole workflow?', confirmLabel: 'Reset workflow',
+        body: 'Every step will be removed, including the trigger and all its settings. You can undo this right after.',
+        onConfirm(){ app.resetFlow(); syncHistory(); toast('Workflow reset — undo to bring it back'); }
+      });
+    });
     app.onHistory(syncHistory);
     syncHistory();
 
     document.addEventListener('keydown', e => {
       if(e.target.matches('input,textarea,select')) return;
       if(e.key === '?'){ e.preventDefault(); floatCard($('#shortcutsBtn'), SHORTCUTS); return; }
-      if(e.key === 'Escape'){ if(card) closeCard(); return; }               // WFPop/confirm handle their own Esc
+      if(e.key === 'Escape'){
+        if(card) closeCard();
+        else if(app.isReadOnly()) app.closeRunHistory();   // Esc leaves Run History same as any other panel
+        return;
+      }
+      if(app.isReadOnly()) return;                          // nothing below this line edits anything
       /* Backspace already means "go back a level" inside an open picker
          (workflow-popover.js) — only read it as "delete" when nothing's open */
       if((e.key === 'Delete' || e.key === 'Backspace') && !window.WFPop.isOpen()){ app.deleteSelected(); return; }
@@ -724,6 +843,8 @@
       if(k === 'z' && !e.shiftKey){ e.preventDefault(); app.undo(); syncHistory(); }
       else if((k === 'z' && e.shiftKey) || k === 'y'){ e.preventDefault(); app.redo(); syncHistory(); }
     });
+
+    positionViewSwitch();
   }
 
   function start(){
