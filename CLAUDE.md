@@ -36,10 +36,10 @@ scripts are written, run, and deleted. None are checked in.
 
 | File | What it holds |
 | --- | --- |
-| `workflow-canvas.html` | The page. All layout/drawer CSS lives in its `<style>` block; the four config drawers (Trigger / Branch / Branch path (lane) / IF-Else) plus the two read-only history panels (Run History / Version History) and the Flow Details panel (workflow name/description) are static markup here. |
+| `workflow-canvas.html` | The page. All layout/drawer CSS lives in its `<style>` block; the four config drawers (Trigger / Branch / Branch path (lane) / IF-Else) plus the read-only history panels (Run History / Version History), Flow Details (workflow name/description), and Guide/Shortcuts are all static `<aside>` markup here — one shared right-hand sidebar system, nine panels deep. |
 | `workflow-app.js` | The application. Node model, canvas layout and rendering, edges, drag/pan/zoom, undo history, the drawers' behaviour, sticky notes, the node picker flow, and the shared Run History/Version History read-only panel mechanism (`openHistoryPanel()`/`closeHistoryPanel()`). |
 | `workflow-popover.js` / `.css` | The anchored picker popover, ported from the textual builder: search, grouped rows, second-level drill-down, keyboard nav, a checkmark on the already-picked row, and a caret help bubble that tracks the highlighted row. Light theme, matching the rest of the app. Also serves the plain `⋮` command menus. |
-| `workflow-chrome.js` / `.css` | The product frame: two-row top bar (including the Run history / Publish / Version history / More actions on the right), hover-out left navigation, the single floating bottom toolbar, tooltips (with key-badge shortcuts), and the Guide ("Node reference") / Keyboard-shortcuts cards. Also builds the Run History/Version History row markup and mock run/version data. |
+| `workflow-chrome.js` / `.css` | The product frame: two-row top bar (including the Run history / Publish / Version history / More actions on the right), hover-out left navigation, the single floating bottom toolbar, tooltips (with key-badge shortcuts). Also builds the Run History/Version History/Guide/Shortcuts row markup and mock run/version data. |
 | `workflow-nodes.css` | Canvas node cards, connectors, edge hover controls, node states, sticky notes. |
 | `server.js` | Static file server on **:8777**. `/` serves `workflow-canvas.html`. |
 | `assets/` | SVG icons (mask-tinted in the popover; some also used as plain `<img>` on canvas). |
@@ -266,16 +266,22 @@ order:
   the end, on explicit direction — "bring zoom in out functionality on left
   of guide and shortcut icons"). Same group as before, just relocated as one
   unit; nothing added or removed, so the card's footprint didn't change. The
-  minimap floats above this group only when the flow's own scale or reach
-  makes part of it genuinely out of sight — not a permanent fixture. It
-  supports two distinct gestures: click the background to ease-scroll the
-  main view there (`requestAnimationFrame` tween), or drag the viewport
-  rectangle itself for live 1:1 panning, clamped so it can't leave the
-  minimap.
+  minimap floats above this group **below 50% zoom or above 150% zoom**
+  (`view.zoom < .5 || view.zoom > 1.5` in `workflow-chrome.js`'s
+  `onViewChange`, was 40%/150%), or whenever the flow's own reach beyond the
+  visible canvas means part of it is out of sight at a normal zoom — not a
+  permanent fixture. Its width and left edge now match the zoom/fit group
+  exactly (`.minimap{width:100%;left:0}` inside `.view-bbar`'s own
+  `position:relative` box — used to be a fixed 120px, centred). It supports
+  two distinct gestures: click the background to ease-scroll the main view
+  there (`requestAnimationFrame` tween), or drag the viewport rectangle
+  itself for live 1:1 panning, clamped so it can't leave the minimap.
 - **Guide + Shortcuts** read as one group (no divider between them — both are
   "how do I use this" affordances). Note used to share this group too but is
   **hidden** for now (`hidden` on `#toolNote` — the sticky-note system itself
   in `workflow-app.js` is untouched, just not reachable from the toolbar).
+  Guide and Shortcuts both open in the right-hand sidebar now, not an
+  instant popup — see below.
 - **Undo / Redo / Reset.**
 
 The whole card re-centres over the remaining canvas width when a config
@@ -288,31 +294,48 @@ vertical layout code path, `axis`/`setAxis`/`getAxis` in `workflow-app.js`,
 was left intact under the hood in case it's ever needed again — `axis`
 defaults to `'h'` and nothing in the UI can currently change it).
 
-**Guide card ("Node reference")** — replaced the old numbered how-to list.
-Icon-tile rows (matching the popover's own tinted-tile visual language),
-grouped **Start** (Trigger) / **Steps** (Action, Get, Wait) / **Flow**
-(Condition, Split path, Loop), each with a bold title + one-line description,
-ending in a "Walkthrough" pill (toast, not built). Lists every node concept
-the same honest way the picker catalogues them — Trigger/Condition/Split path
-are real; Action/Get/Wait/Loop are described but not yet implemented, same as
-the picker's own `soon` items.
-
-**Keyboard shortcuts — real, not aspirational.** The Shortcuts card
-(`SHORTCUTS` in `workflow-chrome.js`) lists exactly what works, each row with
-its own `<kbd>` badge(s): `⌘/Ctrl+Z` undo, `⌘/Ctrl+⇧+Z` redo, `⇧+R` reset (goes
-through the same confirm dialog as the Reset button), `Delete`/`Backspace`
-removes the selected node (`WFApp.deleteSelected()`, reuses `removeNode()` and
-its confirm-before-deleting-a-branch-with-steps-after-it guard), `↑`/`↓` and
-`Enter` move through and choose a picker row, `Esc` closes a menu/popover/
-confirm/floatcard, `?` reopens this panel. Toolbar buttons that carry a real
-shortcut show it in their hover tooltip the same way, as separate `<kbd>`
-badges next to the label (`tipKeys()` helper) — not plain text, and not shown
-at all on buttons with no real shortcut. A reference-site shortcuts list this
-session was handed (line/scope navigation via J/K, letter shortcuts for
-add-action/add-condition, a theme toggle) was **not** copied verbatim: those
-assume the *textual* builder's linear, keyboard-navigable list, which doesn't
-exist in this node canvas, so only the subset that maps to something real was
-built and documented.
+**Guide ("Node reference") and Keyboard shortcuts — sidebar panels, not
+popups.** Both used to be an instant `floatCard()` popup anchored to their
+toolbar button; on explicit direction ("show guide data and keyboard
+shortcuts in right sidebar, instead of instant popup") they now open in the
+same right-hand sidebar every drawer uses (`#guideCfg`/`#shortcutsCfg` in
+`workflow-canvas.html`, `guide`/`shortcuts` keys in the `panels` map,
+`openGuidePanel()`/`openShortcutsPanel()` in `workflow-app.js`,
+`WFApp.openGuide()`/`openShortcuts()` bridge). `floatCard()`/`closeCard()`
+and their CSS (`.floatcard`, `.fc-head`, `.fc-title`, `.fc-close`) are gone
+entirely — nothing else used them. The content itself is unchanged:
+- **Guide** — icon-tile rows (matching the popover's own tinted-tile visual
+  language), grouped **Start** (Trigger) / **Steps** (Action, Get, Wait) /
+  **Flow** (Condition, Split path, Loop), each with a bold title + one-line
+  description, ending in a "Walkthrough" pill (toast, not built). Lists
+  every node concept the same honest way the picker catalogues them —
+  Trigger/Condition/Split path are real; Action/Get/Wait/Loop are described
+  but not yet implemented, same as the picker's own `soon` items.
+- **Shortcuts** (`SHORTCUTS` in `workflow-chrome.js`) lists exactly what
+  works, each row with its own `<kbd>` badge(s): `⌘/Ctrl+Z` undo,
+  `⌘/Ctrl+⇧+Z` redo, `⇧+R` reset (goes through the same confirm dialog as
+  the Reset button), `Delete`/`Backspace` removes the selected node
+  (`WFApp.deleteSelected()`, reuses `removeNode()` and its
+  confirm-before-deleting-a-branch-with-steps-after-it guard), `↑`/`↓` and
+  `Enter` move through and choose a picker row, `Esc` closes a menu,
+  popover, or confirm dialog (no longer "or floatcard" — there isn't one
+  anymore; Esc does NOT close the Guide/Shortcuts sidebar panels themselves,
+  same as every other drawer), `?` opens this panel. Toolbar buttons that
+  carry a real shortcut show it in their hover tooltip the same way, as
+  separate `<kbd>` badges next to the label (`tipKeys()` helper) — not plain
+  text, and not shown at all on buttons with no real shortcut.
+- Both are **blocked while read-only** (Run History/Version History open) —
+  `if(app.isReadOnly()) return;` on the toolbar click and the `?` key.
+  Without that guard, opening Guide/Shortcuts over Run History would swap
+  the drawer's visible content away, and its OWN close button would then
+  just hide the dock without ever calling the read-only-clearing
+  `closeHistoryPanel()` — leaving the canvas stuck locked with nothing on
+  screen able to un-stick it.
+- A reference-site shortcuts list an earlier session was handed (line/scope
+  navigation via J/K, letter shortcuts for add-action/add-condition, a theme
+  toggle) was **not** copied verbatim: those assume the *textual* builder's
+  linear, keyboard-navigable list, which doesn't exist in this node canvas,
+  so only the subset that maps to something real was built and documented.
 
 **Verification convention.** Changes are checked by driving the real page with
 Playwright and asserting computed styles, geometry, and console output (zero

@@ -1,123 +1,113 @@
-# Handoff — 2026-09-29 16:59
+# Handoff — 2026-09-29 17:58
 
 ## Read first
-In `CLAUDE.md`: the rewritten **Top bar** section (breadcrumb gone, Run
-History hidden, the new "Flow Details" paragraph) and **Bottom toolbar**
-section (zoom now leads, Note hidden). Both changed this session; the
-`[hidden]` CSS gotcha documented there is worth knowing before touching any
-other `hidden`-toggled element in this codebase.
+In `CLAUDE.md`: the rewritten **"Guide ... and Keyboard shortcuts — sidebar
+panels, not popups"** section and the minimap paragraph inside **Bottom
+toolbar**. Both changed this session.
 
 ## What we worked on this session
-One message, six independent UI changes, all landed and verified together:
-1. Hide the Run History button from the top bar.
-2. Move workflow name + description into the right-hand sidebar (same
-   system every node drawer uses) as mandatory fields, gating Publish.
-3. Reorder the bottom toolbar: zoom moves to the front, left of Guide/
-   Shortcuts, same overall size.
-4. "IF/Else" instead of "if" on the Inline condition picker row's tag.
-5. Hide the Note tool.
-6. Remove the "‹ Workflows /" breadcrumb, keep just the workflow name.
+Three requests in one message:
+1. Move Guide and Shortcuts from an instant floatcard popup into the same
+   right-hand sidebar every drawer uses.
+2. Make the minimap's width match the zoom/fit toolbar group exactly, and
+   left-align it to that group instead of centring it.
+3. Change the minimap's zoom-based show threshold from 40%/150% to
+   50%/150%.
 
 ## Completed
-- **Run History hidden** — `hidden` attribute added to `#runHistBtn` in
-  `workflow-chrome.js`; the button, its click handler, and
-  `app.openRunHistory()` are all untouched, just not visible.
-- **Flow Details sidebar panel** (`#flowDetailsCfg` in
-  `workflow-canvas.html`, `flowDetails` key in the `panels` map in
-  `workflow-app.js`, `openFlowDetailsPanel()`/`WFApp.openFlowDetails()`/
-  `closeFlowDetails()`) replaces the old `.flowinfo` floating card entirely
-  — that popup's markup-building code and all its CSS (`.floatcard.flowinfo`,
-  `.fi-label`, `.fi-input`, `.fi-foot`, `.fc-area`) were deleted, not just
-  superseded. Workflow name/description are now live-write like every other
-  drawer field (no Save button — this closes the one exception CLAUDE.md
-  used to call out). Clicking the workflow name still opens it; clicking
-  **Publish** (main button or "Save & publish") now calls
-  `requireFlowDetails()` first — empty field(s) open this same panel,
-  red-outline via `.input-box.invalid`, show a `.cfg-alert` banner, and
-  block the publish; "Save only" is NOT gated. NOT a read-only panel like
-  Run/Version History — the canvas stays fully editable behind it.
-- **Toolbar reordered**: `workflow-chrome.js`'s bottombar markup now emits
-  `view-bbar` (zoom/fit/minimap) first, then Guide+Shortcuts+Note, then
-  Undo/Redo/Reset — same three groups, same dividers, just the first group
-  moved from last to first. Nothing added or removed, so the card's overall
-  footprint is unchanged (confirmed visually).
-- **"IF/Else" tag** — `workflow-app.js`'s `SUBMENUS.ifelse[0]` (the "Inline
-  condition" item) had `tag:'if'`; changed to `tag:'IF/Else'`. Rendered
-  as-is by `workflow-popover.js`'s `.wfpop-tag` (`flex-shrink:0`, no fixed
-  width, so the longer text just fits naturally — no CSS change needed).
-- **Note hidden** — `hidden` attribute added to `#toolNote`; `setTool()`,
-  the sticky-note placement/anchor/render system in `workflow-app.js`, and
-  existing notes (if any) are all untouched — only the entry point is gone.
-- **Breadcrumb removed** — `#goBack` and `#crumbRoot` (plus the `/` sep)
-  deleted from the pagebar-left markup, their click handlers removed (not
-  just left dangling — they'd have thrown on a null `$()` result), and the
-  now-fully-dead `.crumb-link`/`.crumb-sep`/`.cbtn.sm` CSS removed too
-  (confirmed nothing else referenced `.cbtn.sm` before deleting it).
-- **Found and fixed a real latent bug while building #1 and #5**: `[hidden]`
-  had NO CSS rule anywhere in this codebase — every existing use of the
-  attribute (minimap, `#runBadge`, trigger schedule fields, etc.) was
-  relying entirely on the browser's low-priority default UA rule, which
-  loses to any author class that sets `display` unconditionally. This is
-  exactly what silently broke `#runHistBtn`'s `hidden` attribute
-  (`.btn-outline{display:inline-flex}` was winning). Fixed once, globally,
-  with `[hidden]{display:none!important}` in `workflow-chrome.css` — this
-  is the actual fix that makes #1 and #5 work, and it fixes the same gap
-  for every other `hidden` toggle in the app going forward.
-- Verified all six changes together with Playwright (written, run,
-  deleted): button/element hidden states, toolbar group order + contents,
-  tag text, Flow Details gate (blocks Publish with only description empty,
-  correct alert copy, clears on fill, publish succeeds once both are
-  filled), breadcrumb markup, zoom/minimap/Guide still functioning after
-  the reorder, undo/redo regression — zero console errors throughout.
+- **Guide/Shortcuts → sidebar panels.** New `#guideCfg`/`#shortcutsCfg`
+  `<aside>` panels in `workflow-canvas.html` (same shell every other drawer
+  uses — `.cfg-head`/close button/`.cfg-scroll`). `guide`/`shortcuts` added
+  to the `panels` map in `workflow-app.js`; `openGuidePanel()`/
+  `openShortcutsPanel()` (plain drawers, NOT read-only, same pattern as
+  Flow Details) exposed via `WFApp.openGuide()`/`openShortcuts()`. In
+  `workflow-chrome.js`: `floatCard()`/`closeCard()` and the module-level
+  `card` variable are deleted outright (confirmed via grep nothing else
+  referenced them); `GUIDE`/`SHORTCUTS` content strings kept their inner
+  markup (`.fc-noderef`/`.fc-keys`/etc.) but dropped the `fcHead()` title+×
+  wrapper, since the sidebar shell already provides that. The dead
+  `.floatcard`/`.fc-head`/`.fc-title`/`.fc-close` CSS (plus the
+  already-unused `.fc-list`) was removed from `workflow-chrome.css`; the
+  content-level classes stayed since they're still in use inside the
+  sidebar body.
+  - Both toolbar buttons AND the `?` key now guard with
+    `if(app.isReadOnly()) return;` — added proactively, not asked for
+    directly: without it, opening Guide while Run History is open would
+    swap the drawer's content away, and Guide's own close button would just
+    hide the dock without ever calling the read-only-clearing
+    `closeHistoryPanel()`, leaving the canvas permanently stuck locked.
+    Verified this exact scenario in Playwright (open Run History via
+    `WFApp.openRunHistory()`, click Guide — no-ops, Run History stays
+    visible, `readOnly` stays true; close Run History normally, Guide works
+    again).
+  - The Shortcuts row list dropped nothing in content, but its `Esc` row
+    copy changed from "Close a menu/popover/confirm/floatcard" to "Close a
+    menu, popover, or confirm dialog" — floatcards don't exist anymore, and
+    Esc does NOT close the new Guide/Shortcuts sidebar panels themselves
+    (matches every other drawer's existing convention — only Trigger/
+    Branch/Flow Details-style panels close via their own Close button or by
+    selecting something else, never Esc).
+- **Minimap width/alignment.** `.minimap` in `workflow-chrome.css` changed
+  from a fixed `120px`, centred (`left:50%;transform:translateX(-50%)`) to
+  `width:100%;left:0` — since `.minimap` is `position:absolute` inside
+  `.view-bbar`'s `position:relative` box, and `.view-bbar`'s own width is
+  driven entirely by its OTHER children (zoom out/in/percent/fit — the
+  minimap itself is out of flow, so it doesn't affect that width), this
+  makes the minimap track the zoom/fit group's real rendered width exactly.
+  Confirmed pixel-identical in testing (both measured the same X and width
+  at a zoomed-out state). Height stayed fixed at 78px — only width was
+  asked for.
+- **Zoom threshold.** `workflow-chrome.js`'s `onViewChange` show condition
+  changed from `view.zoom <= .4 || view.zoom >= 1.5` to
+  `view.zoom < .5 || view.zoom > 1.5` (strict, matching "below 50%"/"above
+  150%" literally). The existing content-overflow trigger (`cw > cs.w*1.15
+  || ch > cs.h*1.15`) was deliberately LEFT IN PLACE — the user only
+  described the two zoom-percentage conditions, didn't mention removing the
+  overflow one, and dropping it would have been a real functionality loss
+  (a wide/tall flow at 100% zoom would never show the minimap even with
+  content off-screen). Flagged as an assumption in the reply rather than
+  silently deciding either way.
+- Verified everything with Playwright (written, run, deleted): Guide/
+  Shortcuts panel structure and content, `?` key, close buttons, clicking a
+  node while either is open correctly swaps the drawer over (tested against
+  a CONFIGURED trigger — an unconfigured one opens a picker popover instead
+  of its drawer, a pre-existing quirk noted earlier this session, not a bug
+  here), the read-only-block scenario and recovery, minimap geometry
+  matching the zoom group exactly, the 50% boundary (exactly 50% stays
+  hidden, 25%/200% show it), Branch and the Flow Details Publish-gate both
+  still working — zero console errors throughout.
 
 ## In progress
-Nothing mid-flight. All six changes are implemented, verified, and were
-explicitly requested to be published this session — done (see Deployment
-section timestamp / live URL, unchanged).
+Nothing mid-flight. Not published yet as of the last message before this
+`/tatago` run — that's what this run is for.
 
 ## Next steps
-No open threads from this specific request. One item intentionally NOT
-touched, flagged to the user separately:
-- **A pre-existing undo/redo bug**: calling `WFApp.redo()` immediately after
-  `WFApp.undo()` (right after creating a single node) does not restore the
-  node — reproduces identically on the last commit from BEFORE this
-  session's changes too (confirmed via `git stash`), so it predates
-  everything done today and is unrelated to any of the six changes above.
-  Not investigated further or fixed — out of scope for this session's
-  request. Worth a dedicated look if the user brings it up: likely in
-  `pushHistory()`/`undo()`/`redo()` in `workflow-app.js`, possibly a timing/
-  debounce issue given it didn't reproduce in every test this session (some
-  earlier undo/redo checks in this same session passed fine with a similar
-  shape of test).
+No open threads from this specific request.
 
 ## Decisions made
-- Interpreted "hide" literally (attribute-hidden, code/handlers intact) for
-  both Run History and Note, rather than the "remove entirely" treatment
-  Test Run got in an earlier session — the user's own wording differed
-  ("hide" vs. that earlier session's explicit "remove"), so the two are
-  deliberately handled differently. If either should come back, it's a
-  one-line `hidden` removal, not a rebuild.
-- Removed the breadcrumb's DOM/handlers/CSS outright rather than hiding it —
-  unlike Run History/Note, "keep only workflow name" reads as a permanent
-  layout decision, not a toggle-off, and there's nothing to preserve access
-  to (no code path re-shows it).
-- Made Flow Details live-write (no Save button) rather than preserving the
-  old popup's local-edit-then-Save behavior — moving the fields into the
-  shared sidebar system means adopting that system's own convention
-  (autosave, `.cfg-alert` validation), not just relocating the old widget
-  into a new container.
-- Only "Save & publish" and the main Publish button are gated on Flow
-  Details being complete; "Save only" is not — the user said "on click of
-  publish CTA" specifically, and Save-only is a lesser, non-public-facing
-  action where forcing metadata first would be unnecessarily strict.
+- Guide/Shortcuts becoming sidebar panels meant adopting the same
+  conventions every other drawer already has: no Esc-to-close, swap-on-
+  node-click via the shared `panels`/`showPanel()` mechanism, light theme.
+  The reference screenshot the user attached showed a dark card — read as
+  "here's what the CURRENT popup looks like" (location/behavior being the
+  actual ask), not a request to keep dark styling, since every other panel
+  in this app is deliberately light (an explicit standing decision recorded
+  earlier in `CLAUDE.md`). Worth confirming with the user if this reading
+  turns out wrong.
+- Kept the content-overflow minimap trigger alongside the new stricter zoom
+  thresholds rather than replacing it — see "Completed" above for the
+  reasoning. This is the one place this session where the literal ask
+  ("show minimap when I zoom out below 50%...") could have been read as
+  either "add this condition" or "these are the only two conditions," and
+  the conservative reading (add/adjust, don't remove working behavior
+  nobody complained about) was chosen.
 
 ## Gotchas & notes
-- `git stash` / `git stash pop` is a fast, safe way to test "does this bug
-  exist on the last commit too" without losing in-progress work — used this
-  session to confirm the undo/redo issue predates today's changes before
-  deciding not to chase it further.
-- When adding a `hidden` attribute to hide something in THIS codebase,
-  don't assume it works — check whether the element's class sets `display`
-  unconditionally first (most `.cbtn`/`.btn-*` classes here do). The global
-  `[hidden]{display:none!important}` rule added this session should make
-  this a non-issue going forward, but it's new as of today.
+- When testing "does clicking a node swap the active sidebar panel," always
+  configure the node first (e.g. pick a trigger type) before clicking it —
+  an unconfigured/empty node opens the node-picker POPOVER instead of its
+  drawer, which doesn't go through the shared panel-swap mechanism at all
+  and will leave a stray `.wfpop-layer` open, blocking every subsequent
+  click in the same test run with a `TimeoutError` that looks like an app
+  bug but isn't. Hit this twice this session already — worth remembering
+  for any future test involving node clicks in a fresh session.

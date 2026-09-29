@@ -282,15 +282,18 @@ body.dock-open .bottombar{left:calc(50% - 206px);}
 .cbtn.tool.active{background:rgba(61,139,208,.14);color:var(--primary);}
 .cbtn.tool.active:hover{background:rgba(61,139,208,.2);}
 
-/* ---- minimap: floats above the view group, only while it's needed ---- */
+/* ---- minimap: floats above the view group, only while it's needed ----
+   Same width as the zoom/fit group itself (100% of .view-bbar, its
+   position:relative anchor) and left-aligned to it — it used to be a fixed
+   120px, centred. Height stays fixed; only width was asked to match. */
 .minimap{
-  position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);
-  width:120px;height:78px;padding:0;cursor:pointer;
+  position:absolute;left:0;bottom:calc(100% + 10px);
+  width:100%;height:78px;padding:0;cursor:pointer;
   background:var(--white);border:1px solid var(--chrome-border);border-radius:10px;
   box-shadow:var(--shadow-card);overflow:hidden;
   animation:mmIn .16s var(--ease);
 }
-@keyframes mmIn{from{opacity:0;transform:translateX(-50%) translateY(4px);}to{opacity:1;transform:translateX(-50%);}}
+@keyframes mmIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
 .minimap svg{display:block;width:100%;height:100%;}
 .minimap .mm-view{fill:rgba(61,139,208,.12);stroke:var(--primary);stroke-width:1.4;cursor:grab;}
 .minimap.dragging{cursor:grabbing;}
@@ -319,25 +322,12 @@ body.dock-open .bottombar{left:calc(50% - 206px);}
 }
 .wf-tip kbd + kbd{margin-left:3px;}
 
-/* ---------------- guide / shortcuts / description card ---------------- */
-.floatcard{
-  position:fixed;z-index:190;width:320px;padding:14px;
-  background:var(--white);border:1px solid var(--border);border-radius:12px;
-  box-shadow:var(--shadow-flyout),0 12px 34px -14px rgba(54,70,88,.4);
-  animation:wfpopIn .14s var(--ease);
-}
-.fc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
-.fc-title{font-size:12.5px;font-weight:500;color:var(--ink);}
-.fc-close{
-  width:20px;height:20px;flex-shrink:0;border:none;background:none;border-radius:5px;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:var(--gray-label);
-  transition:background .15s,color .15s;
-}
-.fc-close:hover{background:var(--chrome-hover);color:var(--page-text);}
-.fc-close svg{width:13px;height:13px;display:block;}
-.fc-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;}
-.fc-list li{font-size:11.5px;line-height:1.45;color:var(--gray-label);}
-.fc-list b{font-weight:500;color:var(--page-text);}
+/* ---------------- Guide / Shortcuts content ----------------
+   Lives inside the right-hand sidebar now (#guideCfg/#shortcutsCfg in
+   workflow-canvas.html use the same .cfg-* header/scroll shell every other
+   drawer does) — only the content-level classes below are still needed;
+   the old floatcard wrapper/header (.floatcard/.fc-head/.fc-title/
+   .fc-close) and the never-used .fc-list are gone. */
 .fc-keys{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;margin:0;align-items:center;}
 .fc-keys dt{margin:0;}
 .fc-keys dd{margin:0;font-size:11.5px;color:var(--gray-label);}

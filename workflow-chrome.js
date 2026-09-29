@@ -281,30 +281,11 @@
     window.addEventListener('scroll', hideTip, true);
   }
 
-  /* ---------------------------------------------------------- small float card */
-  let card = null;
-  function closeCard(){
-    if(!card) return;
-    document.querySelectorAll('[data-tipoff]').forEach(e => e.removeAttribute('data-tipoff'));
-    card.remove(); card = null;
-  }
-  function floatCard(anchor, html){
-    const wasMine = card && card.dataset.owner === anchor.id;
-    closeCard();
-    if(wasMine) return;                                  // second click closes
-    anchor.setAttribute('data-tipoff', '');              // its tooltip would sit on top of the card
-    card = document.createElement('div');
-    card.className = 'floatcard';
-    card.dataset.owner = anchor.id;
-    card.innerHTML = html;
-    document.body.appendChild(card);
-    const r = anchor.getBoundingClientRect(), c = card.getBoundingClientRect();
-    card.style.left = Math.round(Math.min(Math.max(12, r.left + r.width / 2 - c.width / 2), window.innerWidth - c.width - 12)) + 'px';
-    card.style.top = Math.round(r.top - c.height - 10) + 'px';
-    setTimeout(() => document.addEventListener('mousedown', function off(e){
-      if(card && !card.contains(e.target)){ closeCard(); document.removeEventListener('mousedown', off); }
-    }), 0);
-  }
+  /* ---------------------------------------------------------- Guide /
+     Shortcuts content — now built straight into the right-hand sidebar
+     (see #guideCfg/#shortcutsCfg in workflow-canvas.html) instead of an
+     instant floatcard popup; the old floatCard()/closeCard() machinery and
+     its dark-adjacent CSS are gone entirely, since nothing else used them. */
   /* one row per node this product has a concept for — Trigger and the two
      that actually build (Condition, Split path) work today; the rest are
      catalogued the same way the node picker catalogues them, so the guide
@@ -324,10 +305,7 @@
       { icon:'loop', tone:'util', title:'Loop', desc:'Repeats the same steps for every item in a list.' },
     ] },
   ];
-  const fcHead = title => `<div class="fc-head"><span class="fc-title">${title}</span>`
-    + `<button class="fc-close" type="button" data-fc-close aria-label="Close">${svg('close')}</button></div>`;
-  const GUIDE = fcHead('Node reference')
-    + `<div class="fc-noderef">` + NODE_REF.map(g => `<div class="fc-nr-group">${g.group}</div>`
+  const GUIDE = `<div class="fc-noderef">` + NODE_REF.map(g => `<div class="fc-nr-group">${g.group}</div>`
       + g.rows.map(r => `<div class="fc-nr-row"><span class="fc-nr-ico tone-${r.tone}">${svg(r.icon)}</span>`
         + `<span class="fc-nr-text"><b>${r.title}</b><span>${r.desc}</span></span></div>`).join('')).join('')
     + `</div>`
@@ -335,10 +313,10 @@
   /* every row here is a shortcut that actually works — see the keydown
      handler below and Undo/Redo/Reset's own tooltips, which carry the same
      badges so the two places never drift out of sync. */
-  const SHORTCUTS = fcHead('Keyboard shortcuts') + `<dl class="fc-keys">`
+  const SHORTCUTS = `<dl class="fc-keys">`
     + [[['⌘/Ctrl','Z'],'Undo'],[['⌘/Ctrl','⇧','Z'],'Redo'],[['⇧','R'],'Reset the whole workflow'],
        [['Delete'],'Delete the selected node'],[['↑','↓'],'Move through a menu'],
-       [['Enter'],'Choose the highlighted row'],[['Esc'],'Close a menu or panel'],[['?'],'This panel']]
+       [['Enter'],'Choose the highlighted row'],[['Esc'],'Close a menu, popover, or confirm dialog'],[['?'],'This panel']]
       .map(([keys, v]) => `<dt>${keys.map(k => `<kbd>${k}</kbd>`).join('')}</dt><dd>${v}</dd>`).join('') + `</dl>`;
 
   /* ---------------------------------------------------------- behaviour */
@@ -627,13 +605,18 @@
       b.addEventListener('click', () => toast(b.dataset.soon + ' is not part of this prototype')));
 
     /* --- guide / shortcuts --- */
-    $('#guideBtn').addEventListener('click', () => floatCard($('#guideBtn'), GUIDE));
-    $('#shortcutsBtn').addEventListener('click', () => floatCard($('#shortcutsBtn'), SHORTCUTS));
-    /* the card's own × — delegated, since GUIDE/SHORTCUTS are rebuilt fresh
-       into a new element every time floatCard() opens */
+    function openGuide(){ $('#guideBody').innerHTML = GUIDE; app.openGuide(); }
+    function openShortcuts(){ $('#shortcutsBody').innerHTML = SHORTCUTS; app.openShortcuts(); }
+    /* blocked during read-only (Run/Version History open) — otherwise
+       closing Guide/Shortcuts afterward would leave readOnly stuck true
+       with nothing on screen able to clear it, since only Run/Version
+       History's own close button resets that flag */
+    $('#guideBtn').addEventListener('click', () => { if(!app.isReadOnly()) openGuide(); });
+    $('#shortcutsBtn').addEventListener('click', () => { if(!app.isReadOnly()) openShortcuts(); });
+    $('#guideClose').addEventListener('click', () => app.closeGuide());
+    $('#shortcutsClose').addEventListener('click', () => app.closeShortcuts());
     document.addEventListener('click', e => {
-      if(e.target.closest('[data-fc-close]')) closeCard();
-      else if(e.target.closest('#fcWalkthrough')) toast('Walkthrough is not designed yet');
+      if(e.target.closest('#fcWalkthrough')) toast('Walkthrough is not designed yet');
     });
 
     /* --- zoom --- */
@@ -696,13 +679,13 @@
     $('#toolNote').addEventListener('click', () => setTool('note'));
     app.onToolChange(setTool);
 
-    /* ---- minimap: only surfaces when the flow's own scale, or its reach
-       beyond the visible canvas, means some of it is genuinely out of sight —
-       not a permanent fixture. Two distinct gestures, same as a map app:
-       a click on the background eases the main view over to that point;
-       a drag that starts ON the viewport rectangle instead tracks the
-       pointer 1:1, live, with no easing — dragging IS panning, so it can't
-       lag behind the hand. */
+    /* ---- minimap: only surfaces below 50% zoom or above 150% zoom, or
+       when the flow's own reach beyond the visible canvas means some of it
+       is genuinely out of sight at a normal zoom — not a permanent fixture.
+       Two distinct gestures, same as a map app: a click on the background
+       eases the main view over to that point; a drag that starts ON the
+       viewport rectangle instead tracks the pointer 1:1, live, with no
+       easing — dragging IS panning, so it can't lag behind the hand. */
     const MM_W = 120, MM_H = 78, MM_PAD = 6;
     const TYPE_FILL = { trigger:'#a9c3de', ifelse:'#f5c99a', branch:'#f5c99a', lane:'#f2b96b', note:'#e8cf6e' };
     let mm = null;                                        // last draw's world→minimap mapping, for click/drag
@@ -738,7 +721,7 @@
       if(view.content && cs.w && cs.h){
         const cw = (view.content.maxX - view.content.minX) * view.zoom;
         const ch = (view.content.maxY - view.content.minY) * view.zoom;
-        show = view.zoom <= .4 || view.zoom >= 1.5 || cw > cs.w * 1.15 || ch > cs.h * 1.15;
+        show = view.zoom < .5 || view.zoom > 1.5 || cw > cs.w * 1.15 || ch > cs.h * 1.15;
       }
       minimapEl.hidden = !show;
       if(show) drawMinimap(view);
@@ -831,10 +814,9 @@
 
     document.addEventListener('keydown', e => {
       if(e.target.matches('input,textarea,select')) return;
-      if(e.key === '?'){ e.preventDefault(); floatCard($('#shortcutsBtn'), SHORTCUTS); return; }
+      if(e.key === '?'){ e.preventDefault(); if(!app.isReadOnly()) openShortcuts(); return; }
       if(e.key === 'Escape'){
-        if(card) closeCard();
-        else if(app.isReadOnly()) app.closeRunHistory();   // Esc leaves Run History same as any other panel
+        if(app.isReadOnly()) app.closeRunHistory();   // Esc leaves Run History same as any other panel
         return;
       }
       if(app.isReadOnly()) return;                          // nothing below this line edits anything

@@ -13,7 +13,7 @@
 (function(){
   const $ = (s, r=document) => r.querySelector(s);
   const world = $('#world'), edgesSvg = $('#edges'), dock = $('#dock'), canvasEl = $('#canvas');
-  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg'), runHistory: $('#runHistoryCfg'), versionHistory: $('#versionHistoryCfg'), flowDetails: $('#flowDetailsCfg') };
+  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg'), runHistory: $('#runHistoryCfg'), versionHistory: $('#versionHistoryCfg'), flowDetails: $('#flowDetailsCfg'), guide: $('#guideCfg'), shortcuts: $('#shortcutsCfg') };
 
   /* ---------------------------------------------------------- catalogs */
   const MODULES = ['Request','Incident','Problem','Change','Release','Task','Hardware Asset','Software Asset','User'];
@@ -1745,6 +1745,24 @@
     render();
   }
 
+  /* ------------------ Guide / Shortcuts — used to be instant popups
+     (floatCard() in workflow-chrome.js); now the same plain, non-read-only
+     drawer Flow Details uses. Same reasoning: clicking a node while either
+     is open just swaps the drawer over, no special-casing needed since
+     it's the same shared panels/showPanel() mechanism as everything else. */
+  function openGuidePanel(){
+    if(selId) markChecked(selId);
+    selId = null;
+    openDrawer('guide');
+    render();
+  }
+  function openShortcutsPanel(){
+    if(selId) markChecked(selId);
+    selId = null;
+    openDrawer('shortcuts');
+    render();
+  }
+
   /* ------------------ node lifecycle */
   function dropSubtree(id){
     const n = nodes[id]; if(!n) return;
@@ -2223,6 +2241,10 @@
     closeVersionHistory(){ closeHistoryPanel(); },
     openFlowDetails(){ openFlowDetailsPanel(); },
     closeFlowDetails(){ closeDrawer(); },
+    openGuide(){ openGuidePanel(); },
+    closeGuide(){ closeDrawer(); },
+    openShortcuts(){ openShortcutsPanel(); },
+    closeShortcuts(){ closeDrawer(); },
     isReadOnly(){ return readOnly; },
   };
 
