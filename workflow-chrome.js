@@ -307,17 +307,20 @@
   ];
   const GUIDE = `<div class="fc-noderef">` + NODE_REF.map(g => `<div class="fc-nr-group">${g.group}</div>`
       + g.rows.map(r => `<div class="fc-nr-row"><span class="fc-nr-ico tone-${r.tone}">${svg(r.icon)}</span>`
-        + `<span class="fc-nr-text"><b>${r.title}</b><span>${r.desc}</span></span></div>`).join('')).join('')
+        + `<span class="fc-nr-text"><b>${r.title}</b><span>${r.desc}</span></span>`
+        + `<span class="fc-nr-chev">${svg('chevR')}</span></div>`).join('')).join('')
     + `</div>`
     + `<button class="fc-walkthrough" type="button" id="fcWalkthrough">Walkthrough</button>`;
   /* every row here is a shortcut that actually works — see the keydown
      handler below and Undo/Redo/Reset's own tooltips, which carry the same
-     badges so the two places never drift out of sync. */
+     badges so the two places never drift out of sync. Description on the
+     left, key badge(s) right-aligned — a shortcuts list reads left→right as
+     "what it does ⋯⋯ the keys", not the other way round. */
   const SHORTCUTS = `<dl class="fc-keys">`
     + [[['⌘/Ctrl','Z'],'Undo'],[['⌘/Ctrl','⇧','Z'],'Redo'],[['⇧','R'],'Reset the whole workflow'],
        [['Delete'],'Delete the selected node'],[['↑','↓'],'Move through a menu'],
        [['Enter'],'Choose the highlighted row'],[['Esc'],'Close a menu, popover, or confirm dialog'],[['?'],'This panel']]
-      .map(([keys, v]) => `<dt>${keys.map(k => `<kbd>${k}</kbd>`).join('')}</dt><dd>${v}</dd>`).join('') + `</dl>`;
+      .map(([keys, v]) => `<dt>${v}</dt><dd>${keys.map(k => `<kbd>${k}</kbd>`).join('')}</dd>`).join('') + `</dl>`;
 
   /* ---------------------------------------------------------- behaviour */
   function wire(parts){

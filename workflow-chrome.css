@@ -328,9 +328,9 @@ body.dock-open .bottombar{left:calc(50% - 206px);}
    drawer does) — only the content-level classes below are still needed;
    the old floatcard wrapper/header (.floatcard/.fc-head/.fc-title/
    .fc-close) and the never-used .fc-list are gone. */
-.fc-keys{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;margin:0;align-items:center;}
-.fc-keys dt{margin:0;}
-.fc-keys dd{margin:0;font-size:11.5px;color:var(--gray-label);}
+.fc-keys{display:grid;grid-template-columns:1fr auto;gap:7px 10px;margin:0;align-items:center;}
+.fc-keys dt{margin:0;font-size:11.5px;color:var(--gray-label);}
+.fc-keys dd{margin:0;justify-self:end;}
 .fc-keys kbd{
   display:inline-block;font-family:'Inter',monospace;font-size:10.5px;color:var(--page-text);
   background:var(--chrome-hover);border:1px solid var(--chrome-border);border-radius:5px;padding:2px 6px;white-space:nowrap;
@@ -356,9 +356,11 @@ body.dock-open .bottombar{left:calc(50% - 206px);}
 .fc-nr-ico.tone-split{background:var(--major-bg);color:var(--major);}
 .fc-nr-ico.tone-do{background:rgba(139,195,74,.16);color:#6a9a2a;}
 .fc-nr-ico.tone-util{background:rgba(61,139,208,.12);color:var(--primary);}
-.fc-nr-text{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.fc-nr-text{flex:1 1 auto;display:flex;flex-direction:column;gap:1px;min-width:0;}
 .fc-nr-text b{font-size:12.5px;font-weight:500;color:var(--page-text);}
 .fc-nr-text span{font-size:11px;line-height:1.35;color:var(--gray-label);}
+.fc-nr-chev{flex-shrink:0;display:flex;color:var(--light-gray-text);}
+.fc-nr-chev svg{width:14px;height:14px;display:block;}
 .fc-walkthrough{
   display:block;width:100%;margin-top:12px;padding:9px;border:none;border-radius:9px;cursor:pointer;
   background:rgba(61,139,208,.12);color:var(--primary);font-family:inherit;font-size:12.5px;font-weight:500;
