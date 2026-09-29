@@ -116,30 +116,62 @@ cognitive load, readable six months later, no jargon.
   every sibling branch (with its condition summary and a checkmark on the
   current one) instead of only stepping one at a time.
 
-**Two node types are actually implemented — Branch and Condition.** Everything
+**Two node types are actually implemented — Branch and IF / Else.** Everything
 else in the picker is catalogued and shows a toast (`IMPLEMENTED` map in
-`workflow-app.js` gates this).
+`workflow-app.js` gates this — the map key is still `cond`, only the visible
+label changed).
 
-- **Condition** (`cond` type) — a single card: Title, Select Source Node, the
-  grouped And/Or condition builder, all in one drawer (`#conditionCfg`).
-  Created via the picker's **Add condition → Inline condition**. It has
-  **exactly two fixed outputs — Is True and Is False** (`portsOf()` for
-  `cond`), both always shown, fanning out below the card the same way a
-  Branch's lanes do (solid line to whatever's attached, dashed ending in a
-  "+" when empty), each labelled with a green `.elabel.t`/red `.elabel.f` tag
-  on the connector itself. This is deliberately the same shape the product
-  called "IF/Else" earlier in this project's history (see git history around
-  the `abfa752` commit) — it was brought back onto today's `cond` node rather
-  than as a separate type, on explicit instruction ("we wanted to give If and
-  Else both from single condition node"). It is NOT in the `canParallel`
-  family (no parallel siblings off a Condition's own outputs — that space is
-  already spoken for by the two fixed paths); each of its two slots (`slots.
-  true`/`slots.false`) independently starts its own ordinary chain, which
-  CAN itself be a canParallel node further down. The drawer's "Next step"
-  block, the picker's attach logic, and delete/replace all needed zero
-  cond-specific code — they were already written generically against
-  `portsOf()`/`allPortsOf()`, so both rows appeared automatically once the
-  ports changed.
+- **IF / Else** (`cond` type, node title/pill/drawer all read "IF / Else" —
+  `TYPE_LABEL.cond`, `newCondition()`'s default title) — **exactly two fixed
+  outputs, Is True and Is False** (`portsOf()` for `cond`, each carrying
+  `label` for the canvas tag plus `rowLabel`/`emptyText` for the drawer's
+  differently-worded row). Created via the picker's **Add condition → Inline
+  condition**. This revives the shape the product called "IF/Else" earlier in
+  this project's history (see git history around the `abfa752` commit, and
+  `condExt()`'s comments) — brought back onto today's `cond` node rather than
+  as a separate type, on explicit instruction ("we wanted to give If and Else
+  both from single condition node"), then rebuilt a second time against the
+  team's actual Figma reference (`condNodeHTML()` was originally a
+  Branch-style bottom fan — wrong; see Handoff) once screenshots showed it
+  didn't match.
+  - **Card shape**: no outer pill tag — `badgeHTML(st, true)` (the floating
+    variant `laneHTML()` already used) floats the state badge instead, since
+    the title itself ("IF / Else") already reads as the type. Two rows live
+    *inside* the card: `.chip-row[data-port="true"]` has an "IF" `.chip` plus
+    a `.bar` box showing the condition summary with the leading "If " stripped
+    (the chip already says it); `.chip-row[data-port="false"]` is a bare
+    "Else" `.chip`, no box. `.chip`/`.bar`/`.chip-row`/`.port.if`/`.port.else`
+    are pre-existing CSS from the pre-redesign IF/Else, left unused in the
+    stylesheet until this rebuild reused them verbatim (green/red port dots
+    included, for free).
+  - **Connectors**: NOT a Branch-style fan below the card. Each row exits
+    from its OWN dot at its own on-card height, read live from the DOM via
+    `portDy()` (`[data-port]` + `.port` inside it) — a mechanism that existed
+    in the file but was unreachable by any node type before this. The line
+    uses the same `elbow()` shape Branch's lanes already draw: straight off
+    the port, a rounded bend only if the target had to move (never a
+    diagonal bezier), straight into the target. Both rows' tags
+    (`.elabel.t`/`.elabel.f`) sit at the identical fixed offset from the card
+    (`ex + 12`) regardless of fill state, so Is True and Is False always land
+    in a clean vertical column on a flat run — this was a follow-up fix after
+    the first pass centred the tag on a raw bezier's midpoint, which looked
+    diagonal/misaligned whenever one path's subtree had to shift for room.
+    No hover insert/delete controls on these connectors, matching Branch's
+    own lane connectors (which don't have them either).
+  - **Layout/collision**: `cond` is NOT in the `canParallel` family — its two
+    outputs are fixed, not a single-slot-plus-parallel-siblings chain. Each
+    path's subtree is placed further along the main axis, stacked across the
+    cross axis (`crossCursor` bookkeeping in `layout()`'s cond case) so a
+    tall Is True subtree can't run into the Is False row. `condExt()` (used
+    by `ext()`) mirrors that stacking logic without side effects, so a
+    sideways-fanning ancestor (e.g. a Branch lane containing a `cond`) knows
+    how much room the whole two-path subtree needs — verified with a
+    Condition nested inside a Branch lane, beside a sibling lane, no overlap.
+  - **Drawer**: needed almost no cond-specific code — `nextRowsHTML()`/
+    `bindNext()`, the picker's attach logic, and delete/replace/undo were all
+    already written generically against `portsOf()`/`allPortsOf()`, so both
+    rows (labelled "IF"/"Else", not "Is True"/"Is False", per the Figma) just
+    appeared once the ports/row-label fields were added.
 - **Branch** (`branch` type, fans into `lane` children) — a Trigger-style card
   (tag/icon/title/description) with **no** node-picker slots inside the card;
   only its lanes' own lines fan out **downward**, solid for each real lane,

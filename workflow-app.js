@@ -19,7 +19,7 @@
   const MODULES = ['Request','Incident','Problem','Change','Release','Task','Hardware Asset','Software Asset','User'];
   const ATTRS = ['Status is Changed','Department is Changed','Incident is Changed','Priority is Updated','Assignee is Added','Category is Changed','Impact is Changed'];
   const WEEKDAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const TYPE_LABEL = { trigger:'Trigger', branch:'Branch', lane:'Branch path', cond:'Condition' };
+  const TYPE_LABEL = { trigger:'Trigger', branch:'Branch', lane:'Branch path', cond:'IF / Else' };
 
   /* Trigger types — the textual builder's two groups (Record events | Time
      based), shown as one flat list, group headers only — no tab switcher.
@@ -185,10 +185,10 @@
     addLane(b, 'if');                              // Branch 1 — mandatory, solid line
     return b;
   }
-  /* Inline Condition — a single check gating what comes after it. One card,
-     no branching: title, source node, grouped conditions, next step — the
-     same shape as Trigger, just with a condition instead of an event. */
-  function newCondition(){ return mk('cond', { title:'Condition', groups:[newGroup()] }); }
+  /* IF / Else — one card, two fixed outputs (Is True / Is False). Title,
+     source node, and the grouped condition builder live in its drawer; the
+     card itself shows the check inline under "IF" once it's set. */
+  function newCondition(){ return mk('cond', { title:'IF / Else', groups:[newGroup()] }); }
   let brSeq = 0;                                    // kept for history snapshots
   const FIELDS = ['Category','Priority','Status','Department','Assignee','Impact','Urgency'];
   const OPS = ['is','is not','contains','is one of'];
@@ -236,8 +236,14 @@
     if(n.type === 'trigger' || n.type === 'lane') return [{ key:'next', label:'', cls:'' }];
     if(n.type === 'cond'){
       /* exactly two ways out — a condition is either true or it is not. Always
-         both shown, never a third "Else IF" — that's what Branch is for. */
-      return [{ key:'true', label:'Is True', cls:'t' }, { key:'false', label:'Is False', cls:'f' }];
+         both shown, never a third "Else IF" — that's what Branch is for.
+         `label` is the tag on the canvas connector ("Is True"/"Is False");
+         `rowLabel`/`emptyText` are what the drawer's Next-step block shows
+         instead — "IF"/"Else" headers, condition-flavoured placeholders. */
+      return [
+        { key:'true', label:'Is True', cls:'t', rowLabel:'IF', emptyText:'Add step when condition is met' },
+        { key:'false', label:'Is False', cls:'f', rowLabel:'Else', emptyText:'Add step when condition is not met' },
+      ];
     }
     return [];          // a Branch card has no ports of its own — its lanes do
   }
@@ -396,13 +402,21 @@
     return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major rot">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'Branch')}</span></div>${actsHTML}</div>${descLine(n)}</div>`;
   }
 
-  /* Inline Condition — one card, read-only description showing the check
-     itself once it's set ("If Priority is High"), same as a lane's card. */
+  /* IF / Else — no outer pill tag (its own title already reads as the type,
+     same shape a lane card uses — see badgeHTML(st, true) below); two rows
+     live INSIDE the card, "IF" carrying the condition summary in a filled
+     box, "Else" a bare label with no box of its own. Each row is its own
+     port (data-port, read by portDy()/relayout()'s cond case) with a
+     green/red dot (.port.if/.port.else) sitting right where its connector
+     leaves the card — reusing the .chip/.bar/.chip-row/.port set from the
+     pre-redesign IF/Else, left unused in the stylesheet until now. */
   function condNodeHTML(n, st){
-    const sum = condSummary(n);
-    const pill = `<div class="pill-row"><span class="pill">Condition</span>${badgeHTML(st)}</div>`;
-    return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major flip">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'Condition')}</span></div>${actsHTML}</div>`
-      + `<div class="card-bot ro ${sum ? 'set' : ''}">${esc(sum || 'Set up the condition')}</div></div>`;
+    const ifSum = condSummary(n).replace(/^If /, '');
+    return `${badgeHTML(st, true)}<div class="card"><div class="card-top"><div class="card-l"><div class="ico major flip">${img('n-split')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'IF / Else')}</span></div>${actsHTML}</div>`
+      + `<div class="body">`
+        + `<div class="chip-row" data-port="true"><span class="chip">IF</span><div class="bar${ifSum ? ' set' : ''}"><span>${esc(ifSum || 'Set up the condition')}</span></div><span class="port if"></span></div>`
+        + `<div class="chip-row" data-port="false"><span class="chip">Else</span><span class="port else"></span></div>`
+      + `</div></div>`;
   }
 
   /* A lane card: its name, and — once filled — its conditions as the description.
@@ -514,8 +528,31 @@
         const c = n.slots.next, e = c ? ext(c) : { l:own, r:own };
         return { l:Math.max(own, e.l), r:Math.max(own, e.r) };
       }
-      const w = laneWidths(n);                            // branch + if/else: outputs fan out below
+      if(n.type === 'cond') return condExt(key, own);
+      const w = laneWidths(n);                            // branch: outputs fan out below
       return { l:Math.max(own, w.total / 2), r:Math.max(own, w.total / 2) };
+    }
+    /* Condition's two rows (IF / Else) live INSIDE the card, each with its
+       own exit port at that row's own on-card height — so unlike Branch's
+       sideways lane fan, its subtree reach is asymmetric: almost nothing
+       above its own centre, but however far the stacked Is True / Is False
+       subtrees run below it. Mirrors the stacking `layout()`'s own cond
+       case does, without the side effects, so a sibling fan elsewhere on
+       the canvas knows how much room to leave this subtree. */
+    function condExt(key, own){
+      let cursor = 0, maxCross = own;
+      portsOf(nodes[key]).forEach(p => {
+        const cid = nodes[key].slots[p.key];
+        let dy = portDy(els[key], p.key);
+        if(dy == null) dy = mSize(key) - 20;
+        const rowCross = dy - own;
+        if(!cid){ maxCross = Math.max(maxCross, rowCross + 40); return; }
+        const e = ext(cid);
+        const childCentre = Math.max(rowCross, cursor + e.l);
+        maxCross = Math.max(maxCross, childCentre + e.r);
+        cursor = childCentre + e.r + 24;
+      });
+      return { l:own, r:maxCross };
     }
     /* the row of outputs: a Branch's lanes then its dotted "pending" slot; an IF/Else's
        Is True / Is False (each holding whatever node was added there, or nothing yet) */
@@ -525,7 +562,6 @@
     function chainFans(n){ return kidsOf(n).length > 1 || !!showPar(n); }
     function laneItems(n){
       if(canParallel(n)) return kidsOf(n).map(id => ({ id })).concat(showPar(n) ? [{ par:true }] : []);
-      if(n.type === 'cond') return portsOf(n).map(p => ({ id:n.slots[p.key], port:p }));
       return n.lanes.map(id => ({ id })).concat([{ pending:true }]);
     }
     function laneWidths(n){
@@ -593,22 +629,31 @@
         return bottom;
       }
       if(n.type === 'cond'){
-        /* two outputs fan out across the cross axis, always both shown — Is
-           True and Is False, never merging into one line even when both are
-           still empty. Same shape as Branch's lane fan below, just fixed at
-           exactly two named items instead of n.lanes. */
-        const w = laneWidths(n), rowMain = myMain + main + LANE_DY, mid = myCross + cHalf(key);
-        w.items.forEach((it, i) => {
-          const cross = mid - w.total / 2 + w.centres[i], pt = P(rowMain, cross);
-          if(it.id){
-            const cardPt = P(rowMain, cross - cHalf(it.id));
-            bottom = Math.max(bottom, layout(it.id, cardPt.x, cardPt.y));
-            edges.push({ kind:'fan', from:key, to:it.id, port:it.port, cx:cardPt.x, y:cardPt.y });
-          } else {
-            edges.push({ kind:'fanplus', from:key, slot:it.port.key, port:it.port, cx:pt.x, y:pt.y });
-            minX = Math.min(minX, pt.x - 125); maxX = Math.max(maxX, pt.x + 125); minY = Math.min(minY, pt.y - 30); maxY = Math.max(maxY, pt.y + 70);
-            bottom = Math.max(bottom, rowMain + 70);
+        /* IF / Else: the two rows live INSIDE the card itself (see
+           condNodeHTML), each with its own exit port at that row's own
+           on-card height (portDy() reads it straight from the rendered
+           DOM) — never a shared fan point below the card the way Branch's
+           lanes are. Each path's subtree lands further along the main
+           axis, stacked across the cross axis so a tall Is True subtree
+           can't run into the Is False row (see condExt() in ext()). */
+        let crossCursor = myCross;
+        portsOf(n).forEach(p => {
+          const cid = n.slots[p.key];
+          let dy = portDy(els[key], p.key);
+          if(dy == null) dy = main - 20;
+          const exitCross = myCross + dy, exitPt = P(myMain + main, exitCross);
+          if(!cid){
+            edges.push({ kind:'rowplus', from:key, slot:p.key, port:p, ex:exitPt.x, ey:exitPt.y });
+            const lo = P(0, exitCross - 30), hi = P(0, exitCross + 40);
+            minY = Math.min(minY, cOf(lo)); maxY = Math.max(maxY, cOf(hi));
+            crossCursor = Math.max(crossCursor, exitCross + 40);
+            return;
           }
+          const childCentre = Math.max(exitCross, crossCursor + cHalf(cid));
+          const childPt = P(myMain + main + 240 + Math.max(0, ext(cid).l - cHalf(cid)), childCentre - cHalf(cid));
+          bottom = Math.max(bottom, layout(cid, childPt.x, childPt.y));
+          edges.push({ kind:'rowport', from:key, to:cid, port:p, ex:exitPt.x, ey:exitPt.y });
+          crossCursor = childCentre + ext(cid).r + 24;
         });
         return bottom;
       }
@@ -771,30 +816,43 @@
         plusBtn(id, 'pending', e.cx - 10, e.y + 48, 'a new branch');
       });
     });
-    Object.keys(nodes).forEach(id => {
-      const n = nodes[id]; if(n.type !== 'cond' || !pos[id]) return;
-      /* Condition's two outputs — Is True / Is False — fan out the same way a
-         Branch's lanes do (one trunk, an elbow to each), except both are
-         fixed and always shown, and each carries its own "Is True"/"Is
-         False" label whether it's filled or still open. */
-      const from = exitPt(id), start = P(mOf(from) + 6, cOf(from)), busPos = mOf(from) + BUS_DY;
-      const dot = document.createElement('div'); dot.className = 't-dot';
-      dot.style.left = (from.x - 5) + 'px'; dot.style.top = (from.y - 4) + 'px'; world.appendChild(dot);
-      edges.filter(e => ['fan', 'fanplus'].includes(e.kind) && e.from === id).forEach(e => {
-        const open = e.kind === 'fanplus';                                 // no node at the end of this line yet
-        const to = open ? null : entry(e.to);
-        const openTarget = P(mOf({ x:e.cx, y:e.y }) + 10, cOf({ x:e.cx, y:e.y }));
-        svg += open ? elbow(start.x, start.y, openTarget.x, openTarget.y, busPos, true, false)
-                    : elbow(start.x, start.y, to.x, to.y, busPos, false, true);
-        const lab = document.createElement('div');
-        lab.className = 'elabel ' + (e.port.cls || '');
-        lab.textContent = e.port.label;
-        lab.style.left = e.cx + 'px'; lab.style.top = (e.y + 14) + 'px'; world.appendChild(lab);
-        if(open){
-          svg += `<path class="edge dashed" d="M${e.cx} ${e.y + 24} V${e.y + 48}"/>`;
-          plusBtn(id, e.slot, e.cx - 10, e.y + 48, e.port.label);
-        }
-      });
+    /* Condition's two rows (IF / Else) each exit from their OWN dot on the
+       card's trailing edge — at that row's real rendered height — rather
+       than a shared point below the card. The dot itself is drawn by CSS
+       (.port.if/.port.else on the row inside condNodeHTML, right where
+       portDy() measures from) so only the line needs drawing here. Same
+       elbow() shape Branch's own lanes use — straight off the port, a
+       rounded bend only if the target had to move, straight into the
+       target — so the tag always sits on a flat run, never on a diagonal,
+       and both rows' tags land at the same distance from the card since
+       they share the same busPos formula. */
+    edges.filter(e => e.kind === 'rowport').forEach(e => {
+      const to = entry(e.to), start = P(mOf({ x:e.ex, y:e.ey }) + 6, cOf({ x:e.ex, y:e.ey }));
+      const busPos = mOf(start) + BUS_DY;
+      svg += elbow(start.x, start.y, to.x, to.y, busPos, false, true);
+      const lab = document.createElement('div');
+      lab.className = 'elabel ' + (e.port.cls || ''); lab.style.transform = 'translateY(-50%)';
+      lab.textContent = e.port.label;
+      /* same left-anchored offset as the empty row's tag below, so Is True
+         and Is False land at the identical distance from the card whether
+         their row is filled or still waiting for a "+" — never one tag
+         centred on its line and the other hugging the port. */
+      const labPt = P(mOf({ x:e.ex, y:e.ey }) + 12, cOf({ x:e.ex, y:e.ey }));
+      lab.style.left = labPt.x + 'px'; lab.style.top = labPt.y + 'px'; world.appendChild(lab);
+    });
+    edges.filter(e => e.kind === 'rowplus').forEach(e => {
+      const sx = e.ex, sy = e.ey;
+      const lab = document.createElement('div');
+      lab.className = 'elabel ' + (e.port.cls || ''); lab.style.transform = 'translateY(-50%)';
+      lab.textContent = e.port.label;
+      const labPt = P(mOf({ x:sx, y:sy }) + 12, cOf({ x:sx, y:sy }));
+      lab.style.left = labPt.x + 'px'; lab.style.top = labPt.y + 'px'; world.appendChild(lab);
+      const stubEnd = P(mOf(labPt) + lab.offsetWidth + 14, cOf(labPt));
+      const start = P(mOf({ x:sx, y:sy }) + 4, cOf({ x:sx, y:sy }));
+      svg += `<path class="edge" d="M${start.x} ${start.y} L${stubEnd.x} ${stubEnd.y}"/>`;
+      const btnPt = P(mOf(stubEnd), cOf(stubEnd) - 10);
+      plusBtn(e.from, e.slot, btnPt.x, btnPt.y, e.port.label);
+      maxX = Math.max(maxX, stubEnd.x - 76);
     });
     Object.keys(nodes).forEach(id => {
       const n = nodes[id]; if((n.type !== 'trigger' && n.type !== 'lane') || !pos[id]) return;
@@ -1226,11 +1284,12 @@
     }
     return allPortsOf(n).map(p => {
       const cid = n.slots[p.key];
+      const rowLabel = p.rowLabel || p.label, emptyText = p.emptyText || (p.label ? 'Select next block · ' + p.label : 'Select next block');
       const body = cid
         ? `<a class="nns-add filled" data-goto="${cid}"><img src="assets/n-trig-blue.svg" alt=""><span>${esc(nodes[cid].title || TYPE_LABEL[nodes[cid].type])}</span></a>`
-        : `<a class="nns-add" data-slot="${p.key}"><img src="assets/plus-square.svg" alt=""><span>${esc(p.label ? 'Select next block · ' + p.label : 'Select next block')}</span></a>`;
+        : `<a class="nns-add" data-slot="${p.key}"><img src="assets/plus-square.svg" alt=""><span>${esc(emptyText)}</span></a>`;
       return `<div class="nns-branch" style="position:relative;width:100%;max-width:none">`
-        + (p.label ? `<div class="nns-branch-label">${esc(p.label)}</div>` : '')
+        + (rowLabel ? `<div class="nns-branch-label">${esc(rowLabel)}</div>` : '')
         + body + `</div>`;
     }).join('');
   }
