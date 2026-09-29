@@ -808,12 +808,27 @@
         svg += open ? elbow(start.x, start.y, openTarget.x, openTarget.y, busPos, true, false)
                     : elbow(start.x, start.y, to.x, to.y, busPos, false, true);
         if(e.kind !== 'pending') return;
-        /* the dotted slot: a pill naming what it would become, then the "+" */
+        /* the dotted slot: a pill naming what it would become, then the "+" —
+           both sit on the SAME straight run the elbow above already arrives
+           on, continuing along the main axis via mOf()/cOf() like the
+           IF/Else rows do. The old code moved this label/stub in raw Y
+           regardless of axis — a leftover from when this app's main axis
+           was vertical (Y), where "+14 in Y" meant "further along the
+           line"; in today's horizontal-only layout that same raw-Y move
+           instead jumps to a DIFFERENT lane's row, which is what put the
+           "Branch 2" pill in the middle of the dashed line instead of at
+           its end. */
         const lab = document.createElement('div');
-        lab.className = 'elabel'; lab.textContent = 'Branch ' + (ifLanes(n).length + 1);
-        lab.style.left = e.cx + 'px'; lab.style.top = (e.y + 14) + 'px'; world.appendChild(lab);
-        svg += `<path class="edge dashed" d="M${e.cx} ${e.y + 24} V${e.y + 48}"/>`;
-        plusBtn(id, 'pending', e.cx - 10, e.y + 48, 'a new branch');
+        lab.className = 'elabel'; lab.style.transform = 'translateY(-50%)';
+        lab.textContent = 'Branch ' + (ifLanes(n).length + 1);
+        const labPt = P(mOf({ x:e.cx, y:e.y }) + 12, cOf({ x:e.cx, y:e.y }));
+        lab.style.left = labPt.x + 'px'; lab.style.top = labPt.y + 'px'; world.appendChild(lab);
+        const stubEnd = P(mOf(labPt) + lab.offsetWidth + 14, cOf(labPt));
+        const stubStart = P(mOf({ x:e.cx, y:e.y }) + 4, cOf({ x:e.cx, y:e.y }));
+        svg += `<path class="edge dashed" d="M${stubStart.x} ${stubStart.y} L${stubEnd.x} ${stubEnd.y}"/>`;
+        const btnPt = P(mOf(stubEnd), cOf(stubEnd) - 10);
+        plusBtn(id, 'pending', btnPt.x, btnPt.y, 'a new branch');
+        maxX = Math.max(maxX, stubEnd.x - 76);
       });
     });
     /* Condition's two rows (IF / Else) each exit from their OWN dot on the
