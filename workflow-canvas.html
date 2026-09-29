@@ -650,6 +650,37 @@
         </div>
       </aside>
 
+      <!-- --------- Flow Details (workflow name + description, gates Publish) --------- -->
+      <aside class="sidebar hidden" id="flowDetailsCfg">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+            <div class="cfg-head">
+              <div class="head-top">
+                <div class="head-left"><span class="cfg-node-name">Flow Details</span></div>
+                <div class="head-right">
+                  <button class="hover-box" id="fdClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+            <div class="cfg-scroll" id="fdScroll">
+              <div class="cfg-alert hidden" id="fdAlert"></div>
+              <div class="cfg-form">
+                <div class="field">
+                  <div class="field-label">Workflow Name <span class="req">*</span></div>
+                  <div class="input-box" id="fdNameBox"><input id="fdName" type="text" placeholder="Untitled rule"></div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Description <span class="req">*</span></div>
+                  <div class="input-box textarea" id="fdDescBox"><textarea id="fdDesc" placeholder="What does this workflow do?"></textarea></div>
+                </div>
+              </div>
+            </div>
+            <div class="autosave"><i></i>All changes are saved automatically</div>
+          </div>
+        </div>
+      </aside>
+
     </div>
   </div>
   </div>

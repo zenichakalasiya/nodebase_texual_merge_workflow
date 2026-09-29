@@ -165,9 +165,6 @@
     pagebar.className = 'pagebar';
     pagebar.innerHTML =
       `<div class="pagebar-left">`
-        + `<button class="cbtn sm bordered" id="goBack" data-tip="Back" aria-label="Back">${svg('chevL')}</button>`
-        + `<button class="crumb-link" id="crumbRoot">Workflows</button>`
-        + `<span class="crumb-sep">/</span>`
         + `<span class="page-title" id="pageTitle" title="Click to rename">Untitled rule</span>`
         + `<span class="state-pill draft" id="statePill">Draft</span>`
       + `</div>`
@@ -179,7 +176,7 @@
       + `<div class="pagebar-right">`
         + `<div class="enable-row"><span>Enabled</span>`
           + `<button class="switch on" id="enableSw" role="switch" aria-checked="true"><span>ON</span><i></i></button></div>`
-        + `<button class="btn-outline" id="runHistBtn" data-tip="Run history&nbsp;&nbsp;read-only while open">${svg('activity')}Run history<span class="run-badge" id="runBadge" hidden></span></button>`
+        + `<button class="btn-outline" id="runHistBtn" data-tip="Run history&nbsp;&nbsp;read-only while open" hidden>${svg('activity')}Run history<span class="run-badge" id="runBadge" hidden></span></button>`
         + `<div class="split">`
           + `<button class="btn-blue" id="publishFlow">Publish</button>`
           + `<button class="split-caret" id="publishOpts" data-tip="Save options" aria-label="Save options">${svg('chevD')}</button>`
@@ -210,36 +207,37 @@
     handle.setAttribute('aria-label', 'Open navigation');
     handle.innerHTML = svg('chevRR');
 
-    /* One floating toolbar, centred under the canvas — a single card. Guide,
-       Shortcuts and Note read as one continuous group (they're all "how do
-       I use this" affordances, so no divider between them); Undo/Redo/Reset
-       and the view controls (zoom, fit) each get their own group, told
-       apart by a divider only, not by being separate floating pills.
-       The layout-direction switch that used to sit here is gone — this
-       workflow builder is horizontal-only now, so there's nothing to
+    /* One floating toolbar, centred under the canvas — a single card, same
+       overall footprint throughout. The view controls (zoom, fit) lead now,
+       then Guide + Shortcuts (still one continuous group, no divider
+       between them — both are "how do I use this" affordances; Note used
+       to share this group too but is hidden for now), then Undo/Redo/Reset
+       — each group told apart by a divider only, never separate floating
+       pills. The layout-direction switch that used to sit here is gone —
+       this workflow builder is horizontal-only now, so there's nothing to
        switch, and zoom moved into the room that freed up. */
     const bar = document.createElement('div');
     bar.className = 'bottombar';
     bar.innerHTML =
-      `<div class="bbar">`
-        + `<button class="cbtn" id="guideBtn" data-tip="Guide">${svg('bulb')}</button>`
-        + `<button class="cbtn" id="shortcutsBtn" data-tip="${tipKeys('Keyboard shortcuts', '?')}">${svg('command')}</button>`
-        + `<button class="cbtn tool" id="toolNote" data-tip="Note&nbsp;&nbsp;click the canvas to place one">${svg('note')}</button>`
-      + `</div>`
-      + `<span class="bbar-sep"></span>`
-      + `<div class="bbar">`
-        + `<button class="cbtn" id="doUndo" data-tip="${tipKeys('Undo', '⌘/Ctrl', 'Z')}">${svg('undo')}</button>`
-        + `<button class="cbtn" id="doRedo" data-tip="${tipKeys('Redo', '⌘/Ctrl', '⇧', 'Z')}">${svg('redo')}</button>`
-        + `<button class="bbar-text" id="doReset" data-tip="${tipKeys('Reset', '⇧', 'R')}">${svg('reset')}Reset</button>`
-      + `</div>`
-      + `<span class="bbar-sep"></span>`
-      + `<div class="bbar view-bbar" id="viewGroup">`
+      `<div class="bbar view-bbar" id="viewGroup">`
         + `<div class="minimap" id="minimap" hidden><svg id="minimapSvg" viewBox="0 0 120 78"></svg></div>`
         + `<button class="cbtn" id="zoomOutBtn" data-tip="Zoom out">${svg('zoomOut')}</button>`
         + `<button class="zoom-label" id="zoomMenu" data-tip="Zoom presets"><span id="zoomLevel">100%</span></button>`
         + `<button class="cbtn" id="zoomInBtn" data-tip="Zoom in">${svg('zoomIn')}</button>`
         + `<span class="bbar-sep"></span>`
         + `<button class="cbtn" id="fitBtn" data-tip="Fit to screen">${svg('fit')}</button>`
+      + `</div>`
+      + `<span class="bbar-sep"></span>`
+      + `<div class="bbar">`
+        + `<button class="cbtn" id="guideBtn" data-tip="Guide">${svg('bulb')}</button>`
+        + `<button class="cbtn" id="shortcutsBtn" data-tip="${tipKeys('Keyboard shortcuts', '?')}">${svg('command')}</button>`
+        + `<button class="cbtn tool" id="toolNote" data-tip="Note&nbsp;&nbsp;click the canvas to place one" hidden>${svg('note')}</button>`
+      + `</div>`
+      + `<span class="bbar-sep"></span>`
+      + `<div class="bbar">`
+        + `<button class="cbtn" id="doUndo" data-tip="${tipKeys('Undo', '⌘/Ctrl', 'Z')}">${svg('undo')}</button>`
+        + `<button class="cbtn" id="doRedo" data-tip="${tipKeys('Redo', '⌘/Ctrl', '⇧', 'Z')}">${svg('redo')}</button>`
+        + `<button class="bbar-text" id="doReset" data-tip="${tipKeys('Reset', '⇧', 'R')}">${svg('reset')}Reset</button>`
       + `</div>`;
 
     document.body.append(hot, nav, handle, bar);
@@ -412,53 +410,60 @@
     /* --- page bar --- */
     let flowName = 'Untitled rule', flowDesc = '';
 
-    /* Click the workflow name → a small card under it with the name and a
-       description. It opens plain; a Save button appears only once something has
-       actually been edited, and nothing reaches the top bar until it is pressed.
-       Closing the card any other way drops the unsaved edits. */
-    let infoCard = null;
-    const closeInfo = () => {
-      if(!infoCard) return;
-      infoCard.remove(); infoCard = null;
-      document.removeEventListener('mousedown', offInfo, true);
-      document.removeEventListener('keydown', escInfo, true);
-    };
-    const offInfo = e => { if(infoCard && !infoCard.contains(e.target) && !$('#pageTitle').contains(e.target)) closeInfo(); };
-    const escInfo = e => { if(e.key === 'Escape'){ e.stopPropagation(); closeInfo(); } };
+    /* Flow Details — workflow name + description now live in the same
+       right-hand sidebar every node's config uses, not a one-off floating
+       card. Live-write like every other drawer (no Save button); the ONE
+       thing that makes this drawer different is that BOTH fields are
+       mandatory, checked specifically when Publish is pressed — same
+       error-only-after-you've-moved-on convention as a node's own fields
+       (`fdChecked` mirrors a node's `checked`), just gated on a deliberate
+       action instead of losing focus. */
+    let fdChecked = false;
+    function fdMissing(){
+      const miss = [];
+      if(!flowName.trim()) miss.push('name');
+      if(!flowDesc.trim()) miss.push('description');
+      return miss;
+    }
+    function syncFlowDetailsValidity(){
+      const miss = fdChecked ? fdMissing() : [];
+      $('#fdNameBox').classList.toggle('invalid', miss.includes('name'));
+      $('#fdDescBox').classList.toggle('invalid', miss.includes('description'));
+      const alert = $('#fdAlert');
+      alert.classList.toggle('hidden', !miss.length);
+      if(!miss.length) return;
+      const names = miss.map(m => m === 'name' ? 'Workflow Name' : 'Description');
+      alert.innerHTML = `<img src="assets/n-warning-red.svg" alt="">`
+        + `<div class="cfg-alert-text"><b>${names.length} required field${names.length > 1 ? 's are' : ' is'} still empty.</b> `
+        + `Fill in ${names.join(', ')} before publishing.</div>`;
+    }
+    function openFlowDetails(){
+      $('#fdName').value = flowName;
+      $('#fdDesc').value = flowDesc;
+      app.openFlowDetails();
+      syncFlowDetailsValidity();
+    }
     $('#pageTitle').title = 'Edit name and description';
-    $('#pageTitle').addEventListener('click', () => {
-      if(infoCard){ closeInfo(); return; }
-      infoCard = document.createElement('div');
-      infoCard.className = 'floatcard flowinfo';
-      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-      infoCard.innerHTML = '<label class="fi-label" for="flowNameIn">Workflow name</label>'
-        + '<input class="fi-input" id="flowNameIn" type="text" placeholder="Untitled rule" value="' + esc(flowName) + '">'
-        + '<label class="fi-label" for="flowDescIn">Description</label>'
-        + '<textarea class="fc-area" id="flowDescIn" placeholder="What does this workflow do?">' + esc(flowDesc) + '</textarea>'
-        + '<div class="fi-foot" id="flowFoot" hidden><button type="button" class="btn-blue sm" id="flowSave">Save</button></div>';
-      document.body.appendChild(infoCard);
-      const r = $('#pageTitle').getBoundingClientRect();
-      infoCard.style.left = Math.round(Math.max(12, Math.min(r.left - 8, window.innerWidth - infoCard.offsetWidth - 12))) + 'px';
-      infoCard.style.top = Math.round(r.bottom + 10) + 'px';
-      const nameIn = $('#flowNameIn'), descIn = $('#flowDescIn'), foot = $('#flowFoot');
-      const startName = nameIn.value, startDesc = descIn.value;
-      const dirty = () => { foot.hidden = nameIn.value === startName && descIn.value === startDesc; };
-      const save = () => {
-        flowName = nameIn.value.trim() || 'Untitled rule'; flowDesc = descIn.value;
-        $('#pageTitle').textContent = flowName;
-        document.title = flowName + ' — Workflow';
-        closeInfo(); toast('Workflow details saved');
-        positionViewSwitch();          // the name's new length may have changed the left zone's width
-      };
-      nameIn.addEventListener('input', dirty);
-      descIn.addEventListener('input', dirty);
-      nameIn.addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); descIn.focus(); } });
-      $('#flowSave').addEventListener('click', save);
-      nameIn.focus(); nameIn.select();
-      document.addEventListener('mousedown', offInfo, true);
-      document.addEventListener('keydown', escInfo, true);
+    $('#pageTitle').addEventListener('click', openFlowDetails);
+    $('#fdClose').addEventListener('click', () => app.closeFlowDetails());
+    $('#fdName').addEventListener('input', e => {
+      flowName = e.target.value;
+      $('#pageTitle').textContent = flowName.trim() || 'Untitled rule';
+      document.title = (flowName.trim() || 'Untitled rule') + ' — Workflow';
+      syncFlowDetailsValidity();
+      positionViewSwitch();            // the name's new length may have changed the left zone's width
     });
-    $('#crumbRoot').addEventListener('click', () => toast('Workflow list is not part of this prototype'));
+    $('#fdDesc').addEventListener('input', e => { flowDesc = e.target.value; syncFlowDetailsValidity(); });
+    /* Publish (both the main button and "Save & publish") is blocked until
+       both fields are filled — opens this same drawer instead of publishing,
+       so there's one honest place to fix it rather than a second modal. */
+    function requireFlowDetails(){
+      if(!fdMissing().length) return true;
+      fdChecked = true;
+      openFlowDetails();
+      toast('Add a workflow name and description before publishing');
+      return false;
+    }
 
     $('#viewSwitch').addEventListener('click', e => {
       const b = e.target.closest('[data-view]'); if(!b || b.classList.contains('active')) return;
@@ -476,7 +481,6 @@
     });
 
     const pill = $('#statePill');
-    $('#goBack').addEventListener('click', () => toast('Back to the workflow list — not part of this prototype'));
 
     /* ---------------------------------------------------------------------
        Version history + Run history. This prototype has no backend, so both
@@ -584,7 +588,7 @@
       positionViewSwitch();            // "Draft" → "Published" changes the pill's width
     };
     const saveOnly = () => { pill.className = 'state-pill draft'; pill.textContent = 'Draft'; positionViewSwitch(); };
-    $('#publishFlow').addEventListener('click', () => { publish(); toast('Workflow published'); });
+    $('#publishFlow').addEventListener('click', () => { if(!requireFlowDetails()) return; publish(); toast('Workflow published'); });
     $('#publishOpts').addEventListener('click', () => {
       WFPop.open({
         anchor: $('#publishOpts'), noSearch:true, menu:true, width:264, align:'end',
@@ -594,7 +598,7 @@
           { id:'save', label:'Save only',      sub:'Save changes without publishing' },
         ],
         onPick(i){
-          if(i.id === 'pub'){ publish(); toast('Saved and published'); }
+          if(i.id === 'pub'){ if(!requireFlowDetails()) return; publish(); toast('Saved and published'); }
           else { saveOnly(); toast('Saved without publishing'); }
         }
       });

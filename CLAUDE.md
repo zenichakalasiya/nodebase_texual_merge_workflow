@@ -36,7 +36,7 @@ scripts are written, run, and deleted. None are checked in.
 
 | File | What it holds |
 | --- | --- |
-| `workflow-canvas.html` | The page. All layout/drawer CSS lives in its `<style>` block; the four config drawers (Trigger / Branch / Branch path (lane) / Condition) plus the two read-only history panels (Run History / Version History) are static markup here. |
+| `workflow-canvas.html` | The page. All layout/drawer CSS lives in its `<style>` block; the four config drawers (Trigger / Branch / Branch path (lane) / IF-Else) plus the two read-only history panels (Run History / Version History) and the Flow Details panel (workflow name/description) are static markup here. |
 | `workflow-app.js` | The application. Node model, canvas layout and rendering, edges, drag/pan/zoom, undo history, the drawers' behaviour, sticky notes, the node picker flow, and the shared Run History/Version History read-only panel mechanism (`openHistoryPanel()`/`closeHistoryPanel()`). |
 | `workflow-popover.js` / `.css` | The anchored picker popover, ported from the textual builder: search, grouped rows, second-level drill-down, keyboard nav, a checkmark on the already-picked row, and a caret help bubble that tracks the highlighted row. Light theme, matching the rest of the app. Also serves the plain `⋮` command menus. |
 | `workflow-chrome.js` / `.css` | The product frame: two-row top bar (including the Run history / Publish / Version history / More actions on the right), hover-out left navigation, the single floating bottom toolbar, tooltips (with key-badge shortcuts), and the Guide ("Node reference") / Keyboard-shortcuts cards. Also builds the Run History/Version History row markup and mock run/version data. |
@@ -73,11 +73,12 @@ cognitive load, readable six months later, no jargon.
 
 - **The drawer always closes when a picker popover opens**, and comes back if the
   picker is dismissed. Requested explicitly.
-- **No Save button anywhere on the canvas/drawers.** Every keystroke writes
-  straight to the model. The one exception is the workflow name/description
-  popup (click the name top-left) — it holds edits locally and only writes them
-  to the top bar on **Save**, which appears once something differs from the
-  saved value. Closing any other way (Esc, outside click, re-click) discards.
+- **No Save button anywhere on the canvas/drawers — including workflow name
+  and description**, which now live in the Flow Details sidebar panel (see
+  below) and write straight to the top bar on every keystroke, same as any
+  node's own fields. This used to be the one exception (a small floating
+  card with its own Save button) — that popup is gone entirely, replaced
+  once name/description moved into the same right-hand sidebar system.
 - **"Next step" shows by default in every drawer that has one** (Trigger,
   Branch path, Condition) — it is never gated behind the node being fully
   filled in, matching how the canvas's own "+" is always clickable regardless
@@ -248,7 +249,8 @@ this session to match the textual builder's reference exactly:**
   record, Link & add, Send notification; all toast, not built — this replaced
   the older per-module catalog of Service Request/Problem/Change/etc., which
   was redundant with this generic version). Then **Flow control → Add
-  condition** (drills to Inline condition / Branching) and Merge paths (soon).
+  condition** (drills to Inline condition / Branching, Inline condition's
+  small tag chip reads "IF/Else" not "if") and Merge paths (soon).
   Then **Timing & data → Add wait** and Loop over records (soon).
 - Popover is **light-themed**, matching the rest of the app — an earlier pass
   this project went through copied the reference site's dark palette exactly,
@@ -257,20 +259,24 @@ this session to match the textual builder's reference exactly:**
   carries over from the reference, never its dark colours.
 
 **Bottom toolbar — one floating card**, centred under the canvas, its three
-groups told apart by a divider only (never separate floating pills):
+groups told apart by a divider only (never separate floating pills), in this
+order:
 
-- **Guide + Shortcuts + Note** read as one group (no divider between them —
-  they're all "how do I use this" affordances).
+- **Zoom −/100%/+, a divider, Fit to screen** — leads the bar now (moved from
+  the end, on explicit direction — "bring zoom in out functionality on left
+  of guide and shortcut icons"). Same group as before, just relocated as one
+  unit; nothing added or removed, so the card's footprint didn't change. The
+  minimap floats above this group only when the flow's own scale or reach
+  makes part of it genuinely out of sight — not a permanent fixture. It
+  supports two distinct gestures: click the background to ease-scroll the
+  main view there (`requestAnimationFrame` tween), or drag the viewport
+  rectangle itself for live 1:1 panning, clamped so it can't leave the
+  minimap.
+- **Guide + Shortcuts** read as one group (no divider between them — both are
+  "how do I use this" affordances). Note used to share this group too but is
+  **hidden** for now (`hidden` on `#toolNote` — the sticky-note system itself
+  in `workflow-app.js` is untouched, just not reachable from the toolbar).
 - **Undo / Redo / Reset.**
-- **Zoom −/100%/+, a divider, Fit to screen** — this group used to be its own
-  card pinned to the bottom-left; it was folded into the same card as
-  Undo/Redo/Reset once the layout-direction switch (see below) was removed
-  and the room freed up. The minimap floats above this group only when the
-  flow's own scale or reach makes part of it genuinely out of sight — not a
-  permanent fixture. It supports two distinct gestures: click the background
-  to ease-scroll the main view there (`requestAnimationFrame` tween), or drag
-  the viewport rectangle itself for live 1:1 panning, clamped so it can't
-  leave the minimap.
 
 The whole card re-centres over the remaining canvas width when a config
 drawer opens.
@@ -334,18 +340,42 @@ in `workflow-app.js`) and its pill reads "Periodic workflow" instead of
 "Trigger" — both text-only now, no icon (every node pill lost its icon in an
 earlier session, kept text-only for a cleaner look).
 
-**Top bar.** The description icon and the Working/Published version dropdown
-were removed from the page bar; Simple/Node view is now centred on the bar
-(`.viewswitch` absolutely positioned) independent of the breadcrumb — its
-horizontal position is recomputed (`positionViewSwitch()`) whenever the left
-or right zone's width can plausibly have changed, so it slides toward
-whichever side has room rather than ever being covered. Clicking the workflow
-**name** (top-left) opens a small popup (`.flowinfo` card in
-`workflow-chrome.js`) with Workflow name + Description fields — see the Save
-behaviour above. The right zone reads Enabled toggle → **Run history** button
-→ Publish split-button → **Version history** icon → More (⋮) — there used to
-be a Test Run button in the Run History button's spot; it was removed
-entirely (not just hidden) once Run History took over that slot.
+**Top bar.** The description icon, the Working/Published version dropdown,
+and the **breadcrumb** ("‹ Workflows /") are all gone from the page bar —
+the left zone is just the workflow name + its Draft/Published pill now,
+nothing else (`#goBack`/`#crumbRoot` and their CSS were removed outright,
+not hidden, since nothing links back to them). Simple/Node view is centred
+on the bar (`.viewswitch` absolutely positioned) independent of that left
+zone — its horizontal position is recomputed (`positionViewSwitch()`)
+whenever the left or right zone's width can plausibly have changed, so it
+slides toward whichever side has room rather than ever being covered. The
+right zone reads Enabled toggle → **Run history** button (**hidden** —
+`hidden` attribute on `#runHistBtn`; the panel/mechanism itself is
+untouched, just not reachable from here) → Publish split-button →
+**Version history** icon → More (⋮).
+
+**Flow Details — workflow name + description, gating Publish.** Clicking the
+workflow name (top-left) no longer opens a one-off floating card; it opens
+the **same right-hand sidebar** every node's config uses (`#flowDetailsCfg`
+in `workflow-canvas.html`, added to the `panels` map like any other drawer).
+Both fields are **mandatory**: clicking **Publish** (the main button, or
+"Save & publish" from the split-caret menu) calls `requireFlowDetails()`
+first — if either field is empty, it opens this same panel, red-outlines
+whichever field(s) are missing (`.input-box.invalid`, the same convention
+every node drawer already uses), shows a `.cfg-alert` banner naming what's
+missing, and the publish is blocked entirely; "Save only" is NOT gated, only
+an actual publish is. Unlike Run History/Version History, this is an
+ordinary drawer — NOT read-only, the canvas stays fully live behind it, and
+clicking a node just swaps the drawer over to that node's own config like
+any other drawer-to-drawer switch. Verification-only side note: while
+building this, `[hidden]` turned out to not actually work anywhere in this
+codebase before now — no `[hidden]` CSS rule existed at all, so any element
+whose own class set `display` unconditionally (`.btn-outline`, the button
+Run History uses) silently ignored the attribute. Fixed with one global
+`[hidden]{display:none!important}` rule in `workflow-chrome.css`, which is
+what actually makes the Run History/Note hides above work, and fixes the
+same latent gap for every other `hidden` toggle already in the app
+(minimap, `#runBadge`, trigger schedule fields, etc.).
 
 ## Deployment
 

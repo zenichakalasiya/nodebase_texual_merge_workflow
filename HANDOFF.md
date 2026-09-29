@@ -1,132 +1,123 @@
-# Handoff — 2026-09-29 14:35
+# Handoff — 2026-09-29 16:59
 
 ## Read first
-In `CLAUDE.md`: the fully-rewritten **IF / Else** bullet inside "Two node
-types are actually implemented — Branch and IF / Else". It went through two
-rebuilds in this session — read it in full before touching `cond` again, the
-"Card shape"/"Connectors"/"Layout/collision"/"Drawer" sub-bullets each map to
-a specific fix described below.
+In `CLAUDE.md`: the rewritten **Top bar** section (breadcrumb gone, Run
+History hidden, the new "Flow Details" paragraph) and **Bottom toolbar**
+section (zoom now leads, Note hidden). Both changed this session; the
+`[hidden]` CSS gotcha documented there is worth knowing before touching any
+other `hidden`-toggled element in this codebase.
 
 ## What we worked on this session
-Three rounds on the same feature, each triggered by the user looking at the
-result and correcting course:
-1. Gave the single Condition node two fixed outputs (Is True/Is False)
-   instead of one — reusing the `cond` type, not a separate node type.
-2. The user then showed Figma screenshots: what got built (a Branch-style
-   fan below a plain card) didn't match their actual reference (two named
-   rows *inside* the card, each with its own side-exit port). Pulled the
-   real Figma node via the Figma desktop MCP connection and rebuilt the
-   card + connector geometry to match.
-3. The user then flagged the connector shape itself: the "Is True"/"Is
-   False" tags sat on a diagonal bezier curve and didn't line up with each
-   other. Fixed by switching to the same `elbow()` shape Branch's own lanes
-   already use, and pinning both tags to the same fixed offset from the
-   card regardless of fill state.
+One message, six independent UI changes, all landed and verified together:
+1. Hide the Run History button from the top bar.
+2. Move workflow name + description into the right-hand sidebar (same
+   system every node drawer uses) as mandatory fields, gating Publish.
+3. Reorder the bottom toolbar: zoom moves to the front, left of Guide/
+   Shortcuts, same overall size.
+4. "IF/Else" instead of "if" on the Inline condition picker row's tag.
+5. Hide the Note tool.
+6. Remove the "‹ Workflows /" breadcrumb, keep just the workflow name.
 
 ## Completed
-- **Round 1** — `cond` node given two fixed ports via `portsOf()`
-  (`{key:'true',...}`/`{key:'false',...}`), removed from the `canParallel`
-  family, with a dedicated `layout()`/`ext()`/edge-drawing case modeled on
-  Branch's lane fan-out. Verified working, but the VISUAL SHAPE was wrong
-  per the user's actual design intent (see round 2).
-- **Round 2** — Pulled the real design via `mcp__figma-desktop__get_*` tools
-  (file `ZzUz2GRbzdOZjnxOc55VDq`, node `1056:48936`/`1056:49119`) after the
-  user shared a Figma link in an AskUserQuestion answer. Confirmed via
-  `get_variable_defs` that the design's color tokens already match this
-  project's CSS variables exactly (`--gray-label`, `--border`, `--major`,
-  `--critical`, etc. — no new tokens needed). Rebuilt:
-  - `condNodeHTML()` — dropped the outer pill tag (uses `badgeHTML(st,
-    true)`, the floating variant `laneHTML()` already established); two
-    internal rows (`.chip-row[data-port="true"|"false"]`) using `.chip`/
-    `.bar`/`.port.if`/`.port.else` — CSS that existed, unused, from the
-    pre-redesign IF/Else (`abfa752`-era) and turned out to be an exact
-    match, dots and all.
-  - `layout()`'s cond case rewritten around `portDy()` (reads each row's
-    real on-card height from the DOM) instead of a shared bottom fan point;
-    children stack via `crossCursor` bookkeeping so paths can't collide.
-  - `ext()` gained `condExt()`, mirroring that stacking without side
-    effects, so ancestors (e.g. a Branch lane) reserve the right amount of
-    room — verified with a `cond` nested inside a Branch lane beside a
-    sibling lane, no overlap.
-  - Node/drawer renamed **"IF / Else"** everywhere (`TYPE_LABEL.cond`,
-    `newCondition()`'s default title, drawer header/description, "Go to X
-    Node" pill) — per the user's AskUserQuestion answer, since the Figma
-    shows this as the title.
-  - `portsOf(cond)`'s port objects gained `rowLabel`/`emptyText` (drawer
-    shows "IF"/"Else" + "Add step when condition is met"/"...is not met",
-    distinct from the canvas tag's "Is True"/"Is False") — `nextRowsHTML()`
-    updated to prefer these when present; needed no other drawer changes.
-- **Round 3** — Replaced the round-2 edge-drawing (a raw cubic bezier from
-  each row's dot straight to the target, labelled at the curve's midpoint)
-  with `elbow()` — the same function Branch's lanes and Trigger's parallel
-  fan already use: straight off the port, one rounded bend only if the
-  target had to shift, straight into the target. Both rows' tags now sit at
-  a fixed `ex + 12` offset from the card (not the curve's midpoint), so Is
-  True and Is False always land in the same column, always on a flat run,
-  whether their row is filled, empty, or bent around a collision. Dropped
-  hover insert/delete controls on these connectors, matching Branch's own
-  lane connectors (which never had them).
-- Verified all three rounds with Playwright (written, run, deleted): port
-  structure, dot colors/positions, label alignment (same X whether a row is
-  filled or empty), no card overlap (including a `cond` nested inside a
-  `cond`, and nested inside a Branch lane), drawer row labels/placeholders
-  in both empty and filled states, delete cascades both paths, undo/redo,
-  Branch itself unaffected, zero console errors throughout.
+- **Run History hidden** — `hidden` attribute added to `#runHistBtn` in
+  `workflow-chrome.js`; the button, its click handler, and
+  `app.openRunHistory()` are all untouched, just not visible.
+- **Flow Details sidebar panel** (`#flowDetailsCfg` in
+  `workflow-canvas.html`, `flowDetails` key in the `panels` map in
+  `workflow-app.js`, `openFlowDetailsPanel()`/`WFApp.openFlowDetails()`/
+  `closeFlowDetails()`) replaces the old `.flowinfo` floating card entirely
+  — that popup's markup-building code and all its CSS (`.floatcard.flowinfo`,
+  `.fi-label`, `.fi-input`, `.fi-foot`, `.fc-area`) were deleted, not just
+  superseded. Workflow name/description are now live-write like every other
+  drawer field (no Save button — this closes the one exception CLAUDE.md
+  used to call out). Clicking the workflow name still opens it; clicking
+  **Publish** (main button or "Save & publish") now calls
+  `requireFlowDetails()` first — empty field(s) open this same panel,
+  red-outline via `.input-box.invalid`, show a `.cfg-alert` banner, and
+  block the publish; "Save only" is NOT gated. NOT a read-only panel like
+  Run/Version History — the canvas stays fully editable behind it.
+- **Toolbar reordered**: `workflow-chrome.js`'s bottombar markup now emits
+  `view-bbar` (zoom/fit/minimap) first, then Guide+Shortcuts+Note, then
+  Undo/Redo/Reset — same three groups, same dividers, just the first group
+  moved from last to first. Nothing added or removed, so the card's overall
+  footprint is unchanged (confirmed visually).
+- **"IF/Else" tag** — `workflow-app.js`'s `SUBMENUS.ifelse[0]` (the "Inline
+  condition" item) had `tag:'if'`; changed to `tag:'IF/Else'`. Rendered
+  as-is by `workflow-popover.js`'s `.wfpop-tag` (`flex-shrink:0`, no fixed
+  width, so the longer text just fits naturally — no CSS change needed).
+- **Note hidden** — `hidden` attribute added to `#toolNote`; `setTool()`,
+  the sticky-note placement/anchor/render system in `workflow-app.js`, and
+  existing notes (if any) are all untouched — only the entry point is gone.
+- **Breadcrumb removed** — `#goBack` and `#crumbRoot` (plus the `/` sep)
+  deleted from the pagebar-left markup, their click handlers removed (not
+  just left dangling — they'd have thrown on a null `$()` result), and the
+  now-fully-dead `.crumb-link`/`.crumb-sep`/`.cbtn.sm` CSS removed too
+  (confirmed nothing else referenced `.cbtn.sm` before deleting it).
+- **Found and fixed a real latent bug while building #1 and #5**: `[hidden]`
+  had NO CSS rule anywhere in this codebase — every existing use of the
+  attribute (minimap, `#runBadge`, trigger schedule fields, etc.) was
+  relying entirely on the browser's low-priority default UA rule, which
+  loses to any author class that sets `display` unconditionally. This is
+  exactly what silently broke `#runHistBtn`'s `hidden` attribute
+  (`.btn-outline{display:inline-flex}` was winning). Fixed once, globally,
+  with `[hidden]{display:none!important}` in `workflow-chrome.css` — this
+  is the actual fix that makes #1 and #5 work, and it fixes the same gap
+  for every other `hidden` toggle in the app going forward.
+- Verified all six changes together with Playwright (written, run,
+  deleted): button/element hidden states, toolbar group order + contents,
+  tag text, Flow Details gate (blocks Publish with only description empty,
+  correct alert copy, clears on fill, publish succeeds once both are
+  filled), breadcrumb markup, zoom/minimap/Guide still functioning after
+  the reorder, undo/redo regression — zero console errors throughout.
 
 ## In progress
-Nothing mid-flight. This round's fix (round 3, connector alignment) is
-implemented and verified but **not yet published** — the user asked "why
-are changes not published" between rounds and was told publishing only
-happens on request; this `/tatago` run is that request.
+Nothing mid-flight. All six changes are implemented, verified, and were
+explicitly requested to be published this session — done (see Deployment
+section timestamp / live URL, unchanged).
 
 ## Next steps
-No open threads from this specific feature. Two small things noted along
-the way, not asked for, not done:
-- The Guide card ("Node reference") in `workflow-chrome.js` still lists this
-  node type as "Condition", not "IF / Else" — cosmetic drift now that the
-  node itself was renamed; only touch it if asked.
-- `bez()` in `workflow-app.js` is now only referenced by the long-dead
-  "legacy port" fallback in `layout()`/`relayout()` (the one the comment
-  calls "no current node type reaches this... left vertical-only") — still
-  fine to leave; flagging in case a future cleanup pass wants to remove that
-  whole dead block along with the `port`/`plus` edge-drawing code it feeds
-  (unlike IF/Else's own `rowport`/`rowplus`, which came from reusing the
-  same *idea* — per-row exit points — but were rewritten, not copied).
+No open threads from this specific request. One item intentionally NOT
+touched, flagged to the user separately:
+- **A pre-existing undo/redo bug**: calling `WFApp.redo()` immediately after
+  `WFApp.undo()` (right after creating a single node) does not restore the
+  node — reproduces identically on the last commit from BEFORE this
+  session's changes too (confirmed via `git stash`), so it predates
+  everything done today and is unrelated to any of the six changes above.
+  Not investigated further or fixed — out of scope for this session's
+  request. Worth a dedicated look if the user brings it up: likely in
+  `pushHistory()`/`undo()`/`redo()` in `workflow-app.js`, possibly a timing/
+  debounce issue given it didn't reproduce in every test this session (some
+  earlier undo/redo checks in this same session passed fine with a similar
+  shape of test).
 
 ## Decisions made
-- Rebuilt using the team's actual Figma file via the Figma desktop MCP
-  connection rather than continuing to guess from cropped screenshots, once
-  the user shared a node link — this is now the established path for "does
-  this look right" disagreements in this project: ask for the Figma link,
-  pull `get_design_context`/`get_screenshot`/`get_variable_defs` on the
-  specific node, don't keep iterating blind on screenshots alone.
-- Reused pre-existing-but-unreachable code twice this session
-  (`.chip`/`.bar`/`.port` CSS from the pre-redesign IF/Else; the `portDy()`
-  mechanism) rather than inventing parallel systems — both turned out to be
-  exact or near-exact matches for what the new design needed, suggesting
-  this codebase still carries useful scaffolding from earlier iterations
-  worth checking before writing something new from scratch.
-- Chose `elbow()` over a raw bezier for the final connector shape
-  specifically because it's the SAME function already proven correct for
-  Branch/Trigger's fan-outs — consistency with an established, working
-  pattern over a bespoke one, per the user's explicit ask to match Branch's
-  own clean look.
+- Interpreted "hide" literally (attribute-hidden, code/handlers intact) for
+  both Run History and Note, rather than the "remove entirely" treatment
+  Test Run got in an earlier session — the user's own wording differed
+  ("hide" vs. that earlier session's explicit "remove"), so the two are
+  deliberately handled differently. If either should come back, it's a
+  one-line `hidden` removal, not a rebuild.
+- Removed the breadcrumb's DOM/handlers/CSS outright rather than hiding it —
+  unlike Run History/Note, "keep only workflow name" reads as a permanent
+  layout decision, not a toggle-off, and there's nothing to preserve access
+  to (no code path re-shows it).
+- Made Flow Details live-write (no Save button) rather than preserving the
+  old popup's local-edit-then-Save behavior — moving the fields into the
+  shared sidebar system means adopting that system's own convention
+  (autosave, `.cfg-alert` validation), not just relocating the old widget
+  into a new container.
+- Only "Save & publish" and the main Publish button are gated on Flow
+  Details being complete; "Save only" is not — the user said "on click of
+  publish CTA" specifically, and Save-only is a lesser, non-public-facing
+  action where forcing metadata first would be unnecessarily strict.
 
 ## Gotchas & notes
-- `mcp__figma-desktop__get_design_context` dropped mid-call twice this
-  session (backgrounded, then failed with "transport dropped mid-call") —
-  `get_screenshot` and `get_variable_defs` on the same node both worked
-  reliably. If `get_design_context` is unreliable again, `get_screenshot` +
-  `get_metadata` (for the layer tree/dimensions) + `get_variable_defs` (for
-  exact color tokens) is enough to rebuild a component faithfully by hand.
-- The Figma design-to-code skill requires loading
-  (`skill://figma/figma-design-to-code/SKILL.md`, or `Skill` tool with name
-  `figma-design-to-code`) before the first `get_design_context` call in a
-  session — it's a hard requirement stated on the tool itself, not optional
-  guidance.
-- Test carefully when a flow involves adding AND deleting nodes in the same
-  Playwright script before checking node counts — the app auto-selects the
-  newly-created node after the picker closes, so a `#cdDelete` click right
-  after creating a child deletes the CHILD, not whatever you created earlier
-  expecting it to still be selected. Re-click the target node's card
-  explicitly before deleting if the flow created something else since.
+- `git stash` / `git stash pop` is a fast, safe way to test "does this bug
+  exist on the last commit too" without losing in-progress work — used this
+  session to confirm the undo/redo issue predates today's changes before
+  deciding not to chase it further.
+- When adding a `hidden` attribute to hide something in THIS codebase,
+  don't assume it works — check whether the element's class sets `display`
+  unconditionally first (most `.cbtn`/`.btn-*` classes here do). The global
+  `[hidden]{display:none!important}` rule added this session should make
+  this a non-issue going forward, but it's new as of today.

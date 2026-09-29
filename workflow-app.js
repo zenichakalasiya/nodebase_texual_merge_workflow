@@ -13,7 +13,7 @@
 (function(){
   const $ = (s, r=document) => r.querySelector(s);
   const world = $('#world'), edgesSvg = $('#edges'), dock = $('#dock'), canvasEl = $('#canvas');
-  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg'), runHistory: $('#runHistoryCfg'), versionHistory: $('#versionHistoryCfg') };
+  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg'), runHistory: $('#runHistoryCfg'), versionHistory: $('#versionHistoryCfg'), flowDetails: $('#flowDetailsCfg') };
 
   /* ---------------------------------------------------------- catalogs */
   const MODULES = ['Request','Incident','Problem','Change','Release','Task','Hardware Asset','Software Asset','User'];
@@ -116,7 +116,7 @@
   const SUBMENUS = {
     ifelse: [
       { header:'Condition type' },
-      { id:'cond-inline', make:'cond', label:'Inline condition', tag:'if', tone:'if', icon:'split',
+      { id:'cond-inline', make:'cond', label:'Inline condition', tag:'IF/Else', tone:'if', icon:'split',
         sub:'One check, two paths — Is True and Is False',
         help:{ eyebrow:'Condition', title:'Inline', body:'A single check with two ways out — the steps after it run down whichever path matches, Is True or Is False. Adjacent conditions stack into an AND/OR group.', more:DOC } },
       { id:'cond-branch', make:'branch', label:'Branching', tag:'split', tone:'split', icon:'branch',
@@ -1731,6 +1731,20 @@
   $('#rhClose').addEventListener('click', closeHistoryPanel);
   $('#vhClose').addEventListener('click', closeHistoryPanel);
 
+  /* ------------------ Flow Details — workflow name + description, in the
+     same right-hand sidebar as everything else instead of a one-off
+     floating card. An ordinary drawer, NOT read-only: the canvas stays
+     fully live behind it (clicking a node just swaps the drawer over to
+     that node's own config, same as any other drawer-to-drawer switch).
+     The chrome module owns flowName/flowDesc and the field markup; this
+     side only owns the drawer-swap mechanics. */
+  function openFlowDetailsPanel(){
+    if(selId) markChecked(selId);
+    selId = null;
+    openDrawer('flowDetails');
+    render();
+  }
+
   /* ------------------ node lifecycle */
   function dropSubtree(id){
     const n = nodes[id]; if(!n) return;
@@ -2207,6 +2221,8 @@
     closeRunHistory(){ closeHistoryPanel(); },
     openVersionHistory(bodyHtml){ openVersionHistory(bodyHtml); },
     closeVersionHistory(){ closeHistoryPanel(); },
+    openFlowDetails(){ openFlowDetailsPanel(); },
+    closeFlowDetails(){ closeDrawer(); },
     isReadOnly(){ return readOnly; },
   };
 
