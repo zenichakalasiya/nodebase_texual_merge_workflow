@@ -93,8 +93,8 @@
     { header:'Flow control' },
     { id:'ifelse', label:'Add condition', tag:'if', tone:'if', icon:'split', chevron:true,
       keywords:'if else condition true false split check branch inline add condition',
-      sub:'Continue only when a check is true',
-      help:{ eyebrow:'Condition', title:'Add condition', body:'Add a check on the flow — a single gate (Inline) that continues only when it passes, or several paths at once (Branching).', eg:'Like — priority is High goes to the escalation path.', more:DOC } },
+      sub:'Check a value, then choose what happens',
+      help:{ eyebrow:'Condition', title:'Add condition', body:'Add a check on the flow — one check with an Is True / Is False path (Inline), or several paths at once (Branching).', eg:'Like — priority is High goes to the escalation path.', more:DOC } },
     { id:'merge', label:'Merge paths', tag:'merge', tone:'util', icon:'split2', chevron:true, soon:true,
       keywords:'merge join combine converge',
       sub:'Bring split paths back into one flow',
@@ -117,8 +117,8 @@
     ifelse: [
       { header:'Condition type' },
       { id:'cond-inline', make:'cond', label:'Inline condition', tag:'if', tone:'if', icon:'split',
-        sub:'Continue only when a check passes',
-        help:{ eyebrow:'Condition', title:'Inline', body:'A single check that gates the steps after it — they run only when it passes. Adjacent conditions stack into an AND/OR group.', more:DOC } },
+        sub:'One check, two paths — Is True and Is False',
+        help:{ eyebrow:'Condition', title:'Inline', body:'A single check with two ways out — the steps after it run down whichever path matches, Is True or Is False. Adjacent conditions stack into an AND/OR group.', more:DOC } },
       { id:'cond-branch', make:'branch', label:'Branching', tag:'split', tone:'split', icon:'branch',
         sub:'Branch into separate paths, each with its own check',
         help:{ eyebrow:'Branch', title:'Branching', body:'More than two outcomes: each path carries its own check, with a Default for anything that matches none.', more:DOC } },
@@ -229,11 +229,16 @@
   /* Every node hanging off a Trigger / branch path's single output: the first one
      (slots.next), then any parallel siblings. They all run at the same time. */
   const kidsOf = n => (n.slots.next ? [n.slots.next] : []).concat(n.parallel || []);
-  const canParallel = n => n.type === 'trigger' || n.type === 'lane' || n.type === 'cond';
+  const canParallel = n => n.type === 'trigger' || n.type === 'lane';
 
   /* ports = output connection points of a node, in top→bottom order */
   function portsOf(n){
-    if(n.type === 'trigger' || n.type === 'lane' || n.type === 'cond') return [{ key:'next', label:'', cls:'' }];
+    if(n.type === 'trigger' || n.type === 'lane') return [{ key:'next', label:'', cls:'' }];
+    if(n.type === 'cond'){
+      /* exactly two ways out — a condition is either true or it is not. Always
+         both shown, never a third "Else IF" — that's what Branch is for. */
+      return [{ key:'true', label:'Is True', cls:'t' }, { key:'false', label:'Is False', cls:'f' }];
+    }
     return [];          // a Branch card has no ports of its own — its lanes do
   }
   /* every port, including the ones the collapsed card hides — used by the drawer */
@@ -520,6 +525,7 @@
     function chainFans(n){ return kidsOf(n).length > 1 || !!showPar(n); }
     function laneItems(n){
       if(canParallel(n)) return kidsOf(n).map(id => ({ id })).concat(showPar(n) ? [{ par:true }] : []);
+      if(n.type === 'cond') return portsOf(n).map(p => ({ id:n.slots[p.key], port:p }));
       return n.lanes.map(id => ({ id })).concat([{ pending:true }]);
     }
     function laneWidths(n){
@@ -577,13 +583,33 @@
         });
         return bottom;
       }
-      if(n.type === 'trigger' || n.type === 'lane' || n.type === 'cond'){
+      if(n.type === 'trigger' || n.type === 'lane'){
         const c = n.slots.next;
         if(c){
           const pt = P(myMain + main + 64, myCross);
           bottom = layout(c, pt.x, pt.y);
           edges.push({ kind:'trig', from:key, to:c });
         }
+        return bottom;
+      }
+      if(n.type === 'cond'){
+        /* two outputs fan out across the cross axis, always both shown — Is
+           True and Is False, never merging into one line even when both are
+           still empty. Same shape as Branch's lane fan below, just fixed at
+           exactly two named items instead of n.lanes. */
+        const w = laneWidths(n), rowMain = myMain + main + LANE_DY, mid = myCross + cHalf(key);
+        w.items.forEach((it, i) => {
+          const cross = mid - w.total / 2 + w.centres[i], pt = P(rowMain, cross);
+          if(it.id){
+            const cardPt = P(rowMain, cross - cHalf(it.id));
+            bottom = Math.max(bottom, layout(it.id, cardPt.x, cardPt.y));
+            edges.push({ kind:'fan', from:key, to:it.id, port:it.port, cx:cardPt.x, y:cardPt.y });
+          } else {
+            edges.push({ kind:'fanplus', from:key, slot:it.port.key, port:it.port, cx:pt.x, y:pt.y });
+            minX = Math.min(minX, pt.x - 125); maxX = Math.max(maxX, pt.x + 125); minY = Math.min(minY, pt.y - 30); maxY = Math.max(maxY, pt.y + 70);
+            bottom = Math.max(bottom, rowMain + 70);
+          }
+        });
         return bottom;
       }
       if(n.type === 'branch'){
@@ -746,7 +772,32 @@
       });
     });
     Object.keys(nodes).forEach(id => {
-      const n = nodes[id]; if((n.type !== 'trigger' && n.type !== 'lane' && n.type !== 'cond') || !pos[id]) return;
+      const n = nodes[id]; if(n.type !== 'cond' || !pos[id]) return;
+      /* Condition's two outputs — Is True / Is False — fan out the same way a
+         Branch's lanes do (one trunk, an elbow to each), except both are
+         fixed and always shown, and each carries its own "Is True"/"Is
+         False" label whether it's filled or still open. */
+      const from = exitPt(id), start = P(mOf(from) + 6, cOf(from)), busPos = mOf(from) + BUS_DY;
+      const dot = document.createElement('div'); dot.className = 't-dot';
+      dot.style.left = (from.x - 5) + 'px'; dot.style.top = (from.y - 4) + 'px'; world.appendChild(dot);
+      edges.filter(e => ['fan', 'fanplus'].includes(e.kind) && e.from === id).forEach(e => {
+        const open = e.kind === 'fanplus';                                 // no node at the end of this line yet
+        const to = open ? null : entry(e.to);
+        const openTarget = P(mOf({ x:e.cx, y:e.y }) + 10, cOf({ x:e.cx, y:e.y }));
+        svg += open ? elbow(start.x, start.y, openTarget.x, openTarget.y, busPos, true, false)
+                    : elbow(start.x, start.y, to.x, to.y, busPos, false, true);
+        const lab = document.createElement('div');
+        lab.className = 'elabel ' + (e.port.cls || '');
+        lab.textContent = e.port.label;
+        lab.style.left = e.cx + 'px'; lab.style.top = (e.y + 14) + 'px'; world.appendChild(lab);
+        if(open){
+          svg += `<path class="edge dashed" d="M${e.cx} ${e.y + 24} V${e.y + 48}"/>`;
+          plusBtn(id, e.slot, e.cx - 10, e.y + 48, e.port.label);
+        }
+      });
+    });
+    Object.keys(nodes).forEach(id => {
+      const n = nodes[id]; if((n.type !== 'trigger' && n.type !== 'lane') || !pos[id]) return;
       const from = exitPt(id), start = P(mOf(from) + 6, cOf(from));
       const dot = document.createElement('div'); dot.className = 't-dot';
       dot.style.left = (from.x - 5) + 'px'; dot.style.top = (from.y - 4) + 'px'; world.appendChild(dot);

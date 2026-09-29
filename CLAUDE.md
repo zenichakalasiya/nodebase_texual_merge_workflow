@@ -120,12 +120,26 @@ cognitive load, readable six months later, no jargon.
 else in the picker is catalogued and shows a toast (`IMPLEMENTED` map in
 `workflow-app.js` gates this).
 
-- **Condition** (`cond` type) — a single standalone card: Title, Select Source
-  Node, the grouped And/Or condition builder, and Next step, all in one drawer
-  (`#conditionCfg`). Created via the picker's **Add condition → Inline
-  condition**. Joins the "plain chain" layout family (`canParallel`, same as
-  Trigger/Branch-path) — it can host parallel siblings and chains straight into
-  whatever comes next.
+- **Condition** (`cond` type) — a single card: Title, Select Source Node, the
+  grouped And/Or condition builder, all in one drawer (`#conditionCfg`).
+  Created via the picker's **Add condition → Inline condition**. It has
+  **exactly two fixed outputs — Is True and Is False** (`portsOf()` for
+  `cond`), both always shown, fanning out below the card the same way a
+  Branch's lanes do (solid line to whatever's attached, dashed ending in a
+  "+" when empty), each labelled with a green `.elabel.t`/red `.elabel.f` tag
+  on the connector itself. This is deliberately the same shape the product
+  called "IF/Else" earlier in this project's history (see git history around
+  the `abfa752` commit) — it was brought back onto today's `cond` node rather
+  than as a separate type, on explicit instruction ("we wanted to give If and
+  Else both from single condition node"). It is NOT in the `canParallel`
+  family (no parallel siblings off a Condition's own outputs — that space is
+  already spoken for by the two fixed paths); each of its two slots (`slots.
+  true`/`slots.false`) independently starts its own ordinary chain, which
+  CAN itself be a canParallel node further down. The drawer's "Next step"
+  block, the picker's attach logic, and delete/replace all needed zero
+  cond-specific code — they were already written generically against
+  `portsOf()`/`allPortsOf()`, so both rows appeared automatically once the
+  ports changed.
 - **Branch** (`branch` type, fans into `lane` children) — a Trigger-style card
   (tag/icon/title/description) with **no** node-picker slots inside the card;
   only its lanes' own lines fan out **downward**, solid for each real lane,

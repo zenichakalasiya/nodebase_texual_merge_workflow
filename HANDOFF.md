@@ -1,90 +1,103 @@
-# Handoff — 2026-09-28 16:07
+# Handoff — 2026-09-29 10:47
 
 ## Read first
-In `CLAUDE.md`: the new **"Run History and Version History are two different
-concepts — never merge them"** section (right before the node-picker section)
-and the rewritten **"Bottom toolbar"**/horizontal-only note. Both are the
-result of this session and explain the current toolbar/header shape and the
-history-panel mechanism from scratch.
+In `CLAUDE.md`: the rewritten **Condition** bullet inside "Two node types are
+actually implemented — Branch and Condition" — it now has two fixed outputs
+(Is True / Is False), not one. That's the whole story of this session.
 
 ## What we worked on this session
-Removed the Test Run button; consolidated the bottom toolbar (dropped the
-layout-direction switch, merged zoom/fit into the main card); built **Run
-History** as a read-only sidebar-replacing panel (not a modal); then, per an
-explicit follow-up instruction, converted **Version History** to the exact
-same sidebar pattern (it previously used a centered modal, `bigPanel()`).
+The user pointed out that an earlier version of this project (from before the
+"Redesign Branch/IF-Else" session, commit `abfa752` in git history) had a
+single condition node with two outputs — Is True / Is False — and asked for
+that behavior back on today's Condition node, instead of its current single
+"Next step" output.
 
 ## Completed
-- Test Run button fully removed (markup, handler, CSS, icon) — not just
-  hidden.
-- Bottom toolbar reduced to one floating card with three groups (Guide/
-  Shortcuts/Note | Undo/Redo/Reset | Zoom/Fit+minimap); the old two-way
-  Vertical/Horizontal layout-direction switch is gone from the UI (the
-  underlying vertical-axis code in `workflow-app.js` is untouched and
-  reachable again later if needed — `axis` just defaults to `'h'` now with
-  nothing in the UI able to change it).
-- **Run History**: `#runHistBtn` in the page bar (Test Run's old spot) opens
-  `#runHistoryCfg`, replacing the drawer and setting the canvas read-only
-  (`readOnly` in `workflow-app.js`) — blocks node drag, +/parallel-add, and
-  Undo/Redo/Reset; leaves pan/zoom live; clicking a node just peek-highlights
-  it (`.rh-peek`) instead of opening config. Mock runs seeded on Publish.
-- **Version History**: converted from `bigPanel()` (centered modal, paginated)
-  to the identical sidebar-replacement pattern as Run History, per explicit
-  instruction ("version history will also opened in sidebar"). New
-  `#versionHistoryCfg` panel in `workflow-canvas.html`; `workflow-app.js`'s
-  `openRunHistory`/`closeRunHistory` were generalized into a shared
-  `openHistoryPanel(panelKey, listSel, bodyHtml)`/`closeHistoryPanel()` used
-  by both panels (`WFApp.openVersionHistory`/`closeVersionHistory` added
-  alongside the existing Run History bridge methods); `workflow-chrome.js`
-  now just builds `versionHistoryRowsHtml()` and calls the bridge. Restore
-  still runs through `app.confirm()` as a normal explicit action — read-only
-  mode only blocks direct canvas manipulation, not a panel's own buttons.
-  `bigPanel()` and its now-dead CSS (`.wf-modal.big`/`.wfm-head`/`.wfm-body`/
-  `.wfm-foot`/`.wfm-pg*`) were removed; `.wfm-empty` was kept since both
-  panels' empty states still use it.
-- Verified end-to-end with Playwright (written, run, deleted — nothing
-  checked in): drawer swap, read-only lock on drag/+/Undo-Redo-Reset/click,
-  Restore's confirm dialog opening and Esc dismissing only the confirm (not
-  the whole panel), a second Esc closing the panel, Close-button close, full
-  editing restored afterward, Run History unaffected by the refactor, zero
-  console errors.
+- **Condition now has two fixed outputs, Is True / Is False**, on the SAME
+  `cond` node type (no new node type added, no rename — still called
+  "Condition" in the UI, just with two ways out instead of one).
+- Found the old two-output implementation in git history (`git show
+  abfa752:workflow-app.js`) and used it as a reference for behavior/shape,
+  but did not copy its code directly — that version predates the current
+  axis-abstracted layout engine (`P()`/`mOf()`/`cOf()`/`horiz` in
+  `workflow-app.js`), so the fan-out was reimplemented against today's
+  engine, modeled on Branch's already-working lane fan-out.
+- Changes, all in `workflow-app.js` unless noted:
+  - `canParallel()` no longer includes `cond` (its two outputs aren't a
+    single-slot-plus-parallel-siblings chain — they're two independent
+    fixed paths).
+  - `portsOf(cond)` returns `[{key:'true',label:'Is True',cls:'t'},
+    {key:'false',label:'Is False',cls:'f'}]` instead of a single `next`
+    port.
+  - `laneItems()` gained a `cond` case (mirrors the existing `canParallel`
+    and `branch.lanes` cases).
+  - `layout()` gained a dedicated `cond` fan-out case (copied the shape of
+    the `branch` case just above it: `laneWidths()`, centred row, elbow to
+    each item or a dashed stub + "+" when empty).
+  - A new edge-drawing block (mirrors the existing `branch` block) draws
+    Condition's two lines, always both labelled (`.elabel.t`/`.elabel.f` —
+    these CSS classes already existed, unused, left over from the pre-abfa752
+    IF/Else implementation).
+  - Removed `cond` from the old single-`next`-chain layout/edge cases (it no
+    longer uses `slots.next` at all — it uses `slots.true`/`slots.false`).
+  - Picker copy updated (`workflow-app.js`'s `ifelse`/`cond-inline` items)
+    and the Condition drawer's static description (`workflow-canvas.html`)
+    — both used to say "continues only when it passes", now describe the
+    two-path shape.
+- **Needed zero changes**: the drawer's "Next step" block (`nextRowsHTML()`/
+  `bindNext()`), the picker's node-attach logic (`openNodePicker()`), and
+  delete/replace (`removeNode()`/`replaceNode()`/`dropSubtree()`) were
+  already written generically against `portsOf()`/`allPortsOf()` and
+  `Object.keys(n.slots)` — they picked up the second output automatically
+  with no cond-specific code.
+- Verified via Playwright (written, run, deleted): both ports render with
+  correct labels/colors and independent "+" buttons; each path can hold its
+  own nested chain (tested nesting a Condition inside each of Is True and Is
+  False) with no card overlap; the drawer shows two correctly-labelled
+  Next-step rows; deleting the node cascades both subtrees; Branch (a
+  different node type, untouched) and Undo/Redo still work correctly
+  afterward; zero console errors.
 
 ## In progress
 Nothing mid-flight.
 
 ## Next steps
-- The Trigger-drawer-vs-design-screenshots gap noted in `CLAUDE.md` ("Workflow
-  Module Configuration" drawer shape) is still open — untouched this session.
-- No other known open threads from this session.
+- No open threads from this session. The Trigger-drawer-vs-design-screenshots
+  gap noted elsewhere in `CLAUDE.md` remains open, untouched.
+- One open question handed back to the user (not yet answered): the Condition
+  card itself still reads "Condition" on canvas/in the drawer, not "IF /
+  Else" — kept as-is since the rest of the current UI (drawer title, pill,
+  `TYPE_LABEL`) is already built around "Condition", and the two outputs
+  (Is True/Is False) already carry the if/else meaning. Flagged to the user;
+  revisit if they'd rather the card say "IF / Else".
 
 ## Decisions made
-- Run History and Version History both replace the drawer (sidebar panel),
-  never a modal or separate page — deliberate choice after competitor
-  research (Jira/Zapier's separate-page pattern vs. Dify/n8n's canvas-aware
-  read-only mode); the canvas-aware pattern was picked as the better fit.
-  Reason: keeps "inspect what happened" spatially tied to the workflow it
-  happened to, instead of navigating away from the canvas.
-- Read-only mode blocks editing (drag, +, Undo/Redo/Reset) but explicitly
-  leaves pan/zoom live, and a node click peek-highlights rather than opening
-  config — confirmed via AskUserQuestion earlier in the session, then reused
-  as-is for Version History without re-asking, since the pattern is directly
-  analogous and the user's instruction was short and confident.
-- Generalized the two panels' open/close logic into one shared
-  `openHistoryPanel`/`closeHistoryPanel` rather than duplicating it a second
-  time, since a second caller appearing was the exact trigger condition for
-  that refactor.
+- Kept the type key as `cond` and the label "Condition" rather than reviving
+  the old `ifelse` type name — the user's request was about output COUNT/
+  behavior ("If and Else both from single condition node"), not about
+  reverting the naming, and keeping one type avoids duplicating
+  `IMPLEMENTED`/`TYPE_LABEL`/drawer wiring for what would otherwise be two
+  near-identical node types.
+- Reimplemented the fan-out against the current axis-abstracted layout engine
+  rather than porting the old pre-abfa752 code verbatim — that old code
+  predates `P()`/`mOf()`/`cOf()`/`horiz` and was already flagged in its own
+  comments as vertical-only; copying it as-is would have silently broken in
+  this horizontal-only build.
+- Condition's two outputs are NOT parallel-capable themselves (removed `cond`
+  from `canParallel`) — the "add a parallel sibling" affordance only makes
+  sense for a single-output chain (Trigger/Branch-path), and Condition's
+  fan-out space is already spoken for by the two fixed paths. Whatever node
+  sits on the True or False path is free to be a `canParallel` type itself,
+  further down its own chain.
 
 ## Gotchas & notes
-- The `.hidden` class on an individual panel (`#versionHistoryCfg`,
-  `#runHistoryCfg`, etc.) does **not** reflect whether it's actually visible
-  on screen — `showPanel()` only toggles which panel is the "current" one
-  inside the dock; the dock's own `.closed` class (toggled by
-  `openDrawer()`/`closeDrawer()`) is what actually shows/hides the sidebar.
-  Don't use a panel's own `.hidden` state as a visibility check when
-  debugging — check `#dock`'s `.closed` class and/or `WFApp.isReadOnly()`
-  instead. This tripped up a first pass of Playwright verification this
-  session (false negative, not a real bug).
-- The Trigger node starts in an "empty" state and clicking it opens the
-  node-picker popover, not a config drawer — pre-existing, unrelated
-  behavior; don't mistake it for a regression when testing click-to-open-
-  drawer flows.
+- `git show <commit>:workflow-app.js` is a fast way to pull an old version of
+  a single file for reference without touching the working tree — used here
+  to read the pre-redesign IF/Else implementation. Good pattern to reuse if
+  the user asks for other previously-removed behavior back.
+- When testing keyboard shortcuts (Ctrl+Z etc.) with Playwright right after
+  typing in a popover's search field, the shortcut may appear to no-op — the
+  app's global keydown handler deliberately ignores shortcuts while
+  `input,textarea,select` has focus, and the search field can still hold
+  focus after a click. Click `#doUndo`/`#doRedo` directly, or click away to
+  drop focus first, rather than assuming a keyboard-shortcut no-op is a bug.
