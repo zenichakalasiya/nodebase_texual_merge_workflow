@@ -575,8 +575,8 @@
         anchor: $('#publishOpts'), noSearch:true, menu:true, width:264, align:'end',
         title: 'Save options',
         items: [
-          { id:'pub',  label:'Save & publish', sub:'Save changes and make it live' },
-          { id:'save', label:'Save only',      sub:'Save changes without publishing' },
+          { id:'pub',  label:'Save & Publish',  sub:'Save changes and make it live' },
+          { id:'save', label:'Save as draft',   sub:'Save changes without publishing' },
         ],
         onPick(i){
           if(i.id === 'pub'){ if(!requireFlowDetails()) return; publish(); toast('Saved and published'); }
