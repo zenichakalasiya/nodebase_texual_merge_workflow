@@ -367,14 +367,18 @@ earlier session, kept text-only for a cleaner look).
 and the **breadcrumb** ("‹ Workflows /") are all gone from the page bar —
 the left zone is just the workflow name + its Draft/Published pill now,
 nothing else (`#goBack`/`#crumbRoot` and their CSS were removed outright,
-not hidden, since nothing links back to them). Simple/Node view is centred
-on the bar (`.viewswitch` absolutely positioned) independent of that left
-zone — its horizontal position is recomputed (`positionViewSwitch()`)
-whenever the left or right zone's width can plausibly have changed, so it
-slides toward whichever side has room rather than ever being covered. The
-right zone reads Enabled toggle → **Run history** button (**hidden** —
-`hidden` attribute on `#runHistBtn`; the panel/mechanism itself is
-untouched, just not reachable from here) → Publish split-button →
+not hidden, since nothing links back to them). The view switch (`.viewswitch`
+absolutely positioned, centred independent of that left zone) reads
+**Linear | Node** now, not "Simple view"/"Node view" — same `data-view`
+values (`simple`/`node`) and the same "Linear view is not built in this
+prototype" toast on the unbuilt tab, only the visible labels changed. Its
+horizontal position is recomputed (`positionViewSwitch()`) whenever the
+left or right zone's width can plausibly have changed, so it slides toward
+whichever side has room rather than ever being covered. The right zone
+reads Enabled toggle → **Run history** button (**hidden** — `hidden`
+attribute on `#runHistBtn`; the panel/mechanism itself is untouched, just
+not reachable from here) → Publish split-button (its menu reads **Save &
+Publish** / **Save as draft** — was "Save & publish"/"Save only") →
 **Version history** icon → More (⋮).
 
 **Flow Details — workflow name + description, gating Publish.** Clicking the
@@ -399,6 +403,26 @@ Run History uses) silently ignored the attribute. Fixed with one global
 what actually makes the Run History/Note hides above work, and fixes the
 same latent gap for every other `hidden` toggle already in the app
 (minimap, `#runBadge`, trigger schedule fields, etc.).
+
+**Every node drawer's header lost its Documentation (book) icon and, on
+Branch/IF-Else, its Replace icon — replaced by an inline "Doc ↗" link at the
+end of the description**, per explicit reference screenshot. `.cfg-doc`
+(the link's styling) and `assets/open-link.svg` were both already sitting in
+the codebase, built but unused, before this — same pattern as several other
+pieces this project has reused rather than built fresh (`.chip`/`.bar`/
+`.port` for IF/Else, `.input-box.textarea`). Trigger/Branch/IF-Else bake the
+link straight into their static `<p class="cfg-desc">` markup in
+`workflow-canvas.html`; a Branch-path (lane)'s description is rebuilt on
+every open/switch (`isElse` changes the copy), so it goes through the
+reusable `DOC_LINK` HTML constant and `.innerHTML` in `workflow-app.js`
+instead. The link itself does nothing real yet (`[data-doc]`, delegated
+click handler, toasts "Documentation is not part of this prototype" — same
+convention as every other not-yet-built affordance). **Replace was NOT
+removed as a feature** — it's still reachable from the ⋮ **More** menu on
+Branch and IF-Else (`openNodeMenu()`'s `replace` item still calls
+`replaceNode()`); only the dedicated header icon is gone. Trigger and
+Branch-path never had a Replace icon to begin with (replacing the root
+trigger, or a single lane, doesn't make sense the same way).
 
 ## Deployment
 

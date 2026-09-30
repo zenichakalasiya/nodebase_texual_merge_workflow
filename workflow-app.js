@@ -299,6 +299,11 @@
   /* ---------------------------------------------------------- rendering */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const img = (n, alt='') => `<img src="assets/${n}.svg" alt="${alt}">`;
+  /* the "Doc ↗" link every drawer's description ends in — Trigger/Branch/
+     IF-Else bake it straight into their static <p class="cfg-desc"> markup
+     in workflow-canvas.html; a lane's description is rebuilt on every
+     open/switch (isElse changes it), so it needs this reusable snippet. */
+  const DOC_LINK = '<a href="#" class="cfg-doc" data-doc>Doc<img src="assets/open-link.svg" alt=""></a>';
 
   /* `float` lifts the badge out of the card flow, so it hangs above the card's
      top-right corner exactly like the trigger's does inside its pill row —
@@ -985,6 +990,14 @@
     let t = $('.toast'); if(!t){ t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); }
     t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1800);
   }
+  /* the "Doc ↗" link at the end of every drawer's description — same spot
+     the dedicated book-icon Documentation button used to sit, replaced by
+     this per explicit direction. No real docs in this prototype, same as
+     every other not-yet-built affordance. */
+  document.addEventListener('click', e => {
+    const a = e.target.closest('[data-doc]');
+    if(a){ e.preventDefault(); toast('Documentation is not part of this prototype'); }
+  });
 
   /* A confirmation dialog for anything that destroys work. Cancel is focused, so a
      stray Enter never deletes; Esc and a click on the backdrop both cancel. */
@@ -1515,7 +1528,6 @@
   $('#brClose').addEventListener('click', deselect);
   $('#brGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p){ selectNode(p); focusNode(p); } });
   $('#brDelete').addEventListener('click', () => removeNode(selId));
-  $('#brReplace').addEventListener('click', () => replaceNode(selId));
   $('#brMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#brMore')));
 
   /* ------------------ Branch-path (lane) drawer
@@ -1579,9 +1591,9 @@
     gotoLabel(n, $('#lnGoto'));
     $('#lnName').value = n.title; setHeadName('ln', n);
     $('#lnIfOnly').classList.toggle('hidden', isElse);
-    $('#lnDesc').textContent = isElse
+    $('#lnDesc').innerHTML = (isElse
       ? 'Runs when none of the branches above match.'
-      : 'Set the conditions that send the workflow down this path.';
+      : 'Set the conditions that send the workflow down this path.') + ' ' + DOC_LINK;
     $('#lnCond').innerHTML = isElse ? '' : groupsHTML(n);
     $('#lnDelete').classList.toggle('hidden', ifLanes(b)[0] === n);
     $('#lnPos').textContent = (idx + 1) + ' of ' + b.lanes.length;
@@ -1700,7 +1712,6 @@
   $('#cdGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p){ selectNode(p); focusNode(p); } });
   $('#cdClose').addEventListener('click', deselect);
   $('#cdDelete').addEventListener('click', () => removeNode(selId));
-  $('#cdReplace').addEventListener('click', () => replaceNode(selId));
   $('#cdMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#cdMore')));
   bindNext($('#cdNext'));
 

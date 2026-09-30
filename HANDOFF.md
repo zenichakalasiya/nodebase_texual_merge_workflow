@@ -1,113 +1,98 @@
-# Handoff — 2026-09-29 17:58
+# Handoff — 2026-09-30 15:47
 
 ## Read first
-In `CLAUDE.md`: the rewritten **"Guide ... and Keyboard shortcuts — sidebar
-panels, not popups"** section and the minimap paragraph inside **Bottom
-toolbar**. Both changed this session.
+In `CLAUDE.md`: the updated **Top bar** paragraph (Linear/Node tab rename,
+Save options wording) and the new paragraph right before **## Deployment**
+about the drawer header Doc-link change. Both are this session's work.
 
 ## What we worked on this session
-Three requests in one message:
-1. Move Guide and Shortcuts from an instant floatcard popup into the same
-   right-hand sidebar every drawer uses.
-2. Make the minimap's width match the zoom/fit toolbar group exactly, and
-   left-align it to that group instead of centring it.
-3. Change the minimap's zoom-based show threshold from 40%/150% to
-   50%/150%.
+A run of small, independent polish requests, each landed and verified on
+its own:
+1. Renamed "Simple view"/"Node view" tabs to "Linear"/"Node".
+2. Renamed "Save only" → "Save as draft" and capitalized "Publish" in
+   "Save & Publish" (Save options menu, off the Publish split-caret).
+3. Restored the Node reference chevron (`›`) that got dropped when Guide
+   moved from a floatcard into the sidebar; right-aligned the Shortcuts
+   panel's key badges (were on the left, user wanted them on the right).
+4. Removed the Documentation (book) icon and the Replace icon from every
+   node drawer's header, replaced by an inline "Doc ↗" link at the end of
+   each drawer's description text, per an explicit reference screenshot.
 
 ## Completed
-- **Guide/Shortcuts → sidebar panels.** New `#guideCfg`/`#shortcutsCfg`
-  `<aside>` panels in `workflow-canvas.html` (same shell every other drawer
-  uses — `.cfg-head`/close button/`.cfg-scroll`). `guide`/`shortcuts` added
-  to the `panels` map in `workflow-app.js`; `openGuidePanel()`/
-  `openShortcutsPanel()` (plain drawers, NOT read-only, same pattern as
-  Flow Details) exposed via `WFApp.openGuide()`/`openShortcuts()`. In
-  `workflow-chrome.js`: `floatCard()`/`closeCard()` and the module-level
-  `card` variable are deleted outright (confirmed via grep nothing else
-  referenced them); `GUIDE`/`SHORTCUTS` content strings kept their inner
-  markup (`.fc-noderef`/`.fc-keys`/etc.) but dropped the `fcHead()` title+×
-  wrapper, since the sidebar shell already provides that. The dead
-  `.floatcard`/`.fc-head`/`.fc-title`/`.fc-close` CSS (plus the
-  already-unused `.fc-list`) was removed from `workflow-chrome.css`; the
-  content-level classes stayed since they're still in use inside the
-  sidebar body.
-  - Both toolbar buttons AND the `?` key now guard with
-    `if(app.isReadOnly()) return;` — added proactively, not asked for
-    directly: without it, opening Guide while Run History is open would
-    swap the drawer's content away, and Guide's own close button would just
-    hide the dock without ever calling the read-only-clearing
-    `closeHistoryPanel()`, leaving the canvas permanently stuck locked.
-    Verified this exact scenario in Playwright (open Run History via
-    `WFApp.openRunHistory()`, click Guide — no-ops, Run History stays
-    visible, `readOnly` stays true; close Run History normally, Guide works
-    again).
-  - The Shortcuts row list dropped nothing in content, but its `Esc` row
-    copy changed from "Close a menu/popover/confirm/floatcard" to "Close a
-    menu, popover, or confirm dialog" — floatcards don't exist anymore, and
-    Esc does NOT close the new Guide/Shortcuts sidebar panels themselves
-    (matches every other drawer's existing convention — only Trigger/
-    Branch/Flow Details-style panels close via their own Close button or by
-    selecting something else, never Esc).
-- **Minimap width/alignment.** `.minimap` in `workflow-chrome.css` changed
-  from a fixed `120px`, centred (`left:50%;transform:translateX(-50%)`) to
-  `width:100%;left:0` — since `.minimap` is `position:absolute` inside
-  `.view-bbar`'s `position:relative` box, and `.view-bbar`'s own width is
-  driven entirely by its OTHER children (zoom out/in/percent/fit — the
-  minimap itself is out of flow, so it doesn't affect that width), this
-  makes the minimap track the zoom/fit group's real rendered width exactly.
-  Confirmed pixel-identical in testing (both measured the same X and width
-  at a zoomed-out state). Height stayed fixed at 78px — only width was
-  asked for.
-- **Zoom threshold.** `workflow-chrome.js`'s `onViewChange` show condition
-  changed from `view.zoom <= .4 || view.zoom >= 1.5` to
-  `view.zoom < .5 || view.zoom > 1.5` (strict, matching "below 50%"/"above
-  150%" literally). The existing content-overflow trigger (`cw > cs.w*1.15
-  || ch > cs.h*1.15`) was deliberately LEFT IN PLACE — the user only
-  described the two zoom-percentage conditions, didn't mention removing the
-  overflow one, and dropping it would have been a real functionality loss
-  (a wide/tall flow at 100% zoom would never show the minimap even with
-  content off-screen). Flagged as an assumption in the reply rather than
-  silently deciding either way.
-- Verified everything with Playwright (written, run, deleted): Guide/
-  Shortcuts panel structure and content, `?` key, close buttons, clicking a
-  node while either is open correctly swaps the drawer over (tested against
-  a CONFIGURED trigger — an unconfigured one opens a picker popover instead
-  of its drawer, a pre-existing quirk noted earlier this session, not a bug
-  here), the read-only-block scenario and recovery, minimap geometry
-  matching the zoom group exactly, the 50% boundary (exactly 50% stays
-  hidden, 25%/200% show it), Branch and the Flow Details Publish-gate both
-  still working — zero console errors throughout.
+- **Linear/Node rename** — `workflow-chrome.js`'s `.vs-btn` labels changed
+  from "Simple view"/"Node view" to "Linear"/"Node"; the unbuilt-tab toast
+  copy updated to match ("Linear view is not built..."). `data-view`
+  values (`simple`/`node`) left alone — internal ids, not user-facing.
+- **Save options wording** — `{id:'pub', label:'Save & publish', ...}` →
+  `'Save & Publish'`; `{id:'save', label:'Save only', ...}` → `'Save as
+  draft'`. Sub-text (`"Save changes and make it live"` /
+  `"Save changes without publishing"`) left unchanged.
+- **Node reference chevron restored** — `.fc-nr-row` in `workflow-chrome.js`
+  gained a trailing `<span class="fc-nr-chev">${svg('chevR')}</span>`;
+  `.fc-nr-text` got `flex:1 1 auto` so it fills the row and pushes the
+  chevron to the far right edge (new `.fc-nr-chev` CSS, right-aligned,
+  muted color, 14px).
+- **Shortcuts key alignment flipped** — `.fc-keys` grid columns swapped
+  from `auto 1fr` (keys left, description right) to `1fr auto`
+  (description left, keys right, `justify-self:end` on the `dd`). The JS
+  swapped which content goes in `<dt>`/`<dd>` to match — `<dt>` now holds
+  the description text (gets the `color:var(--gray-label)` styling that
+  `dd` used to have), `<dd>` holds the `<kbd>` badges.
+- **Doc link replacing Documentation/Replace icons** — across all four node
+  drawers (`#triggerCfg`, `#branchCfg`, `#laneCfg`, `#conditionCfg` in
+  `workflow-canvas.html`): removed the book-icon "Documentation" button
+  (never had a click handler — purely decorative before this) and, on
+  Branch/IF-Else, the "Replace node" button (`#brReplace`/`#cdReplace` —
+  their orphaned `addEventListener` calls were removed from
+  `workflow-app.js` too, since the buttons no longer exist). Added
+  `<a href="#" class="cfg-doc" data-doc>Doc<img src="assets/open-link.svg">
+  </a>` to the end of each drawer's description — baked directly into the
+  static `<p class="cfg-desc">` markup for Trigger/Branch/IF-Else, or via a
+  new `DOC_LINK` constant + `.innerHTML` for the Branch-path (lane) drawer,
+  whose description text is rebuilt on every open (`isElse` changes it, so
+  it was already going through `.textContent` — switched to `.innerHTML`).
+  A single delegated `[data-doc]` click handler (toast, `e.preventDefault()`
+  since `href="#"`) lives in `workflow-app.js` near `toast()`. Both
+  `.cfg-doc` CSS and `assets/open-link.svg` already existed, unused, before
+  this — reused verbatim. Replace itself is NOT gone: still in the ⋮ More
+  menu on Branch/IF-Else (`openNodeMenu()`), confirmed via Playwright.
+- Verified every change with Playwright (written, run, deleted): tab
+  labels + toast copy, Save options menu text, chevron presence/position
+  on every Guide row, Shortcuts key-badge alignment (`dd` right of `dt`),
+  and — across all four drawers — Documentation/Replace buttons gone, Doc
+  link present and correctly toasting, Delete/More/Clear preserved, the
+  More menu still offering "Replace node", zero console errors.
 
 ## In progress
-Nothing mid-flight. Not published yet as of the last message before this
-`/tatago` run — that's what this run is for.
+Nothing mid-flight. Everything above landed this session; some of it
+(Linear/Node rename, Doc-link/icon changes) was still uncommitted going
+into this `/tatago` run — that's what this run publishes.
 
 ## Next steps
-No open threads from this specific request.
+No open threads from this batch of requests.
 
 ## Decisions made
-- Guide/Shortcuts becoming sidebar panels meant adopting the same
-  conventions every other drawer already has: no Esc-to-close, swap-on-
-  node-click via the shared `panels`/`showPanel()` mechanism, light theme.
-  The reference screenshot the user attached showed a dark card — read as
-  "here's what the CURRENT popup looks like" (location/behavior being the
-  actual ask), not a request to keep dark styling, since every other panel
-  in this app is deliberately light (an explicit standing decision recorded
-  earlier in `CLAUDE.md`). Worth confirming with the user if this reading
-  turns out wrong.
-- Kept the content-overflow minimap trigger alongside the new stricter zoom
-  thresholds rather than replacing it — see "Completed" above for the
-  reasoning. This is the one place this session where the literal ask
-  ("show minimap when I zoom out below 50%...") could have been read as
-  either "add this condition" or "these are the only two conditions," and
-  the conservative reading (add/adjust, don't remove working behavior
-  nobody complained about) was chosen.
+- Treated "you removed the arrow" (from the user's Node-reference feedback)
+  as "the current build never had it, add it to match the reference" rather
+  than literally hunting for a regression — checked the code before and
+  after this session's earlier floatcard→sidebar conversion and confirmed
+  `.fc-nr-row` never rendered a chevron even in the original floatcard
+  version. Didn't relitigate this with the user; just built what the
+  reference image showed.
+- Kept Replace fully functional (via the More menu) rather than removing
+  the capability — the request was specifically about the dedicated header
+  ICON ("remove replace... icon"), and `replaceNode()` already had a second
+  entry point that didn't need touching.
 
 ## Gotchas & notes
-- When testing "does clicking a node swap the active sidebar panel," always
-  configure the node first (e.g. pick a trigger type) before clicking it —
-  an unconfigured/empty node opens the node-picker POPOVER instead of its
-  drawer, which doesn't go through the shared panel-swap mechanism at all
-  and will leave a stray `.wfpop-layer` open, blocking every subsequent
-  click in the same test run with a `TimeoutError` that looks like an app
-  bug but isn't. Hit this twice this session already — worth remembering
-  for any future test involving node clicks in a fresh session.
+- Hit the same test-authoring pitfall a few more times this session:
+  clicking an UNCONFIGURED trigger node opens the node-picker POPOVER, not
+  its drawer — any Playwright check that expects a drawer to be visible
+  after clicking `.nd.trig` must configure the trigger first (click it,
+  pick "When a record is created", THEN the drawer opens on subsequent
+  clicks). Getting this wrong doesn't error cleanly — it produces
+  `getBoundingClientRect()` readings of all zeros (the real panel is
+  hidden/closed) or, worse, a leftover `.wfpop-layer` that blocks every
+  later click in the same script with a `TimeoutError` that reads like an
+  app bug. This is now the single most common self-inflicted issue in this
+  session's testing — worth internalizing rather than re-discovering again.

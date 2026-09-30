@@ -170,8 +170,8 @@
       + `</div>`
       /* Simple | Node — centred on the bar, independent of the breadcrumb and actions */
       + `<div class="viewswitch" id="viewSwitch">`
-        + `<button class="vs-btn" type="button" data-view="simple">${svg('simple')}Simple view</button>`
-        + `<button class="vs-btn active" type="button" data-view="node">${svg('nodes')}Node view</button>`
+        + `<button class="vs-btn" type="button" data-view="simple">${svg('simple')}Linear</button>`
+        + `<button class="vs-btn active" type="button" data-view="node">${svg('nodes')}Node</button>`
       + `</div>`
       + `<div class="pagebar-right">`
         + `<div class="enable-row"><span>Enabled</span>`
@@ -448,7 +448,7 @@
 
     $('#viewSwitch').addEventListener('click', e => {
       const b = e.target.closest('[data-view]'); if(!b || b.classList.contains('active')) return;
-      if(b.dataset.view === 'simple'){ toast('Simple view is not built in this prototype'); return; }
+      if(b.dataset.view === 'simple'){ toast('Linear view is not built in this prototype'); return; }
       $('#viewSwitch').querySelectorAll('.vs-btn').forEach(x => x.classList.toggle('active', x === b));
     });
 
