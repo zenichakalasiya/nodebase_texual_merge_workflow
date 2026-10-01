@@ -1577,7 +1577,7 @@
       + `<button type="button" class="email-chip-x" data-a="emaildel" data-idx="${i}" aria-label="Remove ${esc(em)}"><img src="assets/close2.svg" alt=""></button></span>`).join('');
     return `<div class="cell cell-val cell-emails">`
       + `<div class="email-row">${chips}`
-      + `<input class="email-input" type="text" data-a="emailinput" placeholder="${c.emails.length ? '' : 'Add Email...'}">`
+      + `<input class="email-input" type="text" placeholder="${c.emails.length ? '' : 'Add Email...'}">`
       + `<button type="button" class="email-more" data-a="emailmore" hidden></button></div>`
       + `</div>`;
   }
