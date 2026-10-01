@@ -1641,48 +1641,138 @@
   }
   function layoutEmailRows(container){ container.querySelectorAll('.email-row').forEach(layoutEmailRow); }
 
-  /* The "+N" popup — lists every email on the condition (not just the
-     hidden ones, so there's always full context), a search box to filter,
-     and a hover-reveal × per row. No close button of its own: dismissed by
-     clicking outside, same as every other anchored popover in this app. */
+  /* The "+N" popup — the place to manage a long list (100+ addresses).
+     · header: live count ("100 emails", or "3 of 100" while searching) and
+       a bulk "Remove all" / "Remove 3" that acts on exactly what's shown,
+       confirmed inline in the header before anything is deleted;
+     · one box that searches AND adds: type to filter; if what's typed is a
+       new valid address an "Add" row appears (Enter picks it); pasting a
+       list adds every valid address in it;
+     · the matched part of each address is highlighted; long addresses
+       ellipsize with the full text on hover; hover-reveal × per row.
+     Sized to the email cell and flipped above it when there's no room
+     below. No close button of its own — dismissed by clicking outside or
+     Esc, same as every other anchored popover in this app. */
   let emailPopup = null;
   function closeEmailPopup(){
     if(!emailPopup) return;
     document.removeEventListener('mousedown', offEmailPopup, true);
+    document.removeEventListener('keydown', escEmailPopup, true);
     emailPopup.remove(); emailPopup = null;
   }
   function offEmailPopup(e){ if(emailPopup && !emailPopup.contains(e.target)) closeEmailPopup(); }
+  function escEmailPopup(e){ if(e.key === 'Escape' && emailPopup){ e.stopPropagation(); e.preventDefault(); closeEmailPopup(); } }
   function openEmailPopup(anchor, gi, ci, onChange){
     closeEmailPopup();
     const pop = document.createElement('div');
     pop.className = 'email-popup';
-    pop.innerHTML = `<label class="email-popup-search">${img('search')}<input type="text" placeholder="Search"></label>`
+    pop.innerHTML = `<div class="email-popup-head"></div>`
+      + `<label class="email-popup-search">${img('search')}<input type="text" placeholder="Search or add email"></label>`
+      + `<div class="email-popup-msg" hidden></div>`
       + `<div class="email-popup-list"></div>`;
     document.body.appendChild(pop);
-    const r = anchor.getBoundingClientRect();
-    pop.style.left = Math.round(Math.min(r.left, window.innerWidth - pop.offsetWidth - 12)) + 'px';
-    pop.style.top = Math.round(r.bottom + 6) + 'px';
-    const listEl = pop.querySelector('.email-popup-list'), searchEl = pop.querySelector('input');
-    function renderList(){
-      const n = nodes[selId]; if(!n){ closeEmailPopup(); return; }
-      const c = n.groups[gi].conds[ci];
-      const q = searchEl.value.trim().toLowerCase();
-      const rows = c.emails.map((em, i) => ({ em, i })).filter(x => !q || x.em.toLowerCase().includes(q));
-      listEl.innerHTML = rows.length ? rows.map(x => `<div class="email-popup-row">${esc(x.em)}`
-        + `<button type="button" class="email-popup-x" data-idx="${x.i}" aria-label="Remove ${esc(x.em)}">${img('close2')}</button></div>`).join('')
-        : `<div class="email-popup-empty">No matches</div>`;
+    const cell = anchor.closest('.cell-emails') || anchor;
+    const r = cell.getBoundingClientRect();
+    const w = Math.max(260, Math.min(360, Math.round(r.width)));
+    pop.style.width = w + 'px';
+    pop.style.left = Math.round(Math.max(12, Math.min(r.left, window.innerWidth - w - 12))) + 'px';
+    const headEl = pop.querySelector('.email-popup-head'), listEl = pop.querySelector('.email-popup-list');
+    const searchEl = pop.querySelector('input'), msgEl = pop.querySelector('.email-popup-msg');
+    let confirming = false;
+    const cond = () => { const n = nodes[selId]; return n && n.groups[gi] && n.groups[gi].conds[ci]; };
+    const query = () => searchEl.value.trim();
+    const shown = c => { const q = query().toLowerCase(); return c.emails.map((em, i) => ({ em, i })).filter(x => !q || x.em.toLowerCase().includes(q)); };
+    const plural = (k, s) => k + ' ' + s + (k === 1 ? '' : 's');
+    function mark(em){
+      const q = query(); if(!q) return esc(em);
+      const at = em.toLowerCase().indexOf(q.toLowerCase()); if(at < 0) return esc(em);
+      return esc(em.slice(0, at)) + '<mark>' + esc(em.slice(at, at + q.length)) + '</mark>' + esc(em.slice(at + q.length));
     }
-    renderList();
-    searchEl.addEventListener('input', renderList);
-    listEl.addEventListener('click', e => {
-      const b = e.target.closest('.email-popup-x'); if(!b) return;
-      const n = nodes[selId], c = n.groups[gi].conds[ci];
-      c.emails.splice(+b.dataset.idx, 1);
-      renderList();
-      onChange();
+    function say(msg){ msgEl.textContent = msg || ''; msgEl.hidden = !msg; }
+    function render(){
+      const c = cond(); if(!c){ closeEmailPopup(); return; }
+      const rows = shown(c), q = query(), total = c.emails.length;
+      if(!rows.length) confirming = false;
+      /* header — count on the left, bulk action on the right */
+      if(confirming){
+        headEl.className = 'email-popup-head confirm';
+        headEl.innerHTML = `<span class="email-popup-ttl">Remove ${plural(rows.length, 'email')}?</span>`
+          + `<span class="email-popup-acts"><button type="button" class="email-popup-btn" data-pa="cancel">Cancel</button>`
+          + `<button type="button" class="email-popup-btn danger solid" data-pa="confirm">Remove</button></span>`;
+      } else {
+        headEl.className = 'email-popup-head';
+        headEl.innerHTML = `<span class="email-popup-ttl">${q ? `${rows.length} of ${total}` : plural(total, 'email')}</span>`
+          + (rows.length ? `<button type="button" class="email-popup-btn danger" data-pa="removeall">${q ? 'Remove ' + rows.length : 'Remove all'}</button>` : '');
+      }
+      /* an exact new valid address gets an "Add" row on top */
+      const canAdd = EMAIL_RE.test(q) && !c.emails.some(e => e.toLowerCase() === q.toLowerCase());
+      let html = canAdd ? `<button type="button" class="email-popup-add" data-pa="add">${img('n-plus')}<span>Add <b>${esc(q)}</b></span><kbd>Enter</kbd></button>` : '';
+      html += rows.map(x => `<div class="email-popup-row"><span class="email-popup-t" title="${esc(x.em)}">${mark(x.em)}</span>`
+        + `<button type="button" class="email-popup-x" data-idx="${x.i}" aria-label="Remove ${esc(x.em)}">${img('close2')}</button></div>`).join('');
+      if(!rows.length && !canAdd) html += `<div class="email-popup-empty">${total ? 'No matches' : 'No emails yet — type one above to add it'}</div>`;
+      listEl.innerHTML = html;
+    }
+    /* adds every valid address in `text`; invalid ones stay in the box */
+    function add(text){
+      const c = cond(); if(!c) return;
+      const parts = text.split(/[\s,;]+/).filter(Boolean), bad = [];
+      let added = 0, dup = 0;
+      parts.forEach(p => {
+        if(!EMAIL_RE.test(p)) bad.push(p);
+        else if(c.emails.some(e => e.toLowerCase() === p.toLowerCase())) dup++;
+        else { c.emails.push(p); added++; }
+      });
+      searchEl.value = bad.join(', ');
+      say(bad.length ? (added ? added + ' added · ' : '') + (bad.length === 1 ? '1 address isn’t' : bad.length + ' addresses aren’t') + ' valid — left in the box'
+        : added > 1 ? plural(added, 'email') + ' added' + (dup ? `, ${dup} already there` : '')
+        : !added && dup ? 'Already added' : '');
+      confirming = false;
+      if(added) onChange();
+      render();
+      listEl.scrollTop = added === 1 && !bad.length ? listEl.scrollHeight : 0;   // show the one just added
+    }
+    /* below the cell if it fits, else above it — pinned by its bottom edge
+       then, so it hugs the cell as the list grows/shrinks while filtering */
+    function place(){
+      const h = pop.offsetHeight, below = window.innerHeight - r.bottom - 12;
+      if(h + 6 <= below || r.top < h + 18) pop.style.top = Math.round(r.bottom + 6) + 'px';
+      else pop.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
+    }
+    render(); place();
+    searchEl.addEventListener('input', () => { confirming = false; say(''); render(); listEl.scrollTop = 0; });
+    searchEl.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      if(query()) add(query());
+    });
+    searchEl.addEventListener('paste', e => {
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if(!/[\s,;]/.test(text.trim())) return;          // a single address pastes normally (and filters)
+      e.preventDefault();
+      add(searchEl.value + ' ' + text);
+    });
+    pop.addEventListener('click', e => {
+      const b = e.target.closest('[data-pa], .email-popup-x'); if(!b) return;
+      const c = cond(); if(!c) return;
+      const pa = b.dataset.pa;
+      if(pa === 'add'){ add(query()); searchEl.focus(); return; }
+      if(pa === 'removeall'){ confirming = true; render(); return; }
+      if(pa === 'cancel'){ confirming = false; render(); searchEl.focus(); return; }
+      if(pa === 'confirm'){
+        const drop = new Set(shown(c).map(x => x.i)), k = drop.size;
+        c.emails = c.emails.filter((_, i) => !drop.has(i));
+        confirming = false; searchEl.value = '';
+        say(plural(k, 'email') + ' removed');
+        onChange(); render(); searchEl.focus();
+        return;
+      }
+      c.emails.splice(+b.dataset.idx, 1);               // a row's ×
+      say('');
+      onChange(); render();
     });
     searchEl.focus();
     setTimeout(() => document.addEventListener('mousedown', offEmailPopup, true), 0);
+    document.addEventListener('keydown', escEmailPopup, true);
     emailPopup = pop;
   }
   function syncLaneValidity(n){

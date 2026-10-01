@@ -287,20 +287,52 @@
 .email-hint{margin-left:auto;font-size:10px;color:var(--gray-label);}
 .email-err{font-size:10px;color:var(--critical);}
 
-/* "+N" popup — every email, a search box, hover-reveal × per row, no close
-   button of its own (dismissed by clicking outside, like every other
-   anchored popover here). */
+/* "+N" popup — the manager for long lists: count + bulk remove header,
+   one search-or-add box, highlighted matches, hover-reveal × per row. No
+   close button of its own (dismissed by clicking outside or Esc, like every
+   other anchored popover here). Width is set from the email cell in JS. */
 .email-popup{
-  position:fixed;z-index:200;width:220px;max-height:260px;display:flex;flex-direction:column;
+  position:fixed;z-index:200;width:280px;max-height:340px;display:flex;flex-direction:column;
   background:var(--white);border:1px solid var(--border);border-radius:10px;
   box-shadow:0 10px 30px -14px rgba(54,70,88,.3),0 2px 6px rgba(54,70,88,.05);
   overflow:hidden;animation:wfpopIn .14s var(--ease);
 }
-.email-popup-search{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:8px 10px;border-bottom:1px solid var(--light-border);}
+.email-popup-search{
+  display:flex;align-items:center;gap:7px;flex-shrink:0;margin:8px 8px 4px;padding:0 10px;height:30px;
+  border:1px solid var(--border);border-radius:6px;background:var(--white);cursor:text;transition:border-color .12s;
+}
+.email-popup-search:focus-within{border-color:var(--primary);}
 .email-popup-search img{width:13px;height:13px;display:block;opacity:.5;flex-shrink:0;}
 .email-popup-search input{flex:1 1 0;min-width:0;border:none;outline:none;background:none;font-family:inherit;font-size:11.5px;color:var(--page-text);}
-.email-popup-list{overflow-y:auto;padding:4px;}
+.email-popup-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;
+  min-height:34px;padding:4px 6px 4px 12px;border-bottom:1px solid var(--light-border);
+}
+.email-popup-head.confirm{background:#fff6f5;}
+.email-popup-ttl{font-size:11.5px;font-weight:600;color:var(--page-text);white-space:nowrap;}
+.email-popup-acts{display:flex;gap:4px;}
+.email-popup-btn{
+  border:none;background:none;border-radius:6px;padding:4px 8px;cursor:pointer;
+  font-family:inherit;font-size:11px;font-weight:500;color:var(--page-text);
+}
+.email-popup-btn:hover{background:var(--grid-hover);}
+.email-popup-btn.danger{color:var(--critical);}
+.email-popup-btn.danger:hover{background:rgba(242,92,78,.1);}
+.email-popup-btn.danger.solid{background:var(--critical);color:#fff;}
+.email-popup-btn.danger.solid:hover{filter:brightness(.94);}
+.email-popup-msg{flex-shrink:0;padding:5px 12px;font-size:10.5px;color:var(--gray-label);background:var(--grid-hover);border-bottom:1px solid var(--light-border);}
+.email-popup-list{overflow-y:auto;padding:4px;min-height:0;}
+.email-popup-add{
+  display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border:none;border-radius:7px;
+  background:#f4f9fd;cursor:pointer;font-family:inherit;font-size:11.5px;color:var(--primary);text-align:left;
+}
+.email-popup-add:hover{background:#e9f3fb;}
+.email-popup-add img{width:12px;height:12px;display:block;flex-shrink:0;}
+.email-popup-add span{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.email-popup-add kbd{font-family:inherit;font-size:9.5px;color:var(--gray-label);border:1px solid var(--border);border-radius:4px;padding:1px 5px;background:var(--white);}
 .email-popup-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:7px;font-size:11.5px;color:var(--page-text);}
+.email-popup-t{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.email-popup-t mark{background:rgba(255,196,0,.32);color:inherit;border-radius:2px;}
 .email-popup-row:hover{background:var(--grid-hover);}
 .email-popup-x{
   width:18px;height:18px;flex-shrink:0;border:none;background:none;border-radius:5px;

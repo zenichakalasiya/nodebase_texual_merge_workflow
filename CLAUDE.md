@@ -211,9 +211,17 @@ them if they fit), folding the rest into a **"+N"** badge right after the
 last visible chip. (The first version collapsed while you were still
 typing and reserved room up front, so from the second email on everything
 vanished into "+N" — that's why editing never collapses now.) Clicking
-"+N" opens `openEmailPopup()`: the full list, a search box, a × revealed
-on hover per row, **no close button** (dismissed by clicking outside, on
-explicit direction). Switching the field
+"+N" opens `openEmailPopup()` — the manager for long (100+) lists: a
+header with the live count ("120 emails" / "40 of 120" while searching)
+and a bulk "Remove all" / "Remove 40" that acts on exactly the filtered
+rows, confirmed inline in the header first; one bordered, inset
+(not edge-to-edge, per reference) "Search or add email" box
+(a new valid address shows an "Add" row, Enter adds it; pasting a list
+adds every valid one, invalid ones stay in the box with a note);
+highlighted matches; a × revealed on hover per row. It's sized to the
+email cell, flips above it when there's no room below, and has **no close
+button** (dismissed by clicking outside or Esc, on explicit direction).
+Switching the field
 into or out of Cc Emails resets `op`/`value`/`emails` (the valid option set
 changes completely) — switching between the other seven fields still
 doesn't, same as before. The builder is shared, so this works identically
