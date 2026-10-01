@@ -1568,17 +1568,18 @@
   const joinChip = (act, g, c, join) =>
     `<div class="cg-join"><i></i><button class="join-chip" type="button" data-a="${act}" data-g="${g}" data-c="${c}" data-tip="Switch between And / Or">${cap(join)} ${img('refresh-ccw')}</button><i></i></div>`;
   /* "Cc Emails" (not in fx/expression mode) swaps the plain text value cell
-     for a chip input: each added address is its own removable chip, an
-     always-present input for typing the next one, and a "+N" badge once
-     the chips themselves run out of room (layoutEmailRow() below measures
-     and hides whichever chips don't fit after every render). */
+     for a chip input: each added address is its own removable chip, plus an
+     input for typing the next one. While the cell has focus (.editing) it
+     wraps onto as many lines as it needs, so every address you've added
+     stays visible; once focus leaves it collapses to one line and
+     layoutEmailRow() folds whatever doesn't fit into a "+N" badge. */
   function emailValueHTML(c){
-    const chips = c.emails.map((em, i) => `<span class="email-chip" data-idx="${i}">${esc(em)}`
+    const chips = c.emails.map((em, i) => `<span class="email-chip" data-idx="${i}"><span class="email-chip-t" title="${esc(em)}">${esc(em)}</span>`
       + `<button type="button" class="email-chip-x" data-a="emaildel" data-idx="${i}" aria-label="Remove ${esc(em)}"><img src="assets/close2.svg" alt=""></button></span>`).join('');
     return `<div class="cell cell-val cell-emails">`
       + `<div class="email-row">${chips}`
-      + `<input class="email-input" type="text" placeholder="${c.emails.length ? '' : 'Add Email...'}">`
-      + `<button type="button" class="email-more" data-a="emailmore" hidden></button></div>`
+      + `<button type="button" class="email-more" data-a="emailmore" hidden></button>`
+      + `<input class="email-input" type="text" placeholder="${c.emails.length ? '' : 'Add Email...'}"></div>`
       + `</div>`;
   }
   function condHTML(n, g, gi, c, ci){
@@ -1607,28 +1608,36 @@
       + `<button class="btn-ghost sm" type="button" data-a="cadd" data-g="${gi}"><img src="assets/n-plus.svg" alt="">Add Condition</button></div></div>`
     ).join('');
   }
-  /* Email chips fill their row left→right; once the next one wouldn't fit
-     (leaving room for the input and, unless it's the last chip, a "+N"
-     badge), it and everything after it hide and the badge takes over.
-     Run after every redraw — chip widths are only known once rendered. */
+  /* Collapsed (not focused) only: chips fill the single line left→right.
+     If they all fit, nothing hides. Otherwise as many as fit beside the
+     real, measured "+N" badge stay visible — at least one, which shrinks
+     with an ellipsis if it has to — and the rest fold into the badge.
+     While editing, every chip shows (the row wraps instead).
+     Run after every redraw and on focus change — widths only exist once
+     rendered. */
   function layoutEmailRow(row){
+    const cell = row.closest('.cell-emails');
     const chips = Array.from(row.querySelectorAll('.email-chip'));
     const moreBtn = row.querySelector('.email-more');
     chips.forEach(ch => ch.hidden = false);
     moreBtn.hidden = true;
-    if(!chips.length) return;
-    const rowW = row.clientWidth, gap = 6, inputMin = 90, moreW = 40;
-    let used = 0, hiddenFrom = -1;
-    for(let i = 0; i < chips.length; i++){
-      const w = chips[i].offsetWidth + gap;
-      const budget = rowW - inputMin - (i < chips.length - 1 ? moreW : 0);
-      if(used + w > budget){ hiddenFrom = i; break; }
+    if(!chips.length || cell.classList.contains('editing')) return;
+    const gap = 6, avail = row.clientWidth - 16 - gap;    // 16 = the collapsed input's sliver, plus the gap before it
+    const widths = chips.map(ch => ch.offsetWidth);
+    const total = widths.reduce((s, w) => s + w, 0) + gap * (chips.length - 1);
+    if(total <= avail) return;
+    moreBtn.hidden = false;
+    moreBtn.textContent = '+' + chips.length;              // widest it can read, so the fit is never optimistic
+    const moreW = moreBtn.offsetWidth + gap;
+    let used = 0, k = 0;
+    for(; k < chips.length; k++){
+      const w = widths[k] + (k ? gap : 0);
+      if(used + w + moreW > avail) break;
       used += w;
     }
-    if(hiddenFrom === -1) return;
-    for(let i = hiddenFrom; i < chips.length; i++) chips[i].hidden = true;
-    moreBtn.hidden = false;
-    moreBtn.textContent = '+' + (chips.length - hiddenFrom);
+    k = Math.max(k, 1);
+    for(let i = k; i < chips.length; i++) chips[i].hidden = true;
+    moreBtn.textContent = '+' + (chips.length - k);
   }
   function layoutEmailRows(container){ container.querySelectorAll('.email-row').forEach(layoutEmailRow); }
 
@@ -1715,16 +1724,41 @@
   const condAt = (n, el) => { const c = el.closest('.cg-cond'); return c ? n.groups[+c.dataset.g].conds[+c.dataset.c] : null; };
   function bindBuilder(listSel, addSel, clearSel, edited){
     const list = $(listSel);
-    const redraw = n => { list.innerHTML = groupsHTML(n); layoutEmailRows(list); edited(); };
+    let redrawing = false;               // a rebuild drops focus; that's not the user leaving the field
+    const redraw = n => { redrawing = true; list.innerHTML = groupsHTML(n); redrawing = false; layoutEmailRows(list); edited(); };
     const hostGC = el => { const h = el.closest('.cg-cond'); return h ? { gi:+h.dataset.g, ci:+h.dataset.c } : null; };
+    const emailInputAt = hg => list.querySelector(`.cg-cond[data-g="${hg.gi}"][data-c="${hg.ci}"] .email-input`);
+    function emailErr(el, msg){
+      const err = el.closest('.cg-cond').querySelector('[data-emailerr]'); if(!err) return;
+      err.textContent = msg || '';
+      err.classList.toggle('hidden', !msg);
+    }
+    /* Adds every address in `text` — split on commas, semicolons or spaces,
+       so a pasted list works the same as typing them one by one. Anything
+       that isn't a valid address stays in the box with a message, so a typo
+       is never silently dropped; duplicates are skipped and said so. */
+    function addEmails(input, text, keepFocus){
+      const n = nodes[selId], hg = hostGC(input); if(!hg) return;
+      const c = n.groups[hg.gi].conds[hg.ci];
+      const parts = text.split(/[\s,;]+/).filter(Boolean);
+      if(!parts.length){ input.value = ''; return; }
+      const bad = [];
+      let added = 0, dup = 0;
+      parts.forEach(p => {
+        if(!EMAIL_RE.test(p)) bad.push(p);
+        else if(c.emails.includes(p)) dup++;
+        else { c.emails.push(p); added++; }
+      });
+      if(added){ redraw(n); input = emailInputAt(hg); if(keepFocus && input) input.focus(); }
+      if(!input) return;
+      input.value = bad.join(', ');
+      emailErr(input, bad.length ? 'Enter a valid email' : dup ? 'Already added' : '');
+    }
     function onField(e){
       const f = e.target.dataset.f;
       if(!f){
-        /* typing again after a rejected email clears its error line */
-        if(e.target.classList.contains('email-input')){
-          const err = e.target.closest('.cg-cond').querySelector('[data-emailerr]');
-          if(err) err.classList.add('hidden');
-        }
+        /* typing again after a rejected email clears its message */
+        if(e.target.classList.contains('email-input')) emailErr(e.target, '');
         return;
       }
       const n = nodes[selId], c = condAt(n, e.target); if(!c) return;
@@ -1741,26 +1775,60 @@
     }
     list.addEventListener('input', onField);
     list.addEventListener('change', onField);
-    /* Enter commits the email input's text as a chip — only a real-looking
-       address, so a typo doesn't silently vanish into the list. Refocuses
-       the same input afterward so typing several addresses in a row
-       doesn't need a re-click each time. */
+    /* Enter, comma or semicolon commits what's typed; Backspace in an empty
+       box removes the last chip. Focus stays in the box throughout, so
+       several addresses can be entered without re-clicking. */
     list.addEventListener('keydown', e => {
-      if(e.key !== 'Enter' || !e.target.classList.contains('email-input')) return;
+      const inp = e.target; if(!inp.classList.contains('email-input')) return;
+      if(e.key === 'Enter' || e.key === ',' || e.key === ';'){
+        e.preventDefault();
+        addEmails(inp, inp.value, true);
+      } else if(e.key === 'Backspace' && !inp.value){
+        const n = nodes[selId], hg = hostGC(inp); if(!hg) return;
+        const c = n.groups[hg.gi].conds[hg.ci]; if(!c.emails.length) return;
+        e.preventDefault();
+        c.emails.pop();
+        redraw(n);
+        const again = emailInputAt(hg); if(again) again.focus();
+      }
+    });
+    /* a pasted list ("a@x.com, b@y.com") becomes chips in one go */
+    list.addEventListener('paste', e => {
+      const inp = e.target; if(!inp.classList.contains('email-input')) return;
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if(!/[\s,;]/.test(text.trim())) return;          // a single address pastes normally
       e.preventDefault();
-      const n = nodes[selId], hg = hostGC(e.target); if(!hg) return;
-      const c = n.groups[hg.gi].conds[hg.ci];
-      const raw = e.target.value.trim();
-      const err = e.target.closest('.cg-cond').querySelector('[data-emailerr]');
-      if(!raw) return;
-      if(!EMAIL_RE.test(raw)){ if(err) err.classList.remove('hidden'); return; }
-      if(!c.emails.includes(raw)) c.emails.push(raw);
-      redraw(n);
-      const again = list.querySelector(`.cg-cond[data-g="${hg.gi}"][data-c="${hg.ci}"] .email-input`);
-      if(again) again.focus();
+      addEmails(inp, inp.value + ' ' + text, true);
+    });
+    /* Editing = the cell has focus: it wraps and shows every chip. Leaving
+       it collapses back to one line (+N), committing any valid address that
+       was typed but not yet entered so it isn't lost by clicking away. */
+    list.addEventListener('focusin', e => {
+      /* only the input itself starts editing — pressing a collapsed chip's ×
+         must not reflow the row out from under the pointer mid-click */
+      if(!e.target.classList.contains('email-input')) return;
+      const cell = e.target.closest('.cell-emails'); if(!cell || cell.classList.contains('editing')) return;
+      cell.classList.add('editing');
+      layoutEmailRow(cell.querySelector('.email-row'));
+    });
+    list.addEventListener('focusout', e => {
+      if(redrawing) return;
+      const cell = e.target.closest('.cell-emails'); if(!cell || !cell.isConnected) return;
+      if(e.relatedTarget && cell.contains(e.relatedTarget)) return;   // moving to a chip's × inside it
+      cell.classList.remove('editing');
+      const inp = cell.querySelector('.email-input');
+      if(inp.value.trim()) addEmails(inp, inp.value, false);
+      if(cell.isConnected) layoutEmailRow(cell.querySelector('.email-row'));
     });
     list.addEventListener('click', e => {
-      const b = e.target.closest('[data-a]'); if(!b) return;
+      const b = e.target.closest('[data-a]');
+      if(!b){
+        /* anywhere in the email cell (between chips, the empty space) puts
+           the cursor in its input — the whole box reads as one field */
+        const cell = e.target.closest('.cell-emails');
+        if(cell && !e.target.classList.contains('email-input')) cell.querySelector('.email-input').focus();
+        return;
+      }
       const n = nodes[selId], a = b.dataset.a, host = b.closest('.cg-cond');
       const gi = +(b.dataset.g != null && b.dataset.g !== '' ? b.dataset.g : (host ? host.dataset.g : b.closest('.cg').dataset.g));
       const ci = host ? +host.dataset.c : +b.dataset.c;
@@ -1773,7 +1841,12 @@
       else if(a === 'cdel') g.conds.splice(ci, 1);
       else if(a === 'gdup') n.groups.splice(gi + 1, 0, JSON.parse(JSON.stringify(g)));
       else if(a === 'gdel'){ if(n.groups.length < 2) return; n.groups.splice(gi, 1); }
-      else if(a === 'emaildel') g.conds[ci].emails.splice(+b.dataset.idx, 1);
+      else if(a === 'emaildel'){
+        g.conds[ci].emails.splice(+b.dataset.idx, 1);
+        redraw(n);
+        const again = emailInputAt({ gi, ci }); if(again) again.focus();   // stay in the field
+        return;
+      }
       else if(a === 'emailmore'){ openEmailPopup(b, gi, ci, () => redraw(nodes[selId])); return; }   // doesn't mutate the condition itself
       redraw(n);
     });

@@ -193,17 +193,27 @@ back (`condSummary()`), e.g. "If Priority is High".
 **"Cc Emails" is a special multi-value field in that builder** (last entry in
 `FIELDS`). Picking it swaps the operator list to `EMAIL_OPS` (Match Any /
 Match All / Match None, via `opsFor(c)`) and — unless `fx` is on — the
-plain value input for a chip input (`emailValueHTML()`): type an address,
-**Enter** adds it as a chip (validated against `EMAIL_RE`; a bad one shows
-a one-line `.email-err` and stays in the box), each chip has its own ×, and
-"Press Enter to add" sits under the row. Addresses live in `c.emails[]`
+plain value input for a chip input (`emailValueHTML()`). Adding works like
+any standard recipients field (`addEmails()` in `bindBuilder`): **Enter,
+comma or semicolon** commits; a pasted list ("a@x.com, b@y.com") becomes
+chips in one go; **Backspace** in an empty box removes the last chip;
+clicking away keeps any valid address typed but not yet entered; invalid
+text stays in the box with "Enter a valid email" and duplicates say
+"Already added" (`.email-err`). Clicking anywhere in the cell focuses the
+input; a chip's × keeps focus in the field. Addresses live in `c.emails[]`
 (every condition carries an empty `emails` array from `newCond()`, unused
 for other fields); `condDone()`, `condError()` and `condValueText()` all
-read `emails` instead of `value` for this field. The row is one line only —
-`layoutEmailRow()` measures after every render and collapses chips that
-don't fit into a **"+N"** badge; clicking it opens `openEmailPopup()`: the
-full list, a search box, a × revealed on hover per row, **no close button**
-(dismissed by clicking outside, on explicit direction). Switching the field
+read `emails` instead of `value` for this field. **Two states**: while the
+input has focus the cell is `.editing` — it grows and wraps so every
+address added so far stays visible; once focus leaves it collapses to one
+line and `layoutEmailRow()` keeps as many chips as genuinely fit (all of
+them if they fit), folding the rest into a **"+N"** badge right after the
+last visible chip. (The first version collapsed while you were still
+typing and reserved room up front, so from the second email on everything
+vanished into "+N" — that's why editing never collapses now.) Clicking
+"+N" opens `openEmailPopup()`: the full list, a search box, a × revealed
+on hover per row, **no close button** (dismissed by clicking outside, on
+explicit direction). Switching the field
 into or out of Cc Emails resets `op`/`value`/`emails` (the valid option set
 changes completely) — switching between the other seven fields still
 doesn't, same as before. The builder is shared, so this works identically

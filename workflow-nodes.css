@@ -250,24 +250,33 @@
 
 /* ============ Cc Emails chip input — condition value cell, Cc Emails field ============
    Same .cell-val box (bottom-left radius, no right border, butts against
-   .fx-btn) with chips added. One line only — chips that don't fit collapse
-   into a "+N" badge (layoutEmailRow() in workflow-app.js measures and
-   hides whichever ones don't fit after every render), never wrapping to a
-   second line the way the plain value cell never grows either. */
-.cell-emails{padding:0 0 0 10px;}
+   .fx-btn) with chips added. Two states:
+   · editing (.editing — the input has focus): the cell grows and the row
+     wraps, so every address added so far stays visible while adding more;
+   · collapsed: one line, the input shrinks to a sliver, and chips that
+     don't fit fold into a "+N" badge (layoutEmailRow() in workflow-app.js
+     measures after every render and on every focus change). */
+.cell-emails{padding:0 0 0 10px;cursor:text;}
+.cell-emails.editing{height:auto;min-height:35px;padding-top:5px;padding-bottom:5px;}
+.cell-emails.editing + .fx-btn{height:auto;}          /* stretch alongside the grown cell */
 .email-row{display:flex;align-items:center;gap:6px;width:100%;overflow:hidden;flex-wrap:nowrap;}
+.cell-emails.editing .email-row{flex-wrap:wrap;row-gap:5px;}
 .email-chip{
-  display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
+  display:inline-flex;align-items:center;gap:4px;flex-shrink:0;max-width:150px;
   background:var(--chrome-hover);border-radius:6px;padding:3px 4px 3px 8px;
-  font-size:10.5px;font-weight:500;color:var(--page-text);white-space:nowrap;
+  font-size:10.5px;font-weight:500;color:var(--page-text);white-space:nowrap;cursor:default;
 }
+.email-chip-t{overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .email-chip-x{
   width:16px;height:16px;flex-shrink:0;border:none;background:none;border-radius:4px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;opacity:.55;
 }
 .email-chip-x:hover{opacity:1;background:rgba(242,92,78,.14);}
 .email-chip-x img{width:9px;height:9px;display:block;}
-.email-input{flex:1 1 60px;min-width:60px;border:none;outline:none;background:none;font-family:inherit;font-size:11px;color:var(--page-text);cursor:text;}
+.cell-emails .email-input{flex:1 1 120px;min-width:120px;width:auto;height:22px;border:none;outline:none;background:none;font-family:inherit;font-size:11px;color:var(--page-text);cursor:text;}
+/* collapsed with chips: the input is just a sliver at the end — the chips
+   get the room, and a click anywhere in the cell still focuses it */
+.cell-emails:not(.editing) .email-chip ~ .email-input{flex:1 1 0;min-width:16px;}
 .email-input::placeholder{color:var(--page-text);opacity:.6;font-weight:400;}
 .email-more{
   flex-shrink:0;border:1px solid var(--border);border-radius:10px;background:var(--white);
