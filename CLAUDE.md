@@ -190,6 +190,30 @@ conditions (field/operator/value, `fx` expression toggle) via `bindBuilder()` /
 `groupsHTML()` in `workflow-app.js`. A card's description reads the condition
 back (`condSummary()`), e.g. "If Priority is High".
 
+**"Cc Emails" is a special multi-value field in that builder** (last entry in
+`FIELDS`). Picking it swaps the operator list to `EMAIL_OPS` (Match Any /
+Match All / Match None, via `opsFor(c)`) and — unless `fx` is on — the
+plain value input for a chip input (`emailValueHTML()`): type an address,
+**Enter** adds it as a chip (validated against `EMAIL_RE`; a bad one shows
+a one-line `.email-err` and stays in the box), each chip has its own ×, and
+"Press Enter to add" sits under the row. Addresses live in `c.emails[]`
+(every condition carries an empty `emails` array from `newCond()`, unused
+for other fields); `condDone()`, `condError()` and `condValueText()` all
+read `emails` instead of `value` for this field. The row is one line only —
+`layoutEmailRow()` measures after every render and collapses chips that
+don't fit into a **"+N"** badge; clicking it opens `openEmailPopup()`: the
+full list, a search box, a × revealed on hover per row, **no close button**
+(dismissed by clicking outside, on explicit direction). Switching the field
+into or out of Cc Emails resets `op`/`value`/`emails` (the valid option set
+changes completely) — switching between the other seven fields still
+doesn't, same as before. The builder is shared, so this works identically
+in the Branch-path and IF/Else drawers. Gotchas from building it: the value
+cell's class is `.cell-val` (in `workflow-nodes.css`) — the similarly named
+`.cell-value` in `workflow-canvas.html` is unrelated dead CSS, don't
+"fix" one into the other; and hide the "+N" badge with the `hidden`
+*attribute*, never the `.hidden` class (`display:none!important`, which
+JS toggling `.hidden` the property can't undo).
+
 **Run History and Version History are two different concepts — never merge
 them:**
 

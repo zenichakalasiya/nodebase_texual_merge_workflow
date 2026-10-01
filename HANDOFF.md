@@ -1,98 +1,69 @@
-# Handoff — 2026-09-30 15:47
+# Handoff — 2026-10-01 11:58
 
 ## Read first
-In `CLAUDE.md`: the updated **Top bar** paragraph (Linear/Node tab rename,
-Save options wording) and the new paragraph right before **## Deployment**
-about the drawer header Doc-link change. Both are this session's work.
+In `CLAUDE.md`: the new **"Cc Emails" is a special multi-value field**
+paragraph, right after "The condition builder is real". It's the only
+change this session and documents both how it works and two gotchas.
 
 ## What we worked on this session
-A run of small, independent polish requests, each landed and verified on
-its own:
-1. Renamed "Simple view"/"Node view" tabs to "Linear"/"Node".
-2. Renamed "Save only" → "Save as draft" and capitalized "Publish" in
-   "Save & Publish" (Save options menu, off the Publish split-caret).
-3. Restored the Node reference chevron (`›`) that got dropped when Guide
-   moved from a floatcard into the sidebar; right-aligned the Shortcuts
-   panel's key badges (were on the left, user wanted them on the right).
-4. Removed the Documentation (book) icon and the Replace icon from every
-   node drawer's header, replaced by an inline "Doc ↗" link at the end of
-   each drawer's description text, per an explicit reference screenshot.
+Added a "Cc Emails" option to the condition builder's field dropdown, with
+its own operators and a chip-style multi-email value input with "+N"
+overflow and a search/remove popup — matching the user's reference
+screenshots.
 
 ## Completed
-- **Linear/Node rename** — `workflow-chrome.js`'s `.vs-btn` labels changed
-  from "Simple view"/"Node view" to "Linear"/"Node"; the unbuilt-tab toast
-  copy updated to match ("Linear view is not built..."). `data-view`
-  values (`simple`/`node`) left alone — internal ids, not user-facing.
-- **Save options wording** — `{id:'pub', label:'Save & publish', ...}` →
-  `'Save & Publish'`; `{id:'save', label:'Save only', ...}` → `'Save as
-  draft'`. Sub-text (`"Save changes and make it live"` /
-  `"Save changes without publishing"`) left unchanged.
-- **Node reference chevron restored** — `.fc-nr-row` in `workflow-chrome.js`
-  gained a trailing `<span class="fc-nr-chev">${svg('chevR')}</span>`;
-  `.fc-nr-text` got `flex:1 1 auto` so it fills the row and pushes the
-  chevron to the far right edge (new `.fc-nr-chev` CSS, right-aligned,
-  muted color, 14px).
-- **Shortcuts key alignment flipped** — `.fc-keys` grid columns swapped
-  from `auto 1fr` (keys left, description right) to `1fr auto`
-  (description left, keys right, `justify-self:end` on the `dd`). The JS
-  swapped which content goes in `<dt>`/`<dd>` to match — `<dt>` now holds
-  the description text (gets the `color:var(--gray-label)` styling that
-  `dd` used to have), `<dd>` holds the `<kbd>` badges.
-- **Doc link replacing Documentation/Replace icons** — across all four node
-  drawers (`#triggerCfg`, `#branchCfg`, `#laneCfg`, `#conditionCfg` in
-  `workflow-canvas.html`): removed the book-icon "Documentation" button
-  (never had a click handler — purely decorative before this) and, on
-  Branch/IF-Else, the "Replace node" button (`#brReplace`/`#cdReplace` —
-  their orphaned `addEventListener` calls were removed from
-  `workflow-app.js` too, since the buttons no longer exist). Added
-  `<a href="#" class="cfg-doc" data-doc>Doc<img src="assets/open-link.svg">
-  </a>` to the end of each drawer's description — baked directly into the
-  static `<p class="cfg-desc">` markup for Trigger/Branch/IF-Else, or via a
-  new `DOC_LINK` constant + `.innerHTML` for the Branch-path (lane) drawer,
-  whose description text is rebuilt on every open (`isElse` changes it, so
-  it was already going through `.textContent` — switched to `.innerHTML`).
-  A single delegated `[data-doc]` click handler (toast, `e.preventDefault()`
-  since `href="#"`) lives in `workflow-app.js` near `toast()`. Both
-  `.cfg-doc` CSS and `assets/open-link.svg` already existed, unused, before
-  this — reused verbatim. Replace itself is NOT gone: still in the ⋮ More
-  menu on Branch/IF-Else (`openNodeMenu()`), confirmed via Playwright.
-- Verified every change with Playwright (written, run, deleted): tab
-  labels + toast copy, Save options menu text, chevron presence/position
-  on every Guide row, Shortcuts key-badge alignment (`dd` right of `dt`),
-  and — across all four drawers — Documentation/Replace buttons gone, Doc
-  link present and correctly toasting, Delete/More/Clear preserved, the
-  More menu still offering "Replace node", zero console errors.
+- `FIELDS` gained `'Cc Emails'`; new `EMAIL_OPS` (Match Any / Match All /
+  Match None), `isEmailField()`, `opsFor()`, `EMAIL_RE` in `workflow-app.js`.
+- `newCond()` now always carries `emails: []`; `condDone()`, `condError()`
+  and the new `condValueText()` (used by `condSummary()`) read `emails` for
+  this field instead of `value`. Card description reads e.g. "Cc Emails
+  Match Any a@x.com, b@x.com".
+- `condHTML()` renders `emailValueHTML()` (chips + input + "+N" button) for
+  Cc Emails when `fx` is off, plus an `.email-foot` row with the error line
+  and "Press Enter to add" hint. With `fx` on it falls back to the plain
+  expression input like every other field.
+- `layoutEmailRow()`/`layoutEmailRows()` measure after every render
+  (called from `bindBuilder`'s `redraw()`, the `ctoggle` path, and the
+  initial `openLane()`/`openCondition()` renders) and hide chips that don't
+  fit, showing "+N".
+- `openEmailPopup()`: body-level popup anchored under "+N" — search box,
+  full list, hover-revealed × per row, closes on outside mousedown, no
+  close button (user explicitly asked for this).
+- `bindBuilder`: field change into/out of Cc Emails resets op/value/emails
+  and redraws; Enter on `.email-input` validates + adds + refocuses the
+  input (so several addresses can be typed in a row); typing clears the
+  error; new `emaildel`/`emailmore` click actions.
+- CSS for all of the above in `workflow-nodes.css` (after `.fx-btn`).
+- Verified with Playwright (written, run, deleted): field/operator lists,
+  invalid email rejected with error, five emails added with focus kept,
+  "+4" overflow, popup lists all five, search filters, remove via popup
+  updates model + row, outside click closes, card summary text, field
+  switch resets state, same flow in a Branch-path drawer, zero console
+  errors.
 
 ## In progress
-Nothing mid-flight. Everything above landed this session; some of it
-(Linear/Node rename, Doc-link/icon changes) was still uncommitted going
-into this `/tatago` run — that's what this run publishes.
+Nothing mid-flight — this `/tatago` run publishes it.
 
 ## Next steps
-No open threads from this batch of requests.
+None open from this request.
 
 ## Decisions made
-- Treated "you removed the arrow" (from the user's Node-reference feedback)
-  as "the current build never had it, add it to match the reference" rather
-  than literally hunting for a regression — checked the code before and
-  after this session's earlier floatcard→sidebar conversion and confirmed
-  `.fc-nr-row` never rendered a chevron even in the original floatcard
-  version. Didn't relitigate this with the user; just built what the
-  reference image showed.
-- Kept Replace fully functional (via the More menu) rather than removing
-  the capability — the request was specifically about the dedicated header
-  ICON ("remove replace... icon"), and `replaceNode()` already had a second
-  entry point that didn't need touching.
+- User chose (via questions): Match Any/All/None operators; basic email
+  format validation; popup has search + hover-× remove and no close button.
+- Inline chips keep an always-visible × (standard chip pattern); the
+  hover-only × applies to the popup rows, which is what the user's image
+  showed.
+- Popup lists every email, not just the overflowed ones, so the full set
+  is always visible in one place.
+- Only Cc Emails transitions reset op/value; switching among the other
+  seven fields keeps its existing (non-resetting) behavior untouched.
 
 ## Gotchas & notes
-- Hit the same test-authoring pitfall a few more times this session:
-  clicking an UNCONFIGURED trigger node opens the node-picker POPOVER, not
-  its drawer — any Playwright check that expects a drawer to be visible
-  after clicking `.nd.trig` must configure the trigger first (click it,
-  pick "When a record is created", THEN the drawer opens on subsequent
-  clicks). Getting this wrong doesn't error cleanly — it produces
-  `getBoundingClientRect()` readings of all zeros (the real panel is
-  hidden/closed) or, worse, a leftover `.wfpop-layer` that blocks every
-  later click in the same script with a `TimeoutError` that reads like an
-  app bug. This is now the single most common self-inflicted issue in this
-  session's testing — worth internalizing rather than re-discovering again.
+- `.cell-val` (workflow-nodes.css) is the real value-cell class;
+  `.cell-value` in workflow-canvas.html is unrelated dead CSS. I briefly
+  "fixed" one into the other and had to revert.
+- The "+N" button first shipped with a literal `hidden` class, which
+  `display:none!important` kept hidden forever because the JS toggles the
+  `hidden` attribute. Use the attribute only.
+- Testing pitfall: after an invalid email is rejected the text stays in
+  the input, so Playwright's `type()` appends to it — clear the field first.

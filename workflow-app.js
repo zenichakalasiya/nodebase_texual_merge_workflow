@@ -190,12 +190,22 @@
      card itself shows the check inline under "IF" once it's set. */
   function newCondition(){ return mk('cond', { title:'IF / Else', groups:[newGroup()] }); }
   let brSeq = 0;                                    // kept for history snapshots
-  const FIELDS = ['Category','Priority','Status','Department','Assignee','Impact','Urgency'];
+  const FIELDS = ['Category','Priority','Status','Department','Assignee','Impact','Urgency','Cc Emails'];
   const OPS = ['is','is not','contains','is one of'];
+  /* "Cc Emails" is a multi-value field — matching one/all/none of a list of
+     addresses, not one of a short fixed set, so it gets its own operator
+     list and its own value UI (a chip input) instead of the plain text box
+     every other field uses. See isEmailField()/condHTML(). */
+  const EMAIL_OPS = ['Match Any','Match All','Match None'];
+  const isEmailField = c => c.field === 'Cc Emails';
+  const opsFor = c => isEmailField(c) ? EMAIL_OPS : OPS;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   /* A branch's condition is one or more GROUPS; each group holds one or more
      conditions. `join` on a condition/group is how it links to the one before it
-     (And / Or) — the first of each ignores it. */
-  const newCond = () => ({ field:'', op:'', value:'', fx:false, join:'and', open:true });
+     (And / Or) — the first of each ignores it. `emails` only applies to the
+     Cc Emails field, always present (unused otherwise) so newCond() has one
+     shape regardless of field. */
+  const newCond = () => ({ field:'', op:'', value:'', emails:[], fx:false, join:'and', open:true });
   const newGroup = () => ({ join:'and', conds:[newCond()] });
   function ifLanes(b){ return b.lanes.map(id => nodes[id]).filter(l => l.kind === 'if'); }
   function defaultLane(b){ return b.lanes.map(id => nodes[id]).find(l => l.kind === 'else'); }
@@ -210,7 +220,8 @@
     b.slots[lane.id] = lane.id;
     return lane;
   }
-  const condDone = c => !!(c.field && c.op && String(c.value).trim());
+  const condValueText = c => isEmailField(c) && !c.fx ? c.emails.join(', ') : c.value;
+  const condDone = c => !!(c.field && c.op && (isEmailField(c) && !c.fx ? c.emails.length : String(c.value).trim()));
   function condSummary(l){
     if(l.kind === 'else') return 'Runs when no other branch matches';
     /* "If Category is Networking and Priority is High" — several groups read as
@@ -219,7 +230,7 @@
     l.groups.forEach(g => {
       const done = g.conds.filter(condDone);
       if(!done.length) return;
-      parts.push({ join:g.join, text:done.map((c, i) => (i ? ' ' + c.join + ' ' : '') + c.field + ' ' + c.op + ' ' + c.value).join('') });
+      parts.push({ join:g.join, text:done.map((c, i) => (i ? ' ' + c.join + ' ' : '') + c.field + ' ' + c.op + ' ' + condValueText(c)).join('') });
     });
     if(!parts.length) return '';
     const many = parts.length > 1;
@@ -1540,7 +1551,8 @@
   function condError(n){
     if(!n.checked || n.groups.some(g => g.conds.some(condDone))) return '';
     const g = n.groups[0], c = g.conds[0];
-    const need = [!c.field && 'a field', !c.op && 'an operator', !String(c.value).trim() && 'a value'].filter(Boolean);
+    const valueMissing = isEmailField(c) && !c.fx ? !c.emails.length : !String(c.value).trim();
+    const need = [!c.field && 'a field', !c.op && 'an operator', valueMissing && 'a value'].filter(Boolean);
     const list = need.length > 1 ? need.slice(0, -1).join(', ') + ' and ' + need[need.length - 1] : need[0];
     return 'Condition Group 1, Condition 1 needs ' + list + '.';
   }
@@ -1555,16 +1567,34 @@
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
   const joinChip = (act, g, c, join) =>
     `<div class="cg-join"><i></i><button class="join-chip" type="button" data-a="${act}" data-g="${g}" data-c="${c}" data-tip="Switch between And / Or">${cap(join)} ${img('refresh-ccw')}</button><i></i></div>`;
+  /* "Cc Emails" (not in fx/expression mode) swaps the plain text value cell
+     for a chip input: each added address is its own removable chip, an
+     always-present input for typing the next one, and a "+N" badge once
+     the chips themselves run out of room (layoutEmailRow() below measures
+     and hides whichever chips don't fit after every render). */
+  function emailValueHTML(c){
+    const chips = c.emails.map((em, i) => `<span class="email-chip" data-idx="${i}">${esc(em)}`
+      + `<button type="button" class="email-chip-x" data-a="emaildel" data-idx="${i}" aria-label="Remove ${esc(em)}"><img src="assets/close2.svg" alt=""></button></span>`).join('');
+    return `<div class="cell cell-val cell-emails">`
+      + `<div class="email-row">${chips}`
+      + `<input class="email-input" type="text" data-a="emailinput" placeholder="${c.emails.length ? '' : 'Add Email...'}">`
+      + `<button type="button" class="email-more" data-a="emailmore" hidden></button></div>`
+      + `</div>`;
+  }
   function condHTML(n, g, gi, c, ci){
+    const emailMode = isEmailField(c) && !c.fx;
+    const valueCell = emailMode ? emailValueHTML(c)
+      : `<div class="cell cell-val"><input data-f="value" type="text" placeholder="${c.fx ? 'Expression, e.g. ticket.priority' : 'Select value'}" value="${esc(c.value)}"></div>`;
     return (ci ? joinChip('cjoin', gi, ci, c.join) : '')
       + `<div class="cg-cond${c.open ? '' : ' closed'}" data-g="${gi}" data-c="${ci}">`
       + `<div class="cg-cond-head"><button class="cg-toggle" type="button" data-a="ctoggle"><img src="assets/chevron-down.svg" alt="">Condition ${ci + 1}</button>`
       + (g.conds.length > 1 ? `<button class="cg-x" type="button" data-a="cdel" aria-label="Remove condition"><img src="assets/delete.svg" alt=""></button>` : '')
       + `</div><div class="cg-cond-body"><div class="cond-grid">`
       + `<div class="cond-row"><div class="cell cell-condition"><select data-f="field">${optionsHTML(FIELDS, c.field, 'Select condition')}</select><img src="assets/chevron-down.svg" alt=""></div>`
-      + `<div class="cell cell-operator"><select data-f="op">${optionsHTML(OPS, c.op, 'Select operator')}</select><img src="assets/chevron-down.svg" alt=""></div></div>`
-      + `<div class="cond-row"><div class="cell cell-val"><input data-f="value" type="text" placeholder="${c.fx ? 'Expression, e.g. ticket.priority' : 'Select value'}" value="${esc(c.value)}"></div>`
+      + `<div class="cell cell-operator"><select data-f="op">${optionsHTML(opsFor(c), c.op, 'Select operator')}</select><img src="assets/chevron-down.svg" alt=""></div></div>`
+      + `<div class="cond-row">${valueCell}`
       + `<button class="fx-btn${c.fx ? ' on' : ''}" type="button" data-a="fx" data-tip="${c.fx ? 'Use a plain value' : 'Use an expression'}">fx</button></div>`
+      + (emailMode ? `<div class="email-foot"><span class="email-err hidden" data-emailerr>Enter a valid email</span><span class="email-hint">Press Enter to add</span></div>` : '')
       + `</div></div></div>`;
   }
   function groupsHTML(n){
@@ -1576,6 +1606,75 @@
       + `</div></div><div class="cg-body">${g.conds.map((c, ci) => condHTML(n, g, gi, c, ci)).join('')}`
       + `<button class="btn-ghost sm" type="button" data-a="cadd" data-g="${gi}"><img src="assets/n-plus.svg" alt="">Add Condition</button></div></div>`
     ).join('');
+  }
+  /* Email chips fill their row left→right; once the next one wouldn't fit
+     (leaving room for the input and, unless it's the last chip, a "+N"
+     badge), it and everything after it hide and the badge takes over.
+     Run after every redraw — chip widths are only known once rendered. */
+  function layoutEmailRow(row){
+    const chips = Array.from(row.querySelectorAll('.email-chip'));
+    const moreBtn = row.querySelector('.email-more');
+    chips.forEach(ch => ch.hidden = false);
+    moreBtn.hidden = true;
+    if(!chips.length) return;
+    const rowW = row.clientWidth, gap = 6, inputMin = 90, moreW = 40;
+    let used = 0, hiddenFrom = -1;
+    for(let i = 0; i < chips.length; i++){
+      const w = chips[i].offsetWidth + gap;
+      const budget = rowW - inputMin - (i < chips.length - 1 ? moreW : 0);
+      if(used + w > budget){ hiddenFrom = i; break; }
+      used += w;
+    }
+    if(hiddenFrom === -1) return;
+    for(let i = hiddenFrom; i < chips.length; i++) chips[i].hidden = true;
+    moreBtn.hidden = false;
+    moreBtn.textContent = '+' + (chips.length - hiddenFrom);
+  }
+  function layoutEmailRows(container){ container.querySelectorAll('.email-row').forEach(layoutEmailRow); }
+
+  /* The "+N" popup — lists every email on the condition (not just the
+     hidden ones, so there's always full context), a search box to filter,
+     and a hover-reveal × per row. No close button of its own: dismissed by
+     clicking outside, same as every other anchored popover in this app. */
+  let emailPopup = null;
+  function closeEmailPopup(){
+    if(!emailPopup) return;
+    document.removeEventListener('mousedown', offEmailPopup, true);
+    emailPopup.remove(); emailPopup = null;
+  }
+  function offEmailPopup(e){ if(emailPopup && !emailPopup.contains(e.target)) closeEmailPopup(); }
+  function openEmailPopup(anchor, gi, ci, onChange){
+    closeEmailPopup();
+    const pop = document.createElement('div');
+    pop.className = 'email-popup';
+    pop.innerHTML = `<label class="email-popup-search">${img('search')}<input type="text" placeholder="Search"></label>`
+      + `<div class="email-popup-list"></div>`;
+    document.body.appendChild(pop);
+    const r = anchor.getBoundingClientRect();
+    pop.style.left = Math.round(Math.min(r.left, window.innerWidth - pop.offsetWidth - 12)) + 'px';
+    pop.style.top = Math.round(r.bottom + 6) + 'px';
+    const listEl = pop.querySelector('.email-popup-list'), searchEl = pop.querySelector('input');
+    function renderList(){
+      const n = nodes[selId]; if(!n){ closeEmailPopup(); return; }
+      const c = n.groups[gi].conds[ci];
+      const q = searchEl.value.trim().toLowerCase();
+      const rows = c.emails.map((em, i) => ({ em, i })).filter(x => !q || x.em.toLowerCase().includes(q));
+      listEl.innerHTML = rows.length ? rows.map(x => `<div class="email-popup-row">${esc(x.em)}`
+        + `<button type="button" class="email-popup-x" data-idx="${x.i}" aria-label="Remove ${esc(x.em)}">${img('close2')}</button></div>`).join('')
+        : `<div class="email-popup-empty">No matches</div>`;
+    }
+    renderList();
+    searchEl.addEventListener('input', renderList);
+    listEl.addEventListener('click', e => {
+      const b = e.target.closest('.email-popup-x'); if(!b) return;
+      const n = nodes[selId], c = n.groups[gi].conds[ci];
+      c.emails.splice(+b.dataset.idx, 1);
+      renderList();
+      onChange();
+    });
+    searchEl.focus();
+    setTimeout(() => document.addEventListener('mousedown', offEmailPopup, true), 0);
+    emailPopup = pop;
   }
   function syncLaneValidity(n){
     const miss = missingOf(n), show = n.checked;
@@ -1595,6 +1694,7 @@
       ? 'Runs when none of the branches above match.'
       : 'Set the conditions that send the workflow down this path.') + ' ' + DOC_LINK;
     $('#lnCond').innerHTML = isElse ? '' : groupsHTML(n);
+    layoutEmailRows($('#lnCond'));
     $('#lnDelete').classList.toggle('hidden', ifLanes(b)[0] === n);
     $('#lnPos').textContent = (idx + 1) + ' of ' + b.lanes.length;
     $('.lane-step').classList.toggle('hidden', b.lanes.length < 2);     // nothing to step through with a single branch
@@ -1615,21 +1715,57 @@
   const condAt = (n, el) => { const c = el.closest('.cg-cond'); return c ? n.groups[+c.dataset.g].conds[+c.dataset.c] : null; };
   function bindBuilder(listSel, addSel, clearSel, edited){
     const list = $(listSel);
-    const redraw = n => { list.innerHTML = groupsHTML(n); edited(); };
+    const redraw = n => { list.innerHTML = groupsHTML(n); layoutEmailRows(list); edited(); };
+    const hostGC = el => { const h = el.closest('.cg-cond'); return h ? { gi:+h.dataset.g, ci:+h.dataset.c } : null; };
     function onField(e){
-      const f = e.target.dataset.f; if(!f) return;
+      const f = e.target.dataset.f;
+      if(!f){
+        /* typing again after a rejected email clears its error line */
+        if(e.target.classList.contains('email-input')){
+          const err = e.target.closest('.cg-cond').querySelector('[data-emailerr]');
+          if(err) err.classList.add('hidden');
+        }
+        return;
+      }
       const n = nodes[selId], c = condAt(n, e.target); if(!c) return;
+      if(f === 'field'){
+        const wasEmail = isEmailField(c);
+        c.field = e.target.value;
+        /* the valid operator set — and the whole value UI — changes
+           completely crossing into/out of Cc Emails, so a stale op/value
+           from the old field type can't linger looking selected */
+        if(isEmailField(c) !== wasEmail){ c.op = ''; c.value = ''; c.emails = []; }
+        redraw(n); return;
+      }
       c[f] = e.target.value; edited();
     }
     list.addEventListener('input', onField);
     list.addEventListener('change', onField);
+    /* Enter commits the email input's text as a chip — only a real-looking
+       address, so a typo doesn't silently vanish into the list. Refocuses
+       the same input afterward so typing several addresses in a row
+       doesn't need a re-click each time. */
+    list.addEventListener('keydown', e => {
+      if(e.key !== 'Enter' || !e.target.classList.contains('email-input')) return;
+      e.preventDefault();
+      const n = nodes[selId], hg = hostGC(e.target); if(!hg) return;
+      const c = n.groups[hg.gi].conds[hg.ci];
+      const raw = e.target.value.trim();
+      const err = e.target.closest('.cg-cond').querySelector('[data-emailerr]');
+      if(!raw) return;
+      if(!EMAIL_RE.test(raw)){ if(err) err.classList.remove('hidden'); return; }
+      if(!c.emails.includes(raw)) c.emails.push(raw);
+      redraw(n);
+      const again = list.querySelector(`.cg-cond[data-g="${hg.gi}"][data-c="${hg.ci}"] .email-input`);
+      if(again) again.focus();
+    });
     list.addEventListener('click', e => {
       const b = e.target.closest('[data-a]'); if(!b) return;
       const n = nodes[selId], a = b.dataset.a, host = b.closest('.cg-cond');
       const gi = +(b.dataset.g != null && b.dataset.g !== '' ? b.dataset.g : (host ? host.dataset.g : b.closest('.cg').dataset.g));
       const ci = host ? +host.dataset.c : +b.dataset.c;
       const g = n.groups[gi];
-      if(a === 'ctoggle'){ g.conds[ci].open = !g.conds[ci].open; list.innerHTML = groupsHTML(n); return; }   // layout only
+      if(a === 'ctoggle'){ g.conds[ci].open = !g.conds[ci].open; list.innerHTML = groupsHTML(n); layoutEmailRows(list); return; }   // layout only
       if(a === 'fx') g.conds[ci].fx = !g.conds[ci].fx;
       else if(a === 'cjoin') g.conds[ci].join = g.conds[ci].join === 'and' ? 'or' : 'and';
       else if(a === 'gjoin') g.join = g.join === 'and' ? 'or' : 'and';
@@ -1637,6 +1773,8 @@
       else if(a === 'cdel') g.conds.splice(ci, 1);
       else if(a === 'gdup') n.groups.splice(gi + 1, 0, JSON.parse(JSON.stringify(g)));
       else if(a === 'gdel'){ if(n.groups.length < 2) return; n.groups.splice(gi, 1); }
+      else if(a === 'emaildel') g.conds[ci].emails.splice(+b.dataset.idx, 1);
+      else if(a === 'emailmore'){ openEmailPopup(b, gi, ci, () => redraw(nodes[selId])); return; }   // doesn't mutate the condition itself
       redraw(n);
     });
     $(addSel).addEventListener('click', () => { const n = nodes[selId]; n.groups.push(newGroup()); redraw(n); });
@@ -1695,6 +1833,7 @@
     gotoLabel(n, $('#cdGoto'));
     fillSource(n, $('#cdSource'), $('#cdSourceBox'));
     $('#cdCond').innerHTML = groupsHTML(n);
+    layoutEmailRows($('#cdCond'));
     syncConditionValidity(n);
     $('#cdScroll').scrollTop = 0; $('#cdHead').classList.remove('collapsed');
   }

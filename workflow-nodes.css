@@ -247,6 +247,60 @@
 .fx-btn{width:38px;height:35px;flex-shrink:0;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 0;background:rgba(223,229,237,.35);cursor:pointer;font-family:'Poppins',serif;font-style:italic;font-size:11px;font-weight:500;color:var(--page-text);}
 .fx-btn:hover{background:rgba(223,229,237,.7);}
 .fx-btn.on{background:rgba(61,139,208,.14);color:var(--primary);border-color:rgba(61,139,208,.45);}
+
+/* ============ Cc Emails chip input — condition value cell, Cc Emails field ============
+   Same .cell-val box (bottom-left radius, no right border, butts against
+   .fx-btn) with chips added. One line only — chips that don't fit collapse
+   into a "+N" badge (layoutEmailRow() in workflow-app.js measures and
+   hides whichever ones don't fit after every render), never wrapping to a
+   second line the way the plain value cell never grows either. */
+.cell-emails{padding:0 0 0 10px;}
+.email-row{display:flex;align-items:center;gap:6px;width:100%;overflow:hidden;flex-wrap:nowrap;}
+.email-chip{
+  display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
+  background:var(--chrome-hover);border-radius:6px;padding:3px 4px 3px 8px;
+  font-size:10.5px;font-weight:500;color:var(--page-text);white-space:nowrap;
+}
+.email-chip-x{
+  width:16px;height:16px;flex-shrink:0;border:none;background:none;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;opacity:.55;
+}
+.email-chip-x:hover{opacity:1;background:rgba(242,92,78,.14);}
+.email-chip-x img{width:9px;height:9px;display:block;}
+.email-input{flex:1 1 60px;min-width:60px;border:none;outline:none;background:none;font-family:inherit;font-size:11px;color:var(--page-text);cursor:text;}
+.email-input::placeholder{color:var(--page-text);opacity:.6;font-weight:400;}
+.email-more{
+  flex-shrink:0;border:1px solid var(--border);border-radius:10px;background:var(--white);
+  padding:2px 8px;font-family:inherit;font-size:10.5px;font-weight:500;color:var(--primary);cursor:pointer;
+}
+.email-more:hover{background:#f4f9fd;}
+.email-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;padding:0 2px;}
+.email-hint{margin-left:auto;font-size:10px;color:var(--gray-label);}
+.email-err{font-size:10px;color:var(--critical);}
+
+/* "+N" popup — every email, a search box, hover-reveal × per row, no close
+   button of its own (dismissed by clicking outside, like every other
+   anchored popover here). */
+.email-popup{
+  position:fixed;z-index:200;width:220px;max-height:260px;display:flex;flex-direction:column;
+  background:var(--white);border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 10px 30px -14px rgba(54,70,88,.3),0 2px 6px rgba(54,70,88,.05);
+  overflow:hidden;animation:wfpopIn .14s var(--ease);
+}
+.email-popup-search{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:8px 10px;border-bottom:1px solid var(--light-border);}
+.email-popup-search img{width:13px;height:13px;display:block;opacity:.5;flex-shrink:0;}
+.email-popup-search input{flex:1 1 0;min-width:0;border:none;outline:none;background:none;font-family:inherit;font-size:11.5px;color:var(--page-text);}
+.email-popup-list{overflow-y:auto;padding:4px;}
+.email-popup-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:7px;font-size:11.5px;color:var(--page-text);}
+.email-popup-row:hover{background:var(--grid-hover);}
+.email-popup-x{
+  width:18px;height:18px;flex-shrink:0;border:none;background:none;border-radius:5px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;opacity:0;transition:opacity .12s;
+}
+.email-popup-row:hover .email-popup-x{opacity:1;}
+.email-popup-x:hover{background:rgba(242,92,78,.14);}
+.email-popup-x img{width:10px;height:10px;display:block;}
+.email-popup-empty{padding:16px 10px;text-align:center;font-size:11px;color:var(--gray-label);}
 /* And / Or chip on a thin rail between conditions and between groups */
 .cg-join{display:flex;flex-direction:column;align-items:flex-start;padding-left:14px;}
 .cg-join i{display:block;width:1px;height:12px;background:var(--border);margin-left:16px;}
