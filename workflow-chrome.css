@@ -22,6 +22,19 @@
 .app{position:fixed;inset:0;display:flex;flex-direction:column;background:#f7f9fb;}
 .app .stage{position:static;flex:1 1 0;min-height:0;}
 
+/* Linear view — the textual builder in an iframe, laid over the whole stage
+   (canvas, drawer and bottom toolbar all stay mounted underneath, so Node
+   view comes back exactly as it was left). A direct child of <body>, not of
+   .app — .app is its own stacking context, and the bottom toolbar lives
+   outside it. `top` is set from the stage's own top edge in
+   workflow-chrome.js. Sits above the bottom toolbar (140) and
+   below the hover-out nav (150) and every popover (200). */
+.linear-view{position:fixed;left:0;right:0;bottom:0;z-index:145;background:#fff;}
+.linear-view iframe{position:absolute;inset:0;width:100%;height:100%;border:0;opacity:0;transition:opacity .2s;}
+.linear-view.ready iframe{opacity:1;}
+.linear-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--light-gray-text);}
+body.view-linear .toast{z-index:160;left:50%;}
+
 /* shared icon button */
 .cbtn{
   width:32px;height:32px;flex-shrink:0;border:none;background:none;border-radius:8px;
@@ -251,8 +264,9 @@
   background:var(--white);border:1px solid var(--chrome-border);border-radius:12px;box-shadow:var(--shadow-card);
   transition:left .3s var(--ease);
 }
-/* the config drawer takes 400px off the right, so re-centre over what is left */
-body.dock-open .bottombar{left:calc(50% - 206px);}
+/* the config drawer takes its width off the right, so re-centre over what is left */
+body.dock-open .bottombar{left:calc(50% - (var(--side-w, 400px) + 10px) / 2);}
+body.side-drag .bottombar{transition:none;}
 .bbar{display:flex;align-items:center;gap:2px;}
 .bbar .cbtn{width:30px;height:30px;border-radius:7px;color:var(--page-text);}
 .bbar .cbtn svg{width:16px;height:16px;}

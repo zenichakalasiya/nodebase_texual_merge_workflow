@@ -425,7 +425,7 @@
       syncFlowDetailsValidity();
     }
     $('#pageTitle').title = 'Edit name and description';
-    $('#pageTitle').addEventListener('click', openFlowDetails);
+    $('#pageTitle').addEventListener('click', () => { if(isLinear()) linearSend({ wf:'open', panel:'save' }); else openFlowDetails(); });
     $('#fdClose').addEventListener('click', () => app.closeFlowDetails());
     $('#fdName').addEventListener('input', e => {
       flowName = e.target.value;
@@ -433,8 +433,12 @@
       document.title = (flowName.trim() || 'Untitled rule') + ' — Workflow';
       syncFlowDetailsValidity();
       positionViewSwitch();            // the name's new length may have changed the left zone's width
+      linearSend({ wf:'details', name: flowName, desc: flowDesc });
     });
-    $('#fdDesc').addEventListener('input', e => { flowDesc = e.target.value; syncFlowDetailsValidity(); });
+    $('#fdDesc').addEventListener('input', e => {
+      flowDesc = e.target.value; syncFlowDetailsValidity();
+      linearSend({ wf:'details', name: flowName, desc: flowDesc });
+    });
     /* Publish (both the main button and "Save & publish") is blocked until
        both fields are filled — opens this same drawer instead of publishing,
        so there's one honest place to fix it rather than a second modal. */
@@ -448,8 +452,57 @@
 
     $('#viewSwitch').addEventListener('click', e => {
       const b = e.target.closest('[data-view]'); if(!b || b.classList.contains('active')) return;
-      if(b.dataset.view === 'simple'){ toast('Linear view is not built in this prototype'); return; }
       $('#viewSwitch').querySelectorAll('.vs-btn').forEach(x => x.classList.toggle('active', x === b));
+      setLinear(b.dataset.view === 'simple');
+    });
+
+    /* ---------------------------------------------------------------------
+       Linear view. The textual builder is its own page (linear/index.html —
+       the reference builder's V8 code, React and all), so it lives in an
+       iframe laid over the stage rather than being rebuilt here. It brings
+       its OWN right-hand panel and bottom toolbar; this app's drawer and
+       toolbar belong to Node view only and simply sit underneath, untouched.
+       The two views do not share a workflow yet — only name, description
+       and published state cross over, by postMessage, so this top bar reads
+       the same in both. Loaded on first use: compiling it takes a moment and
+       would stall the canvas if done up front. */
+    const linearEl = $('#linearView');
+    let linearFrame = null, linearReady = false, linearPublished = false;
+    function isLinear(){ return document.body.classList.contains('view-linear'); }
+    function linearSend(msg){ if(linearReady) linearFrame.contentWindow.postMessage(msg, location.origin); }
+    function placeLinear(){ linearEl.style.top = Math.round($('.stage').getBoundingClientRect().top) + 'px'; }
+    function setLinear(on){
+      document.body.classList.toggle('view-linear', on);
+      linearEl.hidden = !on;
+      if(!on) return;
+      if(app.isReadOnly()) app.closeRunHistory();           // leave read-only before the canvas goes out of sight
+      placeLinear();
+      if(!linearFrame){
+        linearFrame = document.createElement('iframe');
+        linearFrame.title = 'Linear view';
+        linearFrame.src = 'linear/index.html';
+        linearEl.appendChild(linearFrame);
+      }
+      linearFrame.focus();
+    }
+    window.addEventListener('resize', () => { if(isLinear()) placeLinear(); });
+    window.addEventListener('message', e => {
+      if(!linearFrame || e.source !== linearFrame.contentWindow || e.origin !== location.origin) return;
+      const m = e.data || {};
+      if(m.wf === 'ready'){
+        linearReady = true; linearEl.classList.add('ready');
+        linearSend({ wf:'details', name: flowName, desc: flowDesc });
+        if(isLinear()) linearFrame.focus();
+      } else if(m.wf === 'state'){
+        flowName = m.name || ''; flowDesc = m.desc || '';
+        $('#fdName').value = flowName; $('#fdDesc').value = flowDesc;
+        $('#pageTitle').textContent = flowName.trim() || 'Untitled rule';
+        document.title = (flowName.trim() || 'Untitled rule') + ' — Workflow';
+        if(m.published && !linearPublished){ publish(); toast('Workflow published'); }
+        else if(!m.published && linearPublished) saveOnly();
+        linearPublished = !!m.published;
+        positionViewSwitch();
+      }
     });
 
     const sw = $('#enableSw');
@@ -550,7 +603,10 @@
         + `<button class="rh-view" type="button" data-a="detail">View details</button>`
       + `</div>`).join('');
     }
-    $('#versionHistBtn').addEventListener('click', () => app.openVersionHistory(versionHistoryRowsHtml()));
+    $('#versionHistBtn').addEventListener('click', () => {
+      if(isLinear()){ toast('Version history opens in Node view for now'); return; }
+      app.openVersionHistory(versionHistoryRowsHtml());
+    });
     $('#runHistBtn').addEventListener('click', () => app.openRunHistory(runHistoryRowsHtml()));
     $('#rhList').addEventListener('click', e => {
       if(e.target.closest('[data-a="detail"]')) toast('Run detail view is not part of this prototype');
@@ -569,7 +625,12 @@
       positionViewSwitch();            // "Draft" → "Published" changes the pill's width
     };
     const saveOnly = () => { pill.className = 'state-pill draft'; pill.textContent = 'Draft'; positionViewSwitch(); };
-    $('#publishFlow').addEventListener('click', () => { if(!requireFlowDetails()) return; publish(); toast('Workflow published'); });
+    /* in Linear view both go to the textual builder's own save/publish panel,
+       which reports back through the 'state' message above */
+    $('#publishFlow').addEventListener('click', () => {
+      if(isLinear()){ linearSend({ wf:'open', panel:'publish' }); return; }
+      if(!requireFlowDetails()) return; publish(); toast('Workflow published');
+    });
     $('#publishOpts').addEventListener('click', () => {
       WFPop.open({
         anchor: $('#publishOpts'), noSearch:true, menu:true, width:264, align:'end',
@@ -579,6 +640,7 @@
           { id:'save', label:'Save as draft',   sub:'Save changes without publishing' },
         ],
         onPick(i){
+          if(isLinear()){ linearSend({ wf:'open', panel: i.id === 'pub' ? 'publish' : 'save' }); return; }
           if(i.id === 'pub'){ if(!requireFlowDetails()) return; publish(); toast('Saved and published'); }
           else { saveOnly(); toast('Saved without publishing'); }
         }
@@ -594,6 +656,7 @@
         ],
         onPick(i){
           if(i.id === 'dup'){ toast('Workflow duplicated'); return; }
+          if(isLinear()){ toast('Delete workflow works from Node view for now'); return; }   // resetFlow() only knows the canvas
           app.confirm({
             title: 'Delete this workflow?', confirmLabel: 'Delete workflow',
             body: 'Every step will be removed, including the trigger and all its settings. You can undo this right after.',
@@ -817,6 +880,7 @@
 
     document.addEventListener('keydown', e => {
       if(e.target.matches('input,textarea,select')) return;
+      if(isLinear()) return;                                // these all act on the canvas, which is out of sight
       if(e.key === '?'){ e.preventDefault(); if(!app.isReadOnly()) openShortcuts(); return; }
       if(e.key === 'Escape'){
         if(app.isReadOnly()) app.closeRunHistory();   // Esc leaves Run History same as any other panel

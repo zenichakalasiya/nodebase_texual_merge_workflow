@@ -44,7 +44,9 @@
      The drawer closes whenever a picker popover opens, so the canvas gets the
      full width while you choose the next node. */
   .dock{
-    width:412px;height:100%;flex-shrink:0;overflow:hidden;
+    /* the ServiceOps panel: opens at 400px and can be dragged between 400 and 650
+       (--side-w, set by the resizer in workflow-app.js); +10px for the inset */
+    width:calc(var(--side-w, 400px) + 10px);height:100%;flex-shrink:0;overflow:hidden;position:relative;
     padding:10px 10px 10px 0;
     transition:width .3s var(--ease),padding .3s var(--ease);
   }
@@ -52,13 +54,23 @@
   /* a floating panel, not a flush wall: rounded on all four corners with a
      margin from the window edges so the canvas reads as continuing behind it */
   .sidebar{
-    width:402px;height:100%;background:var(--white);
+    width:var(--side-w, 400px);height:100%;background:var(--white);
     border:1px solid var(--border);border-radius:14px;
     box-shadow:0 10px 30px -14px rgba(54,70,88,.3),0 2px 6px rgba(54,70,88,.05);
     display:flex;flex-direction:column;overflow:hidden;
     transition:transform .3s var(--ease),opacity .22s var(--ease);
   }
   .dock.closed .sidebar{transform:translateX(24px);opacity:0;}
+  /* drag handle on the panel's left edge — invisible strip, a small grip on hover */
+  .dock-resizer{
+    position:absolute;left:0;top:10px;bottom:10px;width:10px;z-index:6;cursor:col-resize;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .dock-resizer span{width:4px;height:30px;border-radius:2px;background:var(--light-gray-text);opacity:0;transition:opacity .15s;}
+  .dock-resizer:hover span,body.side-drag .dock-resizer span{opacity:1;}
+  .dock.closed .dock-resizer{display:none;}
+  body.side-drag .dock{transition:none;}
+  body.side-drag{cursor:col-resize;user-select:none;}
 
   /* shared square icon button */
   .hover-box{
@@ -301,6 +313,11 @@
 </style>
 </head>
 <body>
+  <!-- Linear view: the textual builder (linear/index.html), loaded into this
+       frame the first time the Linear tab is picked — see workflow-chrome.js -->
+  <div class="linear-view" id="linearView" hidden>
+    <div class="linear-loading">Loading Linear view…</div>
+  </div>
   <div class="app">
   <div class="stage">
 
@@ -313,6 +330,7 @@
 
     <!-- ===================== DOCK ===================== -->
     <div class="dock closed" id="dock">
+      <div class="dock-resizer" id="dockResizer" title="Drag to resize"><span></span></div>
 
       <!-- --------- Trigger configuration --------- -->
       <aside class="sidebar hidden" id="triggerCfg">

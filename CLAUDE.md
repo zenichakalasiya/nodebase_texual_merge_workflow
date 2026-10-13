@@ -41,6 +41,9 @@ scripts are written, run, and deleted. None are checked in.
 | `workflow-popover.js` / `.css` | The anchored picker popover, ported from the textual builder: search, grouped rows, second-level drill-down, keyboard nav, a checkmark on the already-picked row, and a caret help bubble that tracks the highlighted row. Light theme, matching the rest of the app. Also serves the plain `⋮` command menus. |
 | `workflow-chrome.js` / `.css` | The product frame: two-row top bar (including the Run history / Publish / Version history / More actions on the right), hover-out left navigation, the single floating bottom toolbar, tooltips (with key-badge shortcuts). Also builds the Run History/Version History/Guide/Shortcuts row markup and mock run/version data. |
 | `workflow-nodes.css` | Canvas node cards, connectors, edge hover controls, node states, sticky notes. |
+| `linear/index.html` | The **Linear view** — Pranjal's textual builder (V8: React + Tailwind + Babel in one ~12k-line file), embedded in an iframe. Carries our own functional edits (see "Linear view" below). |
+| `linear/node-skin.css` | Every visual change to the Linear view, scoped `html.embed …`, so it looks like the Node view. Loaded from `linear/index.html`'s `<head>`. |
+| `linear/vendor/` | Local copies of React, ReactDOM, Babel and Tailwind for the Linear view (no CDN). |
 | `server.js` | Static file server on **:8777**. `/` serves `workflow-canvas.html`. |
 | `assets/` | SVG icons (mask-tinted in the popover; some also used as plain `<img>` on canvas). |
 | `BRANCHING-DEBATE.md` | Historical research + decision record for the branching question — superseded by explicit direction. |
@@ -412,8 +415,8 @@ nothing else (`#goBack`/`#crumbRoot` and their CSS were removed outright,
 not hidden, since nothing links back to them). The view switch (`.viewswitch`
 absolutely positioned, centred independent of that left zone) reads
 **Linear | Node** now, not "Simple view"/"Node view" — same `data-view`
-values (`simple`/`node`) and the same "Linear view is not built in this
-prototype" toast on the unbuilt tab, only the visible labels changed. Its
+values (`simple`/`node`). Linear is a real view now (see "Linear view"
+below), not a toast. Its
 horizontal position is recomputed (`positionViewSwitch()`) whenever the
 left or right zone's width can plausibly have changed, so it slides toward
 whichever side has room rather than ever being covered. The right zone
@@ -465,6 +468,70 @@ Branch and IF-Else (`openNodeMenu()`'s `replace` item still calls
 `replaceNode()`); only the dedicated header icon is gone. Trigger and
 Branch-path never had a Replace icon to begin with (replacing the root
 trigger, or a single lane, doesn't make sense the same way).
+
+**Linear view = Pranjal's V8 textual builder, embedded and re-skinned.**
+Clicking **Linear** in the top bar hides the node canvas and shows
+`linear/index.html` in an iframe (`#linearView`, `setLinear()` in
+`workflow-chrome.js`). The frame talks to the top bar over `postMessage`
+(`wf:'ready'|'state'|'details'|'open'`); the top bar's Publish / Save menu
+call `linearSend({wf:'open',panel:'publish'|'save'})`. Inside V8 an `EMBED`
+constant hides its own header and left rail and pins the light theme.
+Decisions that are deliberate:
+
+- **The two views hold independent workflows.** Nothing is converted or
+  synced between Linear and Node — building in one does not change the other.
+- **V8 is embedded as-is, not rewritten.** Its sentence model, popovers and
+  right sidebar concept stay. We only (a) restyle it and (b) make targeted
+  functional edits in `linear/index.html`.
+- **All restyling lives in `linear/node-skin.css`**, never in V8's Tailwind
+  classes. V8 markup carries `data-nf="…"` hooks for the skin to target
+  (`side`, `bar`, `seg`, `switch`, `tabs`, `frow`/`fhead`/`fcell`/`vcell`/`rm`,
+  `addbtn`/`addlbl`/`addchev`, `map-row`, `compose`/`crow`/`clabel`,
+  `stage*`, `moderow*`, `rcp*`, `tfield*`, `resizer`, …). Add a hook, then
+  style it in the skin. Later sections of the skin override earlier ones —
+  it was built in numbered passes, so search the whole file before adding a
+  rule.
+- **Look**: accent is the Node blue `#3d8bd0`; canvas `#f7f9fb` with a dot
+  grid; the sidebar is a floating white card (radius 14, 10px inset); labels
+  12px `#7b8fa5`; green switch `#37c15f`. **Font is Inter in Linear, Poppins
+  in Node** (only Linear's bottom toolbar uses Poppins).
+- **Sidebars are resizable in both views**: open at 400px, drag the left edge
+  between 400 and 650px (numbers measured from the real product). Node view:
+  `--side-w` CSS variable, `#dockResizer`, `SIDE_MIN`/`SIDE_MAX` in
+  `workflow-app.js`. Linear: `sideW`/`startSideDrag` in V8. Widths are not
+  shared between views. In Linear, a field row's attribute and value sit side
+  by side once the panel is wider than ~500px, stacked below that.
+- **Linear's bottom toolbar is a copy of the Node one** (zoom −/%/+, fit,
+  Guide, Shortcuts, Undo, Redo, Reset). Save/Publish are not on it — the top
+  bar owns them.
+- **Field rows** (Create / Update / Add task): mandatory rows have a locked
+  attribute cell (`#ECF1F9` fill, `#CBD5DF` border, no delete); optional rows
+  get a red trash box. Borders never brighten on hover.
+- **"Add Field" / "Add Stage" buttons**: 1px `#1d2a3e` outline, radius 6,
+  30px tall, plus icon + medium 12px label; Add Field has a chevron, Add
+  Stage does not.
+
+Functional edits made inside V8 (all in `linear/index.html`):
+
+- **Send SMS** has a To line (mobile-number validation), the same toolbar as
+  email, and a **Technician group** picker that adds each member to To.
+- **Emails field** (`RecipientsBox`, `TokensField`) is ported from the
+  survey app's `EmailsField`/`EmailsPopup`: one search-or-add box, list with
+  hover ×, Clear all, newest chip + "+N" read-out. Used in To/Cc/Bcc and in
+  row values such as Cc emails and Tags.
+- **Request Signature** is a new step under Approval (template list is
+  sample data).
+- **Archive**'s source record is always a clickable slot.
+- **Ask for approval**: decision type is a dropdown; requester / technician /
+  approvers are "Direct | Select" rows with "+ Add" links.
+- Sample data only: `SIGNATURE_TEMPLATES`, `groupMembers()`.
+
+Gotchas: `workflow-canvas.html` and `workflow-nodes.css` use CRLF line
+endings, `linear/index.html` uses LF. When patching V8 with a script, use
+exact-string replace with a count check — the file is too big to eyeball.
+The real product used as reference (an internal ServiceOps demo server — ask
+the user for the address) needs a login
+the user types in themselves; never enter it for them.
 
 ## Deployment
 

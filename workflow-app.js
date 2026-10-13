@@ -995,6 +995,23 @@
      over the canvas rather than the whole window */
   function openDrawer(name){ showPanel(name); dock.classList.remove('closed'); document.body.classList.add('dock-open'); }
   function closeDrawer(){ dock.classList.add('closed'); document.body.classList.remove('dock-open'); }
+  /* The panel is resizable like the ServiceOps one: opens at 400px, and its
+     left edge drags between 400 and 650. The width lives in --side-w so the
+     dock, the panel and the re-centred toolbar all follow it. */
+  const SIDE_MIN = 400, SIDE_MAX = 650;
+  $('#dockResizer').addEventListener('mousedown', e => {
+    e.preventDefault();
+    document.body.classList.add('side-drag');
+    const move = ev => {
+      const w = Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(window.innerWidth - ev.clientX - 10)));
+      document.documentElement.style.setProperty('--side-w', w + 'px');
+    };
+    const up = () => {
+      document.body.classList.remove('side-drag');
+      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  });
   const drawerOpen = () => !dock.classList.contains('closed');
 
   function toast(msg){
