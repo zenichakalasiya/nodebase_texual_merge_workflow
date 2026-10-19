@@ -53,7 +53,10 @@ scripts are written, run, and deleted. None are checked in.
 
 ```bash
 node server.js          # then open http://localhost:8777
+# PowerShell, another port:  $env:PORT='8780'; node server.js
 ```
+
+`server.js` reads `process.env.PORT` (default 8777).
 
 No install step. If port 8777 is already taken, an old server is still running —
 either reuse it (it serves from disk, so edits are picked up on reload) or kill it.
@@ -513,18 +516,62 @@ Decisions that are deliberate:
 
 Functional edits made inside V8 (all in `linear/index.html`):
 
-- **Send SMS** has a To line (mobile-number validation), the same toolbar as
-  email, and a **Technician group** picker that adds each member to To.
-- **Emails field** (`RecipientsBox`, `TokensField`) is ported from the
-  survey app's `EmailsField`/`EmailsPopup`: one search-or-add box, list with
-  hover ×, Clear all, newest chip + "+N" read-out. Used in To/Cc/Bcc and in
-  row values such as Cc emails and Tags.
+- **Recipient / multi-value popup = `RcptField`, finalised on design "1.2".**
+  Used by Send email (To · Cc · Bcc), Send SMS (To, `kind:"phone"`) and Ask
+  for approval's stage lists (Requester group · Technician group · Set
+  approvers to, `kind:"pick"` = choose from the list only). These are the
+  ONLY fields that mix specific AND dynamic values in one list. Popup:
+  - **Added strip:** red "Clear all"; "+N more" opens the **All added**
+    panel on the LEFT, tinted `#F6F9FC`. The Apply bar then spans both
+    columns.
+  - **Specific / Reference views**, each with its own heading. Search-or-add
+    box with the icon on the right: a magnifier, which turns into a blue +
+    button for a new value.
+  - **Sections:** uppercase grey section titles, separated by a 14px gap
+    (no hairline).
+  - **Reference card:** a purple card with a `{x}` tile. Picking a
+    reference adds it to Added and returns to Specific.
+  - **Commit:** Apply commits. An outside click / Esc discards. There is
+    no f(x) button on the field and no Cancel.
+- **Technician groups** read as grey chips with a people icon + member count
+  (`VlChip group`), hover lists the members.
+- **Dynamic (reference) values** show the value only, light purple
+  (`--ref-bg #f0e8fc` / `--ref-fg #8a24d6`), never a `{ }` icon.
+- **VPicker** (the IF node's Category value popup) is the ONE multi-select popup
+  everywhere else, and follows the top bar's **Picker** Version 1 / 2 switch.
+  - **Where:** condition values, Create/Update multi rows (Business
+    services, Add Roles), Create deployment "Notify to", Create
+    announcement groups, the Get Hardware Asset asset-type filter, and
+    Merge "which branches".
+  - **Opening it:** the helpers `vpCfgFor` / `openVpValue` / `vpCtrl`.
+    `openFieldValue` routes those fields to it.
+- **Tags** (Create/Update rows) = VPicker with **Specific | Dynamic** tabs:
+  several specific tags OR one dynamic value, never mixed. The Specific tab
+  shows an empty-state illustration until you search; suggestions
+  (`tagSuggestionsFor`) exist only for Incident / Request in the sample data.
+- **`{ }` placeholder button** (`ph-btn`): same grey square as f(x), 6px from
+  the field's top / right / bottom. It always opens the simple grouped
+  "Insert placeholder" list (`openPhPicker`) — never the Specific | Dynamic
+  tabs.
+- **Yes / No fields** (Spam, Known error, Associate parent entity) are one
+  switch chip (`tgl-chip`). Untouched counts as "No" (`toggleVal`).
+- **Send email:** To and Cc always shown; "Bcc" sits at the Cc label's right.
+  Insert from Template / Insert Knowledge were removed from the reply toolbar.
+- **Search highlight** in every list popup is yellow (`SEARCH_MARK`, `#FDE68A`).
+- **Ask for approval** stage headings are tinted `#F6F9FC`.
 - **Request Signature** is a new step under Approval (template list is
   sample data).
 - **Archive**'s source record is always a clickable slot.
-- **Ask for approval**: decision type is a dropdown; requester / technician /
-  approvers are "Direct | Select" rows with "+ Add" links.
-- Sample data only: `SIGNATURE_TEMPLATES`, `groupMembers()`.
+- Sample data only: `SIGNATURE_TEMPLATES`, `groupMembers()`, `TAG_SUGGESTIONS`,
+  `CATEGORY_TREE`.
+
+Reference docs in the repo root (generated this project):
+- `PICKER-INVENTORY.md`: where multi-select pickers are used.
+- `OPERATORS.md`: Linear vs the real product's operators, side by side.
+- `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
+
+The top bar's only design switch left is **Picker** (Version 1 / 2). The Email
+and Tags switches were removed once both were finalised.
 
 Gotchas: `workflow-canvas.html` and `workflow-nodes.css` use CRLF line
 endings, `linear/index.html` uses LF. When patching V8 with a script, use

@@ -136,6 +136,13 @@ body.view-linear .toast{z-index:160;left:50%;}
 
 /* Enabled + ON/OFF switch */
 .enable-row{display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:13px;color:var(--ink);}
+/* Email recipients design-version switch — Linear view only */
+.email-ver{display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:12px;color:#7b8fa5;margin-right:8px;}
+body:not(.view-linear) .email-ver{display:none;}
+.email-ver select{height:30px;padding:0 26px 0 10px;border:1px solid #dfe5ed;border-radius:6px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%237b8fa5' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;
+  appearance:none;-webkit-appearance:none;font:inherit;font-size:12px;font-weight:500;color:#364658;cursor:pointer;}
+.email-ver select:hover{border-color:#cbd5e1;}
+.email-ver select:focus-visible{outline:2px solid #3d8bd0;outline-offset:1px;}
 .switch{
   position:relative;width:48px;height:24px;flex-shrink:0;padding:0;cursor:pointer;
   border:1px solid var(--chrome-border);border-radius:12px;background:var(--white);

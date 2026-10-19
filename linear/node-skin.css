@@ -815,3 +815,87 @@ html.embed [data-nf="modecell"]:hover{border-color:#cbd5e1;}
 html.embed [data-nf="modecell"][data-open]{border-color:#3d8bd0;}
 html.embed [data-nf="modecell-val"]{color:#364658;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 html.embed [data-nf="modecell-ph"]{color:#7b8fa5;opacity:.7;}
+
+/* 21. Value list (To / Cc / Bcc, SMS To, Ask for approval groups/people) — same height, border and corners as the
+   panel's other inputs (30px, #dfe5ed, radius 6); the f(x) button shrinks to fit inside. */
+html.embed [data-nf="vl"]{min-height:30px !important;padding:2px 2px 2px 10px !important;border-radius:6px !important;
+  background:#fff !important;border-color:#dfe5ed !important;font-size:12px;}
+html.embed [data-nf="vl"][aria-expanded="true"]{border-color:var(--accent) !important;}
+html.embed [data-nf="vl"]:hover:not([aria-expanded="true"]){border-color:#cbd5e1 !important;}
+html.embed [data-nf="vl-fx"]{width:24px !important;height:24px !important;border-radius:4px !important;background:#eef2f6 !important;color:#364658 !important;}
+html.embed [data-nf="vl-bare"] [data-nf="vl-fx"]{margin-top:-1px;}
+
+/* 22. Value-list popup tabs use the same Switch Tabs as every other value picker (8a): the selected tab is marked
+   by aria-selected here instead of the --pop-bg inline style. */
+html.embed [data-nf="tabs"] > button[role="tab"]{height:auto;}
+html.embed [data-nf="tabs"] > button[role="tab"][aria-selected="true"]{
+  background:#fff !important;font-weight:500 !important;box-shadow:0 0 4px rgba(54,70,88,.08) !important;filter:none !important;}
+
+/* 23. Insert placeholder = one { } button at the field's right (user 2026-10-14): the same small grey square as the
+   value list's f(x) — top-right corner on multi-line editors, centred on one-line fields. No toolbar button any more. */
+/* (user 2026-10-19) the SAME look as the Cc field's f(x): #eef2f6 square, dark glyph, no border (the outlined
+   version was rejected). It opens the same simple "Insert placeholder" list on every field that has it. */
+html.embed [data-nf="ph-btn"]{width:24px !important;height:24px !important;border-radius:4px !important;background:#eef2f6 !important;
+  border:none !important;color:#364658 !important;font-size:11px !important;letter-spacing:-.5px;}
+html.embed [data-nf="ph-btn"]:disabled{color:#b4c0cd !important;}
+html.embed [data-nf="ph-btn"]:not(:disabled):hover{background:#e2e8f0 !important;filter:none !important;}
+
+/* 25. Email recipients design versions (user 2026-10-15). Version 2's Cc row puts the "Bcc" link to the RIGHT of
+   the field, so the field box sits one level deeper — give it the same box as every other recipient row. */
+html.embed [data-nf="rc-line"]{width:100%;}
+html.embed [data-nf="rc-line"] > .flex-1{background:#fff;border:1px solid #dfe5ed !important;border-radius:6px;padding:4px 12px;min-height:32px;font-size:12px;overflow:hidden;cursor:text;}
+html.embed [data-nf="rc-line"] > .flex-1:hover{border-color:#cbd5e1 !important;}
+html.embed [data-nf="rc-line"] > .flex-1:focus-within{border-color:#3d8bd0 !important;}
+html.embed [data-nf="rc-line"] > button{font-size:12px;color:#3d8bd0 !important;font-weight:400;}
+/* version 2: while typing, the field grows to show every chip */
+html.embed [data-nf="vl-bare"][data-ver="2"][aria-expanded="true"]{align-items:flex-start;}
+
+/* 24. Reply-box editor (user 2026-10-15) — the ServiceOps ticket reply toolbar under every rich-text field
+   (ReplyTools): AI Assist · quick actions · T formatting row · undo/redo. */
+/* what the formatting produces — Tailwind's reset strips heading sizes, list bullets and table borders */
+[data-rte] h1{font-size:20px;font-weight:600;line-height:1.3;margin:4px 0;}
+[data-rte] h2{font-size:16px;font-weight:600;line-height:1.35;margin:4px 0;}
+[data-rte] h3{font-size:14px;font-weight:600;line-height:1.4;margin:2px 0;}
+[data-rte] ul{list-style:disc;padding-left:22px;margin:2px 0;}
+[data-rte] ol{list-style:decimal;padding-left:22px;margin:2px 0;}
+[data-rte] li{white-space:normal;}
+[data-rte] hr{border:0;border-top:1px solid #dfe5ed;margin:8px 0;}
+[data-rte] a{color:#3d8bd0;text-decoration:underline;}
+[data-rte] table{white-space:normal;}
+html.embed [data-nf="side"] [data-rte][contenteditable="true"] h1{font-size:20px;}
+/* toolbar rows: quiet grey icons, Node blue when active; the formatting row sits on a light band */
+html.embed [data-nf="rte"] [data-nf="rte-bar"], html.embed [data-nf="rte"] [data-nf="rte-row"]{border-top-color:#dfe5ed !important;}
+html.embed [data-nf="rte"] [data-nf="rte-row"]{background:#f9fafb !important;}
+html.embed [data-nf="rte"] button[data-tip]{color:#7b8fa5;}
+html.embed [data-nf="rte"] button[data-tip][style*="var(--accent2)"]{color:#3d8bd0 !important;}
+html.embed [data-nf="rte-ai"]{color:#364658 !important;}
+/* email compose: the toolbar hangs under the body box exactly where the old bar did */
+html.embed [data-nf="compose"] > [data-nf="rte"]{margin-top:-16px;background:#fff;border:1px solid #dfe5ed;border-radius:0 0 6px 6px;}
+html.embed [data-nf="compose"] > [data-nf="rte"] > :first-child{border-top:none !important;}
+html.embed [data-nf="compose"] > [data-nf="rte"] > [data-nf="rte-row"]{border-radius:0;}
+
+/* 26. A DYNAMIC (reference) value (user 2026-10-19): the value only — light-purple fill, purple text, no { } icon.
+   Beats the white-field / grey-border rules above. */
+html.embed [data-nf="side"] [data-refval],
+html.embed [data-nf="side"] [data-refval]:hover{background:var(--ref-bg) !important;border-color:var(--ref-bg) !important;color:var(--ref-fg) !important;}
+html.embed [data-nf="side"] [data-refval] span{color:var(--ref-fg) !important;}
+
+/* 27. Field-end icons (user 2026-10-19, image #145): the f(x) and { } buttons sit at the RIGHT of every field with the
+   SAME gap above, below and to the right — 6px in the 36px Email rows (To / Cc / Bcc / Subject), 4px in the 32px
+   Create / Update value cells. Multi-line editors keep them top-right at that same 6px. */
+html.embed [data-nf="crow"] > .flex-1{padding:5px 5px 5px 12px !important;min-height:36px;}
+html.embed [data-nf="crow"] [data-nf="vl-bare"]{padding-top:0 !important;padding-bottom:0 !important;}
+html.embed [data-nf="crow"] [data-nf="vl-bare"] [data-nf="vl-fx"]{margin-top:0 !important;}
+/* multi-line value boxes (Create / Update / Add task Description …): the { } top-right at the same 6px as the Email rows */
+html.embed [data-phbox] [data-nf="ph-btn"]{top:-4px !important;right:-5px !important;}
+
+/* 28. Ask for approval — the stage HEADING gets its own fill (user 2026-10-19): #F6F9FC sets it apart from the fields
+   below the divider, and a collapsed stage reads as one clean tinted bar. Hover darkens it a step. */
+html.embed [data-nf="stage-head"]{background:#F6F9FC !important;}
+html.embed [data-nf="stage-head"]:hover{background:#EEF2F7 !important;}
+html.embed [data-nf="stage-head"][aria-expanded="true"]{border-bottom:1px solid #dfe5ed !important;}
+
+/* 29. Email Content (user 2026-10-19): the { } sits top-right with the SAME 6px gap as every other field, and the
+   "Write the email…" line is lifted so its middle lines up with the button's middle (box padding-top 10 → 3). */
+html.embed [data-nf="cbody"] > div:first-of-type{padding-top:3px !important;}
+html.embed [data-nf="cbody"] [data-nf="ph-btn"]{top:2px !important;right:-7px !important;}

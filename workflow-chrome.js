@@ -174,6 +174,9 @@
         + `<button class="vs-btn active" type="button" data-view="node">${svg('nodes')}Node</button>`
       + `</div>`
       + `<div class="pagebar-right">`
+        /* Email recipients + Tags designs were FINALISED on 1.2 (user 2026-10-19) — their version switches are gone */
+        + `<label class="email-ver" id="pickVer" data-tip="Condition value picker — design version"><span>Picker</span>`
+          + `<select id="pickVerSel" aria-label="Condition value picker design version"><option value="1">Version 1</option><option value="2">Version 2</option></select></label>`
         + `<div class="enable-row"><span>Enabled</span>`
           + `<button class="switch on" id="enableSw" role="switch" aria-checked="true"><span>ON</span><i></i></button></div>`
         + `<button class="btn-outline" id="runHistBtn" data-tip="Run history&nbsp;&nbsp;read-only while open" hidden>${svg('activity')}Run history<span class="run-badge" id="runBadge" hidden></span></button>`
@@ -339,11 +342,13 @@
     function positionViewSwitch(){
       const bar = $('.pagebar'), left = $('.pagebar-left'), right = $('.pagebar-right'), vs = $('#viewSwitch');
       if(!bar || !left || !right || !vs) return;
-      const barW = bar.getBoundingClientRect().width;
-      const leftW = left.getBoundingClientRect().width, rightW = right.getBoundingClientRect().width;
+      const barR = bar.getBoundingClientRect(), barW = barR.width;
+      /* real edges, relative to the bar — its own padding is NOT part of either zone (the old width-only maths ate the
+         right-hand GAP once the Linear view's version switches widened the right zone) */
+      const leftEnd = left.getBoundingClientRect().right - barR.left, rightStart = right.getBoundingClientRect().left - barR.left;
       const vsW = vs.getBoundingClientRect().width;
       const trueCenter = (barW - vsW) / 2;
-      const safeLeft = Math.max(leftW + GAP, Math.min(trueCenter, barW - rightW - GAP - vsW));
+      const safeLeft = Math.max(leftEnd + GAP, Math.min(trueCenter, rightStart - GAP - vsW));
       vs.style.left = Math.round(safeLeft) + 'px';
       /* only the horizontal position is ours to set — top:50%/translateY(-50%)
          (in CSS) still does the vertical centring; overwriting the whole
@@ -474,6 +479,7 @@
     function setLinear(on){
       document.body.classList.toggle('view-linear', on);
       linearEl.hidden = !on;
+      positionViewSwitch();            // the Email / Picker / Tags version switches only show in Linear — the right zone's width changed
       if(!on) return;
       if(app.isReadOnly()) app.closeRunHistory();           // leave read-only before the canvas goes out of sight
       placeLinear();
@@ -486,12 +492,20 @@
       linearFrame.focus();
     }
     window.addEventListener('resize', () => { if(isLinear()) placeLinear(); });
+    /* Condition value picker (Category etc.) design version: remembered per browser, pushed into the Linear frame on change */
+    const pvSel = $('#pickVerSel');
+    try { const v = localStorage.getItem('wf.pickVer'); if(v && [...pvSel.options].some(o => o.value === v)) pvSel.value = v; } catch(_e){}
+    pvSel.addEventListener('change', () => {
+      try { localStorage.setItem('wf.pickVer', pvSel.value); } catch(_e){}
+      linearSend({ wf:'pickver', v: pvSel.value });
+    });
     window.addEventListener('message', e => {
       if(!linearFrame || e.source !== linearFrame.contentWindow || e.origin !== location.origin) return;
       const m = e.data || {};
       if(m.wf === 'ready'){
         linearReady = true; linearEl.classList.add('ready');
         linearSend({ wf:'details', name: flowName, desc: flowDesc });
+        linearSend({ wf:'pickver', v: $('#pickVerSel').value });
         if(isLinear()) linearFrame.focus();
       } else if(m.wf === 'state'){
         flowName = m.name || ''; flowDesc = m.desc || '';

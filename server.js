@@ -1,3 +1,4 @@
+const PORT = process.env.PORT || 8777;
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -12,4 +13,4 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': types[path.extname(fp)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(data);
   });
-}).listen(8777, () => console.log('Server on http://localhost:8777'));
+}).listen(PORT, () => console.log('Server on http://localhost:' + PORT));

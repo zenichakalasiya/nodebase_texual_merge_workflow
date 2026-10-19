@@ -1,86 +1,115 @@
-# Handoff — 2026-10-13 18:40
+# Handoff — 2026-10-19 16:19
 
 ## Read first
-In `CLAUDE.md`, the new **"Linear view = Pranjal's V8 textual builder,
-embedded and re-skinned"** section (just above "Deployment"), plus the three
-`linear/…` rows in the Structure table. Everything this session touched is
-described there.
+
+In `CLAUDE.md`, read the **"Functional edits made inside V8"** list under
+"Linear view". It now describes the finalised pieces:
+
+- **`RcptField`:** the recipient popup.
+- **`VPicker` everywhere:** the multi-select popup.
+- **Tags:** its own Specific | Dynamic flow.
+- **The `{ }` and toggle rules.**
+
+Also read the three reference docs in the repo root: `PICKER-INVENTORY.md`,
+`OPERATORS.md` and `CONDITION-FIELDS.md`.
 
 ## What we worked on this session
-Made the **Linear** tab real: it now shows Pranjal's V8 textual builder inside
-the app, restyled to look like the Node view. Then worked through the "Node
-Panel Differences" list (https://claude.ai/artifact/FD7oGhj6KuAgJ8VwXRQTvs),
-fixing sidebars step by step against Figma and the real product.
+
+Long design-polish session on the **Linear view's value pickers**:
+
+- **Email field:** finalised design version 1.2.
+- **Same popup elsewhere:** Send SMS and Ask for approval now use that popup too.
+- **Tags:** rebuilt with Specific | Dynamic tabs.
+- **Every other multi-select:** moved onto the IF node's Category popup (VPicker).
+- **Small fixes:** placeholder `{ }` button, toggles, search highlight, dynamic-value look.
+- **Research:** compared operators against the real ServiceOps product.
 
 ## Completed
-- Linear view embedded (`linear/index.html` + `linear/vendor/`), switched from
-  the top bar, with Publish / Save wired through to it.
-- `linear/node-skin.css`: Node colours, canvas, floating sidebar card,
-  segmented controls, switches, tabs, joined field cells, tooltips, picker
-  popup, email/SMS composer as a labelled form, integration mapping rows as
-  key | value pairs.
-- Sidebars resizable in both views (400–650px, opens at 400).
-- Linear's bottom toolbar replaced by a copy of the Node one.
-- Send SMS: To line, toolbar, Technician group picker.
-- Emails field ported from the survey app (To/Cc/Bcc, Cc emails, Tags).
-- Request Signature step added.
-- Archive: source record always clickable.
-- Ask for approval: decision dropdown, "Direct | Select" rows, stage card back
-  to V8's outlined style.
-- Field rows: mandatory cell colours, trash icon for delete, no hover
-  brightening.
-- "Add Field" and "Add Stage" buttons in the new outlined style (Add Stage
-  has no chevron); both hold a 30px height.
-- Node view: condition-group blocks restyled to the Figma stage block.
+
+- **Category popup (VPicker):**
+  - Category › Subcategory tree, with no dots.
+  - Figma row states.
+  - Selected Items plus a joined left side panel.
+  - Version 1 / 2, chosen from the top bar's **Picker** switch.
+- **Email (`RcptField`, finalised on 1.2):**
+  - Search-or-add box with the icon on the right; it turns into a blue + for a new value.
+  - Smart placeholder, and no helper line under the search box.
+  - "Specific" and "Reference" headings.
+  - Uppercase section titles with a 14px gap (no hairline).
+  - Red "Clear all".
+  - All-added panel on the left, tinted `#F6F9FC`, with the Apply bar spanning full width and no gap under the panel.
+  - Purple `{x}` Reference card. A picked reference joins Added and returns to Specific.
+  - No f(x) button on the field and no Cancel; Apply commits and an outside click discards.
+  - Technician-group chips show a people icon and member count.
+  - To and Cc are always shown, with "Bcc" at the Cc label's right.
+  - Removed Insert from Template / Insert Knowledge.
+- **Send SMS To** (`kind:"phone"`) and **Ask for approval** stage lists (`kind:"pick"`) use the same `RcptField`.
+- **Tags:**
+  - `vpCtrl` with VPicker plus Specific | Dynamic tabs: several specific tags OR one dynamic value.
+  - Empty-state illustration until the user searches.
+- **Moved to VPicker:**
+  - Create/Update multi rows (Business services, Add Roles)
+  - Create deployment "Notify to"
+  - Create announcement groups
+  - Get Hardware Asset asset-type filter
+  - Merge "which branches"
+- **`{ }` placeholder button:**
+  - Grey square, 6px inset on every field.
+  - Always opens the simple "Insert placeholder" list, including text and description rows.
+  - Email Content: aligned with the "Write the email…" line.
+- **Smaller pieces:**
+  - Yes/No fields are a switch chip; untouched counts as "No".
+  - Dynamic values show as a purple value with no `{ }`.
+  - Yellow search highlight in every list popup.
+  - Approval stage headings tinted.
+- **Top bar:** the Email and Tags switches were removed. The view switch now repositions when entering Linear, and its gap maths was fixed.
+- **Docs:** `PICKER-INVENTORY.md`, `OPERATORS.md` (with real-product operators collected from the demo portal) and `CONDITION-FIELDS.md`.
 
 ## In progress
-- **WhatsApp step** — must match the real product (App Type locked to
-  "WhatsApp", App Action Type dropdown, then dependent fields) and lose V8's
-  extra config. Not started; needs a look at the real product first.
-- **Add Relation** — list what is missing versus the real product. So far:
-  no sidebar, only 4 modules, no condition groups. Not confirmed on the real
-  product yet.
+
+- The user's last message ended mid-sentence ("…and"). Ask what the remaining request was.
+- **Switched to VPicker but not browser-tested yet:**
+  - Merge feeder picker
+  - Get Hardware Asset preset
+  - Create announcement groups
+  - Create deployment Notify to
+- **Tested:** Tags, Add Roles, Email, SMS and Approval.
 
 ## Next steps
-- Inspect WhatsApp, Add Relation and the Request Signature template list on
-  the real product (internal demo server; user signs in), then build.
-- Get answers to the open questions below.
-- Test the Linear screens not yet checked: WhatsApp / Teams / Google Chat
-  forms, Assign / Close / Link, run approval workflow, conditions / wait /
-  get / loop / merge, Expression Builder, Shortcuts panel, walkthrough. Re-test
-  the SMS sidebar (not re-checked after the Emails port).
+
+- Test the untested VPicker callers above. Merge chips should show branch names, not ids.
+- **Open questions for the user:**
+  - Should stage forms allow placeholders? Approval description's `{ }` is disabled.
+  - Should Service Request and the other record types get tag suggestions?
+  - Should canvas-sentence dynamic badges also drop the `{ }`?
+  - Should search highlight every match in a row, or only the first?
+- **Operator gaps vs the product** (`OPERATORS.md` §H):
+  - is empty / is not empty
+  - date between / exactly next / last
+  - Match All for tags
+  - "any" on the trigger's "to" side
+  - periodic Interval
+  - Wait "up to" (Max Wait Time)
+- **Older open threads** (from the previous handoff):
+  - WhatsApp and Add Relation parity with the real product
+  - sidebar card vs flush
+  - button colours
+  - Inter vs Poppins
 
 ## Decisions made
-- Embed V8 as-is rather than rebuild it; the two views keep independent
-  workflows.
-- Linear keeps V8's own sidebar concept; only the width behaviour is shared.
-- Accent is Node blue everywhere. Font stays Inter in Linear, Poppins in Node
-  (my reading of "keep inter in both" — not confirmed).
-- All Linear styling goes in `linear/node-skin.css` via `data-nf` hooks.
-- Get step: no sidebar built, because V8's sentence already covers sorting.
 
-## Open questions for the user
-- Sidebar as floating card (now) or flush panel (Figma)?
-- Buttons blue (Figma) or black (real product)?
-- Use the `#CBD5DF` border on optional rows too?
-- Asterisk on "Field 1"? (real product has none)
-- Yes/No selected colour — keep V8's green?
-- Bring the "Import values" CSV panel into the email field?
-- Build a real Ask-for-approval node in the Node view?
-- Is a Get sidebar still wanted?
-- Other add buttons (Add mapping, Add placeholder configuration) in the new
-  button style?
-- Welcome popup in Linear view; Undo/Redo not fading when empty.
-- Integration key | value layout and the email composer restyle were my
-  interpretation — both can be undone.
+- **Only Email, SMS and Approval mix specific + dynamic values** in one list (`RcptField`). Every other multi-select uses VPicker, following the Picker switch.
+- **Tags take several specific values OR one dynamic value**, never mixed.
+- **`{ }` has one meaning:** the simple placeholder list. Specific | Dynamic belongs to value fields.
+- **Reference card is purple tinted:** the user picked it from 4 options.
+- **Technician-group chips use icon + count**, not a new colour.
+- **An outside click discards** unapplied Email changes. The user was asked; no change requested.
 
 ## Gotchas & notes
-- `linear/node-skin.css` was built in numbered passes; later rules override
-  earlier ones. Search the whole file before adding a rule.
-- `workflow-canvas.html` and `workflow-nodes.css` are CRLF; `linear/index.html`
-  is LF. Shell heredocs mangle backslashes — write patch scripts to a file.
-- Sample data only: `SIGNATURE_TEMPLATES`, `groupMembers()`.
-- Never type the real product's password for the user.
-- Pre-existing, not fixed: redo right after undo doesn't restore a newly
-  created node in the Node view.
-- Optional, from last session: cap the Cc Emails editing cell at ~3 rows.
+
+- **Patching `linear/index.html`:** shell `node -e` / sed strip backslashes in regexes. Write patch scripts to a scratch file and use exact-string replace with a count check.
+- **Line endings:** `workflow-chrome.js` is CRLF, so use the Edit tool on it.
+- **Playwright on the If Else drawer:** Esc closes the whole drawer. In the real product's builder, clicks right after closing a menu get swallowed.
+- **Demo portal (real product):** the address is in local memory, not the repo. The user signs in themselves; never type the password. A test draft was left unsaved there.
+- **Dev server:** this session used port 8780 (`$env:PORT='8780'; node server.js`).
+- **Pre-existing, not fixed:** in the Node view, redo after undo doesn't restore a new node.
