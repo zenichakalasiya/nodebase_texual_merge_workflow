@@ -13,13 +13,13 @@
 (function(){
   const $ = (s, r=document) => r.querySelector(s);
   const world = $('#world'), edgesSvg = $('#edges'), dock = $('#dock'), canvasEl = $('#canvas');
-  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg'), runHistory: $('#runHistoryCfg'), versionHistory: $('#versionHistoryCfg'), flowDetails: $('#flowDetailsCfg'), guide: $('#guideCfg'), shortcuts: $('#shortcutsCfg') };
+  const panels = { trigger: $('#triggerCfg'), branch: $('#branchCfg'), lane: $('#laneCfg'), cond: $('#conditionCfg'), email: $('#emailCfg'), runHistory: $('#runHistoryCfg'), versionHistory: $('#versionHistoryCfg'), flowDetails: $('#flowDetailsCfg'), guide: $('#guideCfg'), shortcuts: $('#shortcutsCfg') };
 
   /* ---------------------------------------------------------- catalogs */
   const MODULES = ['Request','Incident','Problem','Change','Release','Task','Hardware Asset','Software Asset','User'];
   const ATTRS = ['Status is Changed','Department is Changed','Incident is Changed','Priority is Updated','Assignee is Added','Category is Changed','Impact is Changed'];
   const WEEKDAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const TYPE_LABEL = { trigger:'Trigger', branch:'Branch', lane:'Branch path', cond:'IF / Else' };
+  const TYPE_LABEL = { trigger:'Trigger', branch:'Branch', lane:'Branch path', cond:'IF / Else', email:'Send an Email' };
 
   /* Trigger types — the textual builder's two groups (Record events | Time
      based), shown as one flat list, group headers only — no tab switcher.
@@ -81,7 +81,7 @@
   const DOC = 'https://docs.motadata.com/serviceops-docs/admin-section/automation/workflow/#purpose-audience-and-scope';
   const NODE_CATALOG = [
     { label:'Quick', chips:[
-      { id:'q-notify', label:'Notify', icon:'n-trig-blue' },
+      { id:'q-notify', label:'Notify', icon:'n-trig-blue', make:'email' },
       { id:'q-create', label:'Create', icon:'n-plus' },
       { id:'q-update', label:'Update', icon:'refresh-ccw' },
     ] },
@@ -146,9 +146,13 @@
         sub:'Link records or add a child item',
         help:{ eyebrow:'Action', title:'Link & add', body:'Links this record to another, or adds a child item under it.', more:DOC } },
       { header:'Communicate' },
-      { id:'act-notify', label:'Send notification', tag:'notify', tone:'util', icon:'branch', soon:true,
-        sub:'Send an email, SMS, or in-app alert',
-        help:{ eyebrow:'Communicate', title:'Send notification', body:'Tells someone what happened — by email, SMS, or an in-app alert.', more:DOC } },
+      { id:'act-email', make:'email', label:'Send email', tag:'notify', tone:'util', icon:'n-trig-blue',
+        keywords:'email mail notify notification send message template',
+        sub:'Email people — write it or start from a template',
+        help:{ eyebrow:'Communicate', title:'Send email', body:'Sends an email to the people you choose — type the message, or fill it from a template.', more:DOC } },
+      { id:'act-notify', label:'Send SMS or in-app alert', tag:'notify', tone:'util', icon:'branch', soon:true,
+        sub:'Text message or in-app notification',
+        help:{ eyebrow:'Communicate', title:'Send notification', body:'Tells someone what happened — by SMS or an in-app alert.', more:DOC } },
     ],
   };
   /* while searching, the sub-levels fold into the results so a leaf is reachable
@@ -158,7 +162,7 @@
     if(SUBMENUS[i.id]) return out.concat([{ header:i.label }], SUBMENUS[i.id].filter(c => !c.header));
     return out.concat([i]);
   }, []);
-  const IMPLEMENTED = { cond:1, branch:1 };
+  const IMPLEMENTED = { cond:1, branch:1, email:1 };
 
   /* ---------------------------------------------------------- state */
   const nodes = {};           // id -> node
@@ -189,6 +193,19 @@
      source node, and the grouped condition builder live in its drawer; the
      card itself shows the check inline under "IF" once it's set. */
   function newCondition(){ return mk('cond', { title:'IF / Else', groups:[newGroup()] }); }
+  /* Send an Email — an action step with one output, chained like a trigger/
+     branch path (its next step, plus any parallel siblings). Recipients are
+     { emails:[] } holders so the shared chip input and its "+N" manager
+     (openEmailPopup) work on them exactly as on a Cc Emails condition. */
+  function newEmail(){ return mk('email', { title:'Send an Email', rcpt:{ to:{ emails:[] } }, techGroups:[], subject:'', body:'', template:'' }); }
+  /* the same four templates the Linear view offers (TEMPLATE_CONTENT there) —
+     picking one fills Subject + Content; recipients are left alone */
+  const EMAIL_TEMPLATES = {
+    'Acknowledgement':   { subject:'We received your request — {{Ticket Id}}', body:'Hi {{Requester Name|there}},\n\nThanks for reaching out. Your request {{Ticket Id}} has been logged and our team is on it.\n\nTrack it any time: {{Request URL}}\n\n— {{Helpdesk Name}}' },
+    'Resolution notice': { subject:'Resolved — {{Subject}}', body:'Hi {{Requester Name|there}},\n\nGood news — your ticket {{Ticket Id}} ({{Subject}}) has been resolved.\n\nIf anything still looks off, you can reopen it: {{Reopen Request URL}}\n\n— {{Helpdesk Name}}' },
+    'Approval request':  { subject:'Approval needed — {{Ticket Id}}', body:'Hi {{Approval Approver|approver}},\n\n{{Requester Name}} needs your approval on {{Ticket Id}} — {{Subject}}.\n\nReview and decide here: {{Approval URL}}\n\n— {{Helpdesk Name}}' },
+    'Escalation notice': { subject:'Escalated — {{Ticket Id}} ({{Priority}})', body:'Hi {{Technician Name|team}},\n\nTicket {{Ticket Id}} ({{Subject}}) has been escalated.\nPriority: {{Priority}} · Due: {{Due By}}\n\nDetails: {{Request URL}}' },
+  };
   let brSeq = 0;                                    // kept for history snapshots
   const FIELDS = ['Category','Priority','Status','Department','Assignee','Impact','Urgency','Cc Emails'];
   const OPS = ['is','is not','contains','is one of'];
@@ -240,11 +257,13 @@
   /* Every node hanging off a Trigger / branch path's single output: the first one
      (slots.next), then any parallel siblings. They all run at the same time. */
   const kidsOf = n => (n.slots.next ? [n.slots.next] : []).concat(n.parallel || []);
-  const canParallel = n => n.type === 'trigger' || n.type === 'lane';
+  /* single-output steps: Trigger, a branch path, and Send an Email */
+  const isChain = n => n.type === 'trigger' || n.type === 'lane' || n.type === 'email';
+  const canParallel = isChain;
 
   /* ports = output connection points of a node, in top→bottom order */
   function portsOf(n){
-    if(n.type === 'trigger' || n.type === 'lane') return [{ key:'next', label:'', cls:'' }];
+    if(isChain(n)) return [{ key:'next', label:'', cls:'' }];
     if(n.type === 'cond'){
       /* exactly two ways out — a condition is either true or it is not. Always
          both shown, never a third "Else IF" — that's what Branch is for.
@@ -273,6 +292,11 @@
       } else {
         SCHED[n.trigType].fields.forEach(f => { if(!String(n.sched[f.k] || '').trim()) miss.push('sched:' + f.k); });
       }
+    } else if(n.type === 'email'){
+      if(!n.title.trim()) miss.push('title');
+      if(!n.rcpt.to.emails.length) miss.push('to');
+      if(!n.subject.trim()) miss.push('subject');
+      if(!n.body.trim()) miss.push('body');
     } else if(n.type === 'lane'){
       if(n.kind === 'if'){
         if(!n.title.trim()) miss.push('title');
@@ -294,6 +318,7 @@
       return isEventTrig(n.trigType) && n.attrs.length > 1 && n.attrs.some(a => !a);
     }
     if(n.type === 'branch') return false;          // its lanes carry the loose ends, not the card
+    if(n.type === 'email') return false;           // an email can be the last step — nothing is left hanging
     return allPortsOf(n).some(p => !n.slots[p.key]);
   }
   function stateOf(n){
@@ -435,6 +460,21 @@
       + `</div></div>`;
   }
 
+  /* Send an Email — Trigger-style card: tag, icon + title, then a read-only
+     line reading the message back ("To a@x.com +2 · Subject: …"). */
+  function emailSummary(n){
+    const to = n.rcpt.to.emails, parts = [];
+    if(to.length) parts.push('To ' + emLabel(to[to.length - 1]) + (to.length > 1 ? ' +' + (to.length - 1) : ''));
+    if(n.subject.trim()) parts.push('Subject: ' + n.subject.trim());
+    return parts.join(' · ');
+  }
+  function emailNodeHTML(n, st){
+    const pill = `<div class="pill-row"><span class="pill">Send email</span>${badgeHTML(st)}</div>`;
+    const sum = emailSummary(n);
+    return `${pill}<div class="card"><div class="card-top"><div class="card-l"><div class="ico blue">${img('mail')}</div><span class="nm ${n.title?'set':''}">${esc(n.title || 'Send an Email')}</span></div>${actsHTML}</div>`
+      + `<div class="card-bot ro ${sum ? 'set' : ''}">${esc(sum || 'Set up the email')}</div></div>`;
+  }
+
   /* A lane card: its name, and — once filled — its conditions as the description.
      Read-only on the canvas; the conditions are edited in the drawer. */
   function laneHTML(n, st){
@@ -470,7 +510,7 @@
   }
 
   function nodeClass(n, st){
-    let c = 'nd ' + (n.type === 'trigger' || n.type === 'branch' ? 'trig ' : '') + n.type;
+    let c = 'nd ' + (n.type === 'trigger' || n.type === 'branch' || n.type === 'email' ? 'trig ' : '') + n.type;
     if(n.id === selId) c += ' selected';
     if(st && st !== 'empty' && st !== 'draft') c += ' ' + st;
     if(st === 'empty') c += ' empty';
@@ -490,7 +530,7 @@
     })(rootId);
 
     // 1. inner HTML + class
-    const HTML = { trigger:triggerHTML, branch:branchHTML, lane:laneHTML, cond:condNodeHTML };
+    const HTML = { trigger:triggerHTML, branch:branchHTML, lane:laneHTML, cond:condNodeHTML, email:emailNodeHTML };
     list.forEach(item => {
       seen.add(item.key);
       const el = getEl(item.key), n = item.n, st = stateOf(n);
@@ -540,7 +580,7 @@
         const e = ext(kidsOf(n)[0]), slotHalf = horiz ? 22 : 125;
         return { l:Math.max(own, e.l), r:Math.max(e.r, own + LANE_GAP + slotHalf * 2) };
       }
-      if((n.type === 'trigger' || n.type === 'lane') && !chainFans(n)){
+      if(isChain(n) && !chainFans(n)){
         const c = n.slots.next, e = c ? ext(c) : { l:own, r:own };
         return { l:Math.max(own, e.l), r:Math.max(own, e.r) };
       }
@@ -635,7 +675,7 @@
         });
         return bottom;
       }
-      if(n.type === 'trigger' || n.type === 'lane'){
+      if(isChain(n)){
         const c = n.slots.next;
         if(c){
           const pt = P(myMain + main + 64, myCross);
@@ -886,7 +926,7 @@
       maxX = Math.max(maxX, stubEnd.x - 76);
     });
     Object.keys(nodes).forEach(id => {
-      const n = nodes[id]; if((n.type !== 'trigger' && n.type !== 'lane') || !pos[id]) return;
+      const n = nodes[id]; if(!isChain(n) || !pos[id]) return;
       const from = exitPt(id), start = P(mOf(from) + 6, cOf(from));
       const dot = document.createElement('div'); dot.className = 't-dot';
       dot.style.left = (from.x - 5) + 'px'; dot.style.top = (from.y - 4) + 'px'; world.appendChild(dot);
@@ -1065,6 +1105,7 @@
     }
     else if(n.type === 'lane') openLane(n);
     else if(n.type === 'cond') openCondition(n);
+    else if(n.type === 'email') openEmail(n);
     else openBranch(n);
     render();
   }
@@ -1185,7 +1226,7 @@
         const make = item.make;
         if(!make || !IMPLEMENTED[make]){ toast(item.label + ' is not designed yet'); return true; }
         picking = null;
-        const node = make === 'cond' ? newCondition() : newBranch();
+        const node = make === 'cond' ? newCondition() : make === 'email' ? newEmail() : newBranch();
         node.parent = parentId;
         /* Source Node is left for the user to choose. Pre-selecting it — now
            that the title arrives pre-filled too — would make a brand-new node
@@ -1283,7 +1324,7 @@
   /* ---------------------------------------------------------- shared drawer bits */
   /* Names the still-empty required fields, so an error node opens onto a drawer
      that says what to fill rather than just a red outline. */
-  const MISS_LABEL = { type:'Trigger Type', title:'Title', module:'Select Module', attrs:'Select Attribute', source:'Select Source Node', conds:'a complete condition (field, operator and value)' };
+  const MISS_LABEL = { type:'Trigger Type', title:'Title', module:'Select Module', attrs:'Select Attribute', source:'Select Source Node', to:'To', subject:'Subject', body:'Content', conds:'a complete condition (field, operator and value)' };
   function missLabel(n, m){
     if(m.indexOf('sched:') === 0){
       const f = SCHED[n.trigType].fields.find(x => x.k === m.slice(6));
@@ -1399,6 +1440,7 @@
   bindHeadName('tr', '#trTitle');
   bindHeadName('br', '#brTitle');
   bindHeadName('ln', '#lnName');
+  bindHeadName('em', '#emTitle');
 
   /* ---- Next step: expanded by default, collapsible ---- */
   document.querySelectorAll('[data-nn-toggle]').forEach(btn => {
@@ -1679,7 +1721,7 @@
   }
   function offEmailPopup(e){ if(emailPopup && !emailPopup.contains(e.target)) closeEmailPopup(); }
   function escEmailPopup(e){ if(e.key === 'Escape' && emailPopup){ e.stopPropagation(); e.preventDefault(); closeEmailPopup(); } }
-  function openEmailPopup(anchor, gi, ci, onChange){
+  function openEmailPopup(anchor, gi, ci, onChange, holder){
     closeEmailPopup();
     const pop = document.createElement('div');
     pop.className = 'email-popup';
@@ -1696,7 +1738,7 @@
     const headEl = pop.querySelector('.email-popup-head'), listEl = pop.querySelector('.email-popup-list');
     const searchEl = pop.querySelector('input'), msgEl = pop.querySelector('.email-popup-msg');
     let confirming = false;
-    const cond = () => { const n = nodes[selId]; return n && n.groups[gi] && n.groups[gi].conds[ci]; };
+    const cond = holder || (() => { const n = nodes[selId]; return n && n.groups && n.groups[gi] && n.groups[gi].conds[ci]; });
     const query = () => searchEl.value.trim();
     const shown = c => { const q = query().toLowerCase(); return c.emails.map((em, i) => ({ em, i })).filter(x => !q || x.em.toLowerCase().includes(q)); };
     const plural = (k, s) => k + ' ' + s + (k === 1 ? '' : 's');
@@ -2033,6 +2075,211 @@
   $('#cdDelete').addEventListener('click', () => removeNode(selId));
   $('#cdMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#cdMore')));
   bindNext($('#cdNext'));
+
+  /* ------------------ Send an Email drawer
+     Title, then one tinted "Message" card — To / Cc (+ Bcc) / Subject /
+     Content — with "Use template" at its top right. Writes live like every
+     other drawer; required fields only turn red once the user moves on. */
+  let emRedrawing = false;               // a rebuild drops focus; that's not the user leaving the field
+  /* To (user 2026-10-21): ONE search-or-add box. Empty → a "No emails yet" state; typing → matching PEOPLE (name or
+     email) plus "Add “x@y.com”" for a new valid address; a purple Reference row adds a value from the record. Cc / Bcc
+     are gone for now and the technician group is its own field below. A value is an email string or {ref:'…'}. */
+  const EM_PEOPLE = [
+    { name:'Priya Nair', email:'priya.nair@acme.com' }, { name:'Arjun Mehta', email:'arjun.mehta@acme.com' },
+    { name:'Sara Khan', email:'sara.khan@acme.com' }, { name:'David Chen', email:'david.chen@acme.com' },
+    { name:'Emily Rodriguez', email:'emily.rodriguez@acme.com' }, { name:'Rohit Sharma', email:'rohit.sharma@acme.com' },
+    { name:'Anna Kowalski', email:'anna.kowalski@acme.com' }, { name:'James Okafor', email:'james.okafor@acme.com' },
+    { name:'Mei Lin', email:'mei.lin@acme.com' }, { name:'Tom Becker', email:'tom.becker@acme.com' } ];
+  const EM_REFS = ['Requester › Email', 'Technician › Email', "Technician's Manager › Email", 'Created By › Email'];
+  const EM_GROUPS = ['Service Desk','Hardware Team','Software Team','Network Ops','Field Support','Security','Database','Apps Team','Tier-2','Tier-3',
+    'Default Support Group','Finance IT Support Group','HR IT Support Group','Operations IT Support Group','Sales IT Support Group','Internal IT Support Group','General Support Group'];
+  const EM_EMPTY_SVG = '<svg width="92" height="74" viewBox="0 0 120 96" fill="none" aria-hidden="true">'
+    + '<circle cx="60" cy="48" r="42" fill="#F1F4F8"/>'
+    + '<path d="M22 18l4.2 1.4L22 20.8l-1.4 4.2-1.4-4.2-4.2-1.4 4.2-1.4 1.4-4.2z" fill="#CBD5E1"/>'
+    + '<path d="M101 30l2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z" fill="#CBD5E1"/>'
+    + '<g transform="translate(22 32) rotate(-12)"><rect width="50" height="34" rx="5" fill="#E2E8F0"/></g>'
+    + '<g transform="translate(36 37) rotate(6)"><rect width="52" height="36" rx="5" fill="#fff" stroke="#8E9FBC" stroke-width="1.8"/>'
+    + '<path d="M4 6l22 16 22-16" stroke="#8E9FBC" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '<path d="M8 29h14" stroke="#DCE3EC" stroke-width="2.4" stroke-linecap="round"/></g>'
+    + '<circle cx="88" cy="68" r="11" fill="#7B8FA5"/>'
+    + '<text x="88" y="72.4" text-anchor="middle" font-size="13" font-weight="600" fill="#fff" font-family="Poppins, sans-serif">@</text></svg>';
+  const emLabel = x => typeof x === 'string' ? x : (x && x.ref) || '';
+  const emInitials = s => s.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const emHL = (s, q) => { const i = q ? s.toLowerCase().indexOf(q.toLowerCase()) : -1;
+    return i < 0 ? esc(s) : esc(s.slice(0, i)) + '<mark>' + esc(s.slice(i, i + q.length)) + '</mark>' + esc(s.slice(i + q.length)); };
+  let emToQ = '', emToOpen = false, emToView = 'spec';
+  function emMatches(n){
+    const q = emToQ.trim().toLowerCase(), have = new Set(n.rcpt.to.emails.filter(x => typeof x === 'string').map(x => x.toLowerCase()));
+    return q ? EM_PEOPLE.filter(p => !have.has(p.email) && (p.name.toLowerCase().includes(q) || p.email.includes(q))) : [];
+  }
+  function emCanAdd(n){
+    const q = emToQ.trim();
+    return EMAIL_RE.test(q) && !n.rcpt.to.emails.some(x => typeof x === 'string' && x.toLowerCase() === q.toLowerCase()) && !EM_PEOPLE.some(p => p.email === q.toLowerCase());
+  }
+  function emPopHTML(n){
+    if(emToView === 'ref'){
+      return '<button type="button" class="em-to-back" data-a="toback"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Reference</button>'
+        + '<div class="em-to-sec">From the Incident</div>'
+        + EM_REFS.map(r => '<button type="button" class="em-to-row ref" data-a="toref" data-v="' + esc(r) + '"><span class="em-to-x">{x}</span><span class="em-to-name">' + esc(r) + '</span></button>').join('');
+    }
+    const q = emToQ.trim(), list = n.rcpt.to.emails, m = emMatches(n);
+    let h = '';
+    if(!q){
+      h = list.length ? '<div class="em-to-hint">Search people or type an email and press Enter</div>'
+        : '<div class="em-to-empty">' + EM_EMPTY_SVG + '<div class="em-to-et">No emails yet</div><div class="em-to-es">Search people or type an email and press Enter</div></div>';
+    } else {
+      if(emCanAdd(n)) h += '<button type="button" class="em-to-row add" data-a="toadd"><span class="em-to-av add">+</span><span class="em-to-name">Add “' + esc(q) + '”</span><kbd>Enter</kbd></button>';
+      if(m.length) h += '<div class="em-to-sec">People</div>' + m.map(p => '<button type="button" class="em-to-row" data-a="topick" data-v="' + esc(p.email) + '"><span class="em-to-av">' + emInitials(p.name)
+        + '</span><span class="em-to-tx"><span class="em-to-name">' + emHL(p.name, q) + '</span><span class="em-to-mail">' + emHL(p.email, q) + '</span></span></button>').join('');
+      if(!h) h = '<div class="em-to-hint">' + (/@/.test(q) ? 'Keep typing a full email address' : 'No people match “' + esc(q) + '”') + '</div>';
+    }
+    return h + '<button type="button" class="em-to-refcard" data-a="toreflist"><span class="em-to-x lg">{x}</span><span class="em-to-tx"><span class="em-to-rt">Reference</span><span class="em-to-rs">Use a value from an earlier step</span></span>'
+      + '<span class="em-to-chev"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>';
+  }
+  function renderEmailTo(n, focus){
+    const host = $('#emTo'), list = n.rcpt.to.emails;
+    emRedrawing = true;
+    host.innerHTML = '<div class="em-to-box">'
+      + list.map((x, i) => '<span class="em-chip' + (typeof x === 'string' ? '' : ' ref') + '">' + esc(emLabel(x))
+        + '<button type="button" data-a="todel" data-idx="' + i + '" aria-label="Remove ' + esc(emLabel(x)) + '">×</button></span>').join('')
+      + '<input class="em-to-input" type="text" autocomplete="off" placeholder="' + (list.length ? 'Add more…' : 'Search people or type an email…') + '" value="' + esc(emToQ) + '"></div>'
+      + '<div class="em-to-err hidden" data-emailerr></div>'
+      + (emToOpen ? '<div class="em-to-pop">' + emPopHTML(n) + '</div>' : '');
+    emRedrawing = false;
+    if(focus){ const i = host.querySelector('.em-to-input'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  }
+  function renderEmailPop(n){ const p = $('#emTo .em-to-pop'); if(p) p.innerHTML = emPopHTML(n); }
+  /* the technician group: newest pick + "+N"; hover lists them all; the picker ticks several and stays open */
+  function renderEmailTg(n){
+    const g = n.techGroups || (n.techGroups = []), b = $('#emTg');
+    b.innerHTML = (g.length
+      ? '<span class="em-chip">' + esc(g[g.length - 1]) + '</span>' + (g.length > 1 ? '<span class="em-more">+' + (g.length - 1) + '</span>' : '')
+      : '<span class="em-tg-ph">Pick technician groups…</span>')
+      + '<svg class="em-tg-chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    if(g.length > 1) b.setAttribute('data-tip', [...g].reverse().join(', ')); else b.removeAttribute('data-tip');
+  }
+  function renderEmailTpl(n){
+    // always "Use template" — picking one fills Subject + Content; the link keeps its name (user 2026-10-21)
+    $('#emTplWrap').innerHTML = '<button type="button" class="em-tpl-btn" id="emTpl">' + img('n-plus') + 'Use template</button>';
+  }
+  function syncEmailValidity(n){
+    const miss = missingOf(n), show = n.checked;
+    $('#emTitleBox').classList.toggle('invalid', show && miss.includes('title'));
+    document.querySelector('#emCard .em-field[data-k="to"]').classList.toggle('invalid', show && miss.includes('to'));
+    $('#emSubjectBox').classList.toggle('invalid', show && miss.includes('subject'));
+    $('#emBodyBox').classList.toggle('invalid', show && miss.includes('body'));
+    setHeadName('em', n);
+    renderAlert($('#emAlert'), n);
+    $('#emNext').innerHTML = nextRowsHTML(n);
+  }
+  function openEmail(n){
+    openDrawer('email');
+    $('#emTitle').value = n.title; setDesc($('#emDesc'), n.desc);
+    setHeadName('em', n);
+    gotoLabel(n, $('#emGoto'));
+    $('#emSubject').value = n.subject; $('#emBody').value = n.body;
+    emToQ = ''; emToOpen = false; emToView = 'spec';
+    renderEmailTo(n); renderEmailTg(n);
+    renderEmailTpl(n);
+    syncEmailValidity(n);
+    $('#emScroll').scrollTop = 0; $('#emHead').classList.remove('collapsed');
+  }
+  const emailEdited = () => { const n = nodes[selId]; if(n && n.type === 'email'){ syncEmailValidity(n); render(); } };
+  $('#emTitle').addEventListener('input', e => { const n = nodes[selId]; if(!n) return; n.title = e.target.value; emailEdited(); });
+  $('#emDesc').addEventListener('input', e => { const n = nodes[selId]; if(n){ n.desc = e.target.value; autoGrow(e.target); render(); } });
+  $('#emSubject').addEventListener('input', e => { const n = nodes[selId]; if(!n) return; n.subject = e.target.value; emailEdited(); });
+  $('#emBody').addEventListener('input', e => { const n = nodes[selId]; if(!n) return; n.body = e.target.value; emailEdited(); });
+  $('#emAttach').addEventListener('click', () => toast('Attachments are not part of this prototype'));
+  $('#emTg').addEventListener('click', () => {
+    const n = nodes[selId]; if(!n || n.type !== 'email') return;
+    if(!n.techGroups) n.techGroups = [];
+    WFPop.open({
+      anchor: () => $('#emTg'), title:'Technician group', searchPlaceholder:'Search technician groups', selected:n.techGroups,
+      items: EM_GROUPS.map(g => ({ id:g, label:g })),
+      onPick(item){ const g = n.techGroups, i = g.indexOf(item.id); if(i >= 0) g.splice(i, 1); else g.push(item.id);
+        renderEmailTg(n); emailEdited(); return true; }   // applies at once; the picker stays open for more
+    });
+  });
+  (function bindEmailTo(){
+    const host = $('#emTo');
+    const nodeNow = () => { const n = nodes[selId]; return n && n.type === 'email' ? n : null; };
+    const err = (msg) => { const e = host.querySelector('[data-emailerr]'); if(!e) return; e.textContent = msg || ''; e.classList.toggle('hidden', !msg); };
+    function add(n, v){
+      const list = n.rcpt.to.emails, key = emLabel(v).toLowerCase();
+      if(list.some(x => emLabel(x).toLowerCase() === key)){ err('Already added'); return; }
+      list.push(v); emToQ = ''; emToView = 'spec'; renderEmailTo(n, true); emailEdited();
+    }
+    host.addEventListener('focusin', e => {
+      const n = nodeNow(); if(!n || !e.target.classList.contains('em-to-input') || emToOpen) return;
+      emToOpen = true; renderEmailTo(n, true);
+    });
+    host.addEventListener('focusout', e => {
+      if(emRedrawing) return;
+      const n = nodeNow(); if(!n || (e.relatedTarget && host.contains(e.relatedTarget))) return;
+      const q = emToQ.trim();
+      emToOpen = false; emToView = 'spec';
+      if(q && EMAIL_RE.test(q) && !n.rcpt.to.emails.some(x => emLabel(x).toLowerCase() === q.toLowerCase())){ n.rcpt.to.emails.push(q); emToQ = ''; renderEmailTo(n); emailEdited(); }
+      else renderEmailTo(n);
+    });
+    host.addEventListener('input', e => {
+      const n = nodeNow(); if(!n || !e.target.classList.contains('em-to-input')) return;
+      emToQ = e.target.value; emToView = 'spec'; err('');
+      if(!emToOpen){ emToOpen = true; renderEmailTo(n, true); } else renderEmailPop(n);
+    });
+    host.addEventListener('keydown', e => {
+      const n = nodeNow(); if(!n || !e.target.classList.contains('em-to-input')) return;
+      const q = emToQ.trim();
+      if(e.key === 'Enter' || e.key === ',' || e.key === ';'){
+        if(!q) return; e.preventDefault();
+        if(emCanAdd(n)) return add(n, q);
+        const m = emMatches(n); if(m.length) return add(n, m[0].email);
+        err(EMAIL_RE.test(q) ? 'Already added' : 'Enter a valid email');
+      } else if(e.key === 'Backspace' && !e.target.value && n.rcpt.to.emails.length){
+        e.preventDefault(); n.rcpt.to.emails.pop(); renderEmailTo(n, true); emailEdited();
+      } else if(e.key === 'Escape' && emToOpen){
+        e.preventDefault(); e.stopPropagation(); emToOpen = false; renderEmailTo(n, true);
+      }
+    });
+    /* clicks inside the popup must not blur the box (that would close it under the pointer) */
+    host.addEventListener('mousedown', e => { if(e.target.closest('.em-to-pop') || e.target.closest('[data-a="todel"]')) e.preventDefault(); });
+    host.addEventListener('click', e => {
+      const n = nodeNow(); if(!n) return;
+      const b = e.target.closest('[data-a]');
+      if(!b){ if(e.target.closest('.em-to-box')) host.querySelector('.em-to-input').focus(); return; }
+      const a = b.dataset.a;
+      if(a === 'todel'){ n.rcpt.to.emails.splice(+b.dataset.idx, 1); renderEmailTo(n, emToOpen); emailEdited(); return; }
+      if(a === 'topick') return add(n, b.dataset.v);
+      if(a === 'toadd') return add(n, emToQ.trim());
+      if(a === 'toref') return add(n, { ref: b.dataset.v });
+      if(a === 'toreflist'){ emToView = 'ref'; renderEmailPop(n); return; }
+      if(a === 'toback'){ emToView = 'spec'; renderEmailPop(n); return; }
+    });
+  })();
+  /* the template link lives in the Message heading, outside the card */
+  $('#emTplWrap').addEventListener('click', e => {
+    const n = nodes[selId]; if(!n || n.type !== 'email') return;
+    if(e.target.closest('#emTpl')) openEmailTemplates(n);
+  });
+  /* "Use template" — the same anchored picker every other choice uses. A
+     template fills Subject + Content (replacing what's there — Undo brings it
+     back); recipients are never touched. */
+  function openEmailTemplates(n){
+    WFPop.open({
+      anchor: () => $('#emTpl'), noSearch:true, wide:true, title:'Use template', selected:n.template || null,
+      items: Object.keys(EMAIL_TEMPLATES).map(name => ({ id:name, label:name, sub:EMAIL_TEMPLATES[name].subject, icon:'copy', tone:'util' })),
+      onPick(item){
+        const t = EMAIL_TEMPLATES[item.id]; if(!t) return;
+        n.template = item.id; n.subject = t.subject; n.body = t.body;
+        $('#emSubject').value = n.subject; $('#emBody').value = n.body;
+        renderEmailTpl(n); emailEdited();
+      }
+    });
+  }
+  $('#emGoto').addEventListener('click', () => { const p = nodes[selId].parent; if(p){ selectNode(p); focusNode(p); } });
+  $('#emClose').addEventListener('click', deselect);
+  $('#emDelete').addEventListener('click', () => removeNode(selId));
+  $('#emMore').addEventListener('click', () => openNodeMenu(nodes[selId], $('#emMore')));
+  bindNext($('#emNext'));
 
   /* ------------------ Run History / Version History — both replace the
      drawer instead of opening a popup; the canvas goes read-only while
@@ -2402,6 +2649,7 @@
   bindCollapse($('#trScroll'), $('#trHead'));
   bindCollapse($('#lnScroll'), $('#lnHead'));
   bindCollapse($('#cdScroll'), $('#cdHead'));
+  bindCollapse($('#emScroll'), $('#emHead'));
 
   document.querySelectorAll('.switch-tabs').forEach(group => {
     group.querySelectorAll('.switch-tab').forEach(btn => btn.addEventListener('click', () => {

@@ -620,6 +620,88 @@
         </div>
       </aside>
 
+      <!-- --------- Send an Email configuration --------- -->
+      <aside class="sidebar hidden" id="emailCfg">
+        <div class="cfg-container">
+          <div class="cfg-inner">
+            <div class="cfg-head" id="emHead">
+              <div class="head-top">
+                <div class="head-left">
+                  <button class="goto-pill" id="emGoto" aria-label="Go to previous node">
+                    <img src="assets/chevron-down.svg" alt="">
+                    <span class="pill-text">Go to Trigger Node</span>
+                  </button>
+                  <div class="title-inline">
+                    <div class="cfg-node-badge em-badge"><img src="assets/mail.svg" alt=""></div>
+                    <span class="cfg-node-name" data-name="em" title="Click to rename">Send an Email</span>
+                  </div>
+                </div>
+                <div class="head-right">
+                  <div class="cfg-actions">
+                    <button class="hover-box" id="emDelete" data-tip="Delete" aria-label="Delete"><img src="assets/delete.svg" alt=""></button>
+                    <button class="hover-box" id="emMore" data-tip="More" aria-label="More"><img src="assets/more-vertical.svg" alt=""></button>
+                  </div>
+                  <button class="hover-box" id="emClose" data-tip="Close" aria-label="Close"><img src="assets/close2.svg" alt=""></button>
+                </div>
+              </div>
+              <div class="head-expanded">
+                <div class="cfg-node-title">
+                  <div class="cfg-node-badge em-badge"><img src="assets/mail.svg" alt=""></div>
+                  <span class="cfg-node-name" data-name="em" title="Click to rename">Send an Email</span>
+                </div>
+                <p class="cfg-desc">Send an email when the workflow reaches this step — write it here or start from a template. <a href="#" class="cfg-doc" data-doc>Doc<img src="assets/open-link.svg" alt=""></a></p>
+                <textarea class="desc-inline" id="emDesc" rows="1" placeholder="Add a description..."></textarea>
+              </div>
+              <div class="head-divider"></div>
+            </div>
+            <div class="cfg-scroll" id="emScroll">
+              <div class="cfg-alert hidden" id="emAlert"></div>
+              <div class="cfg-form">
+                <div class="field">
+                  <div class="field-label">Title <span class="req">*</span></div>
+                  <div class="input-box" id="emTitleBox"><input id="emTitle" type="text" placeholder="Add title..."></div>
+                </div>
+                <!-- "Message" + "Use template" sit ABOVE the filled card, outside it (user 2026-10-21 — like the product's
+                     "Insert From Template"); the card is #F9FAFB with no stroke -->
+                <div class="em-card-head">
+                  <span class="em-card-title">Message</span>
+                  <span class="em-tpl-wrap" id="emTplWrap"></span>
+                </div>
+                <div class="em-card" id="emCard">
+                  <!-- To: search people or type an email (+ Reference); Cc / Bcc removed for now (user 2026-10-21) -->
+                  <div class="field em-field" data-k="to">
+                    <div class="field-label">To <span class="req">*</span></div>
+                    <div class="em-to" id="emTo"></div>
+                  </div>
+                  <!-- Technician group: its own multi-select, no longer folded into To (user 2026-10-21) -->
+                  <div class="field em-field" data-k="tg">
+                    <div class="field-label">Technician group</div>
+                    <button type="button" class="em-tg" id="emTg"></button>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Subject <span class="req">*</span></div>
+                    <div class="input-box" id="emSubjectBox"><input id="emSubject" type="text" placeholder="Add a subject..."></div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Content <span class="req">*</span></div>
+                    <div class="input-box textarea em-body" id="emBodyBox"><textarea id="emBody" rows="6" placeholder="Write the email..."></textarea></div>
+                  </div>
+                </div>
+                <button type="button" class="em-attach" id="emAttach"><img src="assets/plus-square.svg" alt="">Attachments</button>
+              </div>
+              <div class="next-node" id="emNextWrap">
+                <button class="next-node-head" type="button" data-nn-toggle>
+                  <span class="nn-text"><h3>Next step</h3><p>Define what happens after this block</p></span>
+                  <span class="nn-chev"><img src="assets/chevron-down.svg" alt=""></span>
+                </button>
+                <div class="nn-body" id="emNext"></div>
+              </div>
+            </div>
+            <div class="autosave"><i></i>All changes are saved automatically</div>
+          </div>
+        </div>
+      </aside>
+
       <!-- --------- Run History (replaces the drawer, read-only while open) --------- -->
       <aside class="sidebar hidden" id="runHistoryCfg">
         <div class="cfg-container">

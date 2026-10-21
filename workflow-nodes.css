@@ -553,3 +553,85 @@
 /* cursor mode hint: note tool turns the empty canvas into a "place here" surface */
 .canvas.tool-note{cursor:crosshair;}
 .canvas.tool-note .nd{cursor:default;}
+
+/* ============ Send an Email drawer ============
+   One tinted "Message" card holds To / Cc (+ Bcc) / Subject / Content, with
+   "Use template" in primary blue at its top right. Recipients reuse the
+   Cc Emails chip input (.cell-emails) — boxed on their own here, not joined
+   to an fx button the way a condition value cell is. */
+.cfg-node-badge.em-badge{background:rgba(61,139,208,.12);}
+.em-card{display:flex;flex-direction:column;gap:14px;width:100%;padding:14px 12px;background:#F9FAFB;border:none;border-radius:10px;}   /* filled, no stroke (user 2026-10-21) */
+.em-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px;width:100%;margin-top:-6px;margin-bottom:-6px;}   /* sits above the card, outside it */
+.em-card-title{font-size:12px;font-weight:600;color:var(--page-text);}
+.em-tpl-wrap{display:flex;align-items:center;min-width:0;}
+.em-tpl{display:inline-flex;align-items:center;gap:2px;min-width:0;}
+.em-tpl-btn{display:inline-flex;align-items:center;gap:5px;min-width:0;max-width:200px;border:none;background:none;border-radius:6px;padding:3px 6px;font-family:inherit;font-size:12px;font-weight:500;color:var(--primary);cursor:pointer;}
+.em-tpl-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.em-tpl-btn:hover{background:rgba(61,139,208,.1);}
+.em-tpl-btn img{width:13px;height:13px;display:block;flex-shrink:0;}
+.em-tpl-x{width:20px;height:20px;border:none;background:none;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .12s;}
+.em-tpl:hover .em-tpl-x,.em-tpl-x:focus-visible{opacity:.6;}
+.em-tpl-x:hover{opacity:1;background:rgba(242,92,78,.12);}
+.em-tpl-x img{width:9px;height:9px;display:block;}
+.em-label-row{display:flex;align-items:center;justify-content:space-between;}
+.em-bcc-link{border:none;background:none;padding:0 2px;font-family:inherit;font-size:11px;font-weight:500;color:var(--primary);cursor:pointer;}
+.em-bcc-link:hover{text-decoration:underline;}
+.em-rcpt .cell-emails{height:auto;min-height:32px;border:1px solid var(--border);border-radius:6px;background:var(--white);}
+.em-rcpt .email-foot{min-height:0;}
+.em-rcpt .email-hint{display:none;}
+.em-rcpt .cell-emails.editing ~ .email-foot .email-hint{display:inline;}
+.em-field.invalid .cell-emails{border-color:var(--critical);}
+.em-card .input-box.em-body{height:auto;padding-top:6px;padding-bottom:6px;}
+.em-card .input-box.em-body textarea{height:auto;min-height:118px;line-height:1.55;resize:vertical;}
+.em-attach{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--border);border-radius:6px;background:var(--white);padding:6px 10px;font-family:inherit;font-size:11.5px;font-weight:500;color:var(--page-text);cursor:pointer;}
+.em-attach:hover{border-color:var(--primary);color:var(--primary);}
+.em-attach img{width:13px;height:13px;display:block;}
+
+/* ── Send an Email › To + Technician group (user 2026-10-21) ─────────────────────
+   To = one search-or-add box with a dropdown under it: an empty state, people
+   matches, "Add “x”", and a purple Reference card. Technician group = a
+   multi-select showing the newest pick + "+N". */
+.em-to{position:relative;width:100%;}
+.em-to-box{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-height:36px;padding:4px 8px;background:#fff;border:1px solid #dfe5ed;border-radius:8px;cursor:text;transition:border-color .12s;}
+.em-to-box:focus-within{border-color:#3d8bd0;}
+.em-field.invalid .em-to-box{border:1px dashed #f25c4e;}
+.em-to-input{flex:1;min-width:140px;height:26px;border:none;outline:none;background:transparent;font:inherit;font-size:13px;color:#364658;padding:0 4px;}
+.em-to-input::placeholder{color:#a5bad0;}
+.em-chip{display:inline-flex;align-items:center;gap:2px;height:24px;max-width:100%;padding:0 4px 0 8px;border-radius:6px;background:#EEF2F6;color:#364658;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.em-chip.ref{background:#f0e8fc;color:#8a24d6;}
+.em-chip button{width:18px;height:18px;border:none;background:none;border-radius:4px;color:inherit;opacity:.55;cursor:pointer;font-size:13px;line-height:1;}
+.em-chip button:hover{opacity:1;background:rgba(0,0,0,.06);}
+.em-to-err{margin-top:4px;font-size:11.5px;color:#f25c4e;}
+.em-to-pop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;display:flex;flex-direction:column;gap:2px;padding:6px;max-height:320px;overflow:auto;background:#fff;border:1px solid #dfe5ed;border-radius:12px;box-shadow:0 12px 32px -12px rgba(54,70,88,.28),0 2px 6px rgba(54,70,88,.06);}
+.em-to-empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:12px 16px 14px;}
+.em-to-et{margin-top:6px;font-size:13px;font-weight:600;color:#364658;}
+.em-to-es{margin-top:3px;max-width:230px;font-size:11.5px;line-height:1.4;color:#7b8fa5;}
+.em-to-hint{padding:8px 8px 6px;font-size:12px;color:#7b8fa5;}
+.em-to-sec{padding:8px 8px 4px;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#8E9FBC;}
+.em-to-row{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border:none;border-radius:8px;background:none;text-align:left;cursor:pointer;font:inherit;color:#364658;}
+.em-to-row:hover{background:#F6F9FC;}
+.em-to-row kbd{margin-left:auto;padding:1px 5px;border:1px solid #dfe5ed;border-radius:4px;font:inherit;font-size:10px;color:#7b8fa5;}
+.em-to-av{flex-shrink:0;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#EEF2F6;color:#516381;font-size:10.5px;font-weight:600;}
+.em-to-av.add{background:rgba(61,139,208,.12);color:#3d8bd0;font-size:15px;}
+.em-to-row.add .em-to-name{color:#3d8bd0;font-weight:500;}
+.em-to-tx{display:flex;flex-direction:column;min-width:0;}
+.em-to-name{font-size:13px;color:#364658;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.em-to-mail{font-size:11.5px;color:#7b8fa5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.em-to-pop mark{background:#FDE68A;color:inherit;border-radius:2px;}
+.em-to-x{flex-shrink:0;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#f0e8fc;color:#8a24d6;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;}
+.em-to-row.ref .em-to-name{color:#6B21A8;}
+.em-to-refcard{display:flex;align-items:center;gap:10px;margin-top:6px;padding:8px 10px;border:1px solid #E9D5FF;border-radius:10px;background:linear-gradient(135deg,#fff 0%,#FAF5FF 100%);cursor:pointer;text-align:left;font:inherit;box-shadow:0 1px 2px rgba(124,58,237,.06);}
+.em-to-refcard:hover{border-color:#C4B5FD;}
+.em-to-x.lg{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#A855F7 0%,#7C3AED 100%);color:#fff;font-size:11px;box-shadow:0 2px 6px -1px rgba(124,58,237,.45);}
+.em-to-rt{font-size:12.5px;font-weight:600;color:#6B21A8;}
+.em-to-rs{font-size:11px;color:#8B5CF6;}
+.em-to-chev{margin-left:auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#F3E8FF;color:#7C3AED;}
+.em-to-chev svg,.em-to-back svg{width:13px;height:13px;}
+.em-to-back{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;padding:4px 6px;border:none;background:none;border-radius:6px;font:inherit;font-size:12.5px;font-weight:600;color:#364658;cursor:pointer;}
+.em-to-back:hover{background:#F6F9FC;}
+.em-tg{display:flex;align-items:center;gap:6px;width:100%;min-height:36px;padding:0 10px;background:#fff;border:1px solid #dfe5ed;border-radius:8px;cursor:pointer;font:inherit;text-align:left;transition:border-color .12s;}
+.em-tg:hover{border-color:#cbd5e1;}
+.em-tg-ph{flex:1;font-size:13px;color:#a5bad0;}
+.em-tg .em-chip{padding:0 8px;}
+.em-more{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:999px;border:1px solid #dfe5ed;background:#F6F9FC;color:#7b8fa5;font-size:11.5px;font-weight:500;}
+.em-tg-chev{margin-left:auto;width:13px;height:13px;color:#a5bad0;flex-shrink:0;}

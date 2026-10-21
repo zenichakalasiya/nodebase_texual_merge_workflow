@@ -175,8 +175,12 @@
       + `</div>`
       + `<div class="pagebar-right">`
         /* Email recipients + Tags designs were FINALISED on 1.2 (user 2026-10-19) — their version switches are gone */
-        + `<label class="email-ver" id="pickVer" data-tip="Condition value picker — design version"><span>Picker</span>`
-          + `<select id="pickVerSel" aria-label="Condition value picker design version"><option value="1">Version 1</option><option value="2">Version 2</option></select></label>`
+        /* Text field trial (user 2026-10-21): three ways a free-text field gets the Specific | Dynamic popup */
+        + `<label class="email-ver" id="textVer" data-tip="Subject / Description field — design option"><span>Text field</span>`
+          + `<select id="textVerSel" aria-label="Text field design option"><option value="A">A · Either / or</option><option value="B">B · Editor in popup</option><option value="C">C · Type in field</option></select></label>`
+        /* Sidebar popup trial: V1 opens below the field · V2 opens on the field, its tabs covering it (user 2026-10-22) */
+        + `<label class="email-ver" id="popVer" data-tip="Popups opened from a sidebar field — design option"><span>Popup</span>`
+          + `<select id="popVerSel" aria-label="Sidebar popup design option"><option value="1">V1 · Below</option><option value="2">V2 · On the field</option></select></label>`
         + `<div class="enable-row"><span>Enabled</span>`
           + `<button class="switch on" id="enableSw" role="switch" aria-checked="true"><span>ON</span><i></i></button></div>`
         + `<button class="btn-outline" id="runHistBtn" data-tip="Run history&nbsp;&nbsp;read-only while open" hidden>${svg('activity')}Run history<span class="run-badge" id="runBadge" hidden></span></button>`
@@ -493,11 +497,19 @@
     }
     window.addEventListener('resize', () => { if(isLinear()) placeLinear(); });
     /* Condition value picker (Category etc.) design version: remembered per browser, pushed into the Linear frame on change */
-    const pvSel = $('#pickVerSel');
-    try { const v = localStorage.getItem('wf.pickVer'); if(v && [...pvSel.options].some(o => o.value === v)) pvSel.value = v; } catch(_e){}
+    const tvSel = $('#textVerSel');
+    tvSel.value = 'B';
+    try { const v = localStorage.getItem('wf.textVer'); if(v && [...tvSel.options].some(o => o.value === v)) tvSel.value = v; } catch(_e){}
+    tvSel.addEventListener('change', () => {
+      try { localStorage.setItem('wf.textVer', tvSel.value); } catch(_e){}
+      linearSend({ wf:'textver', v: tvSel.value });
+    });
+    const pvSel = $('#popVerSel');
+    pvSel.value = '1';
+    try { const v = localStorage.getItem('wf.popVer'); if(v && [...pvSel.options].some(o => o.value === v)) pvSel.value = v; } catch(_e){}
     pvSel.addEventListener('change', () => {
-      try { localStorage.setItem('wf.pickVer', pvSel.value); } catch(_e){}
-      linearSend({ wf:'pickver', v: pvSel.value });
+      try { localStorage.setItem('wf.popVer', pvSel.value); } catch(_e){}
+      linearSend({ wf:'popver', v: pvSel.value });
     });
     window.addEventListener('message', e => {
       if(!linearFrame || e.source !== linearFrame.contentWindow || e.origin !== location.origin) return;
@@ -505,7 +517,8 @@
       if(m.wf === 'ready'){
         linearReady = true; linearEl.classList.add('ready');
         linearSend({ wf:'details', name: flowName, desc: flowDesc });
-        linearSend({ wf:'pickver', v: $('#pickVerSel').value });
+        linearSend({ wf:'textver', v: $('#textVerSel').value });
+        linearSend({ wf:'popver', v: $('#popVerSel').value });
         if(isLinear()) linearFrame.focus();
       } else if(m.wf === 'state'){
         flowName = m.name || ''; flowDesc = m.desc || '';

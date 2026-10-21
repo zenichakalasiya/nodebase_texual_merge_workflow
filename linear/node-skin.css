@@ -899,3 +899,55 @@ html.embed [data-nf="stage-head"][aria-expanded="true"]{border-bottom:1px solid 
    "Write the email…" line is lifted so its middle lines up with the button's middle (box padding-top 10 → 3). */
 html.embed [data-nf="cbody"] > div:first-of-type{padding-top:3px !important;}
 html.embed [data-nf="cbody"] [data-nf="ph-btn"]{top:2px !important;right:-7px !important;}
+
+/* 30 · Text field trial (user 2026-10-21) — B's read-only Description field grows to ~3 lines
+   (the generic value-cell rule above pins every value button to 32px) */
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + button[data-nf="txt-b-field"][data-multi]{
+  height:auto !important;min-height:76px !important;padding:8px 11px !important;align-items:flex-start;
+}
+html.embed [data-nf="txt-preview"]{font-size:12.8px !important;}
+/* C's one-line field wraps instead of clipping when the text + values outgrow one line */
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + div[data-nf="txt-c"]:not([data-phbox]){height:auto !important;min-height:32px !important;}
+
+/* 31 · "+N more" popup, option A (user 2026-10-21): with the selected list open, the "N selected" note moves to the
+   far left of the joined bar, so the popover's own copy hides */
+[data-vp-side] [data-nf="pop-sel-count"]{visibility:hidden;}
+/* 32 · Add Packages side panel slides in from the right */
+@keyframes pkgSheetIn{from{transform:translateX(24px);opacity:.6}to{transform:none;opacity:1}}
+[data-nf="pkg-sheet"]{animation:pkgSheetIn .18s ease-out;}
+
+/* 33 · Multi-select popups — the Selected side is TINTED (finalised 2026-10-21): the left column is #F9FAFB top to
+   bottom; picks are plain rows — the name and its × only, no card fill or stroke (a soft hover shows the row) */
+[data-nf="rc-side-wrap"],[data-nf="vp-side"],[data-nf="vp-side-bar"]{background:#F9FAFB !important;}
+[data-nf="rc-card"],[data-nf="vp-side-row"]{background:transparent !important;border-color:transparent !important;}
+[data-nf="rc-card"]:hover,[data-nf="vp-side-row"]:hover{background:#EEF2F6 !important;}
+/* plain rows: the TEXT sits on the same 12px edge as the search box and section labels; the hover fill runs 10px
+   past it on both sides. A subcategory keeps its 10px indent. */
+[data-nf="rc-card"],[data-nf="vp-side-row"]{margin-left:-10px !important;margin-right:-10px !important;padding-left:10px !important;}
+[data-nf="vp-side-row"][style*="margin-left: 10px"]{margin-left:0 !important;}
+
+/* 34 · tooltips are portalled (initTipPortal, user 2026-10-21) — the in-place ::after bubble got clipped by its container */
+[data-tip]:hover::after,[data-tip-below]:hover::after,html.embed [data-tip]:hover::after,html.embed [data-tip-below]:hover::after{display:none !important;content:none !important;}
+/* 35 · Field gallery (user 2026-10-21): every field box is white, as in the drawer */
+[data-nf="gallery"] [data-nf="content"]{background:#fff !important;}
+/* the gallery gets the SIDEBAR field looks (those rules are scoped to [data-nf=side]) */
+html.embed [data-nf="gallery"] [data-tfield]{min-height:38px !important;padding:0 8px !important;background:#fff !important;border-radius:8px;gap:6px;}
+html.embed [data-nf="gallery"] [data-nf="vcell"]{background:#fff !important;border-color:#dfe5ed !important;border-radius:8px !important;}
+html.embed [data-nf="gallery"] [data-nf="pk-btn"]{background:#fff !important;min-height:38px;}
+
+/* 36 · Side-by-side rows keep their two columns while the value's popup is open (user 2026-10-21). The 14e rules
+   key on the value control's resting border (var(--border2)); an open control switches to var(--accent2), so the
+   row used to fall back to stacked and the popup came out as wide as the whole row. These hooks hold column 2. */
+@container side (min-width: 510px){
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"]:has(+ [style*="1px solid var(--accent2)"]:not(.overflow-hidden)),
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"]:has(+ [data-nf="vp-field"]),
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"]:has(+ [data-nf="txt-b-field"]),
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"]:has(+ [data-nf="rc-box"]){grid-column:1;border-radius:8px 0 0 8px !important;}
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + [style*="1px solid var(--accent2)"]:not(.overflow-hidden),
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + [data-nf="vp-field"],
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + [data-nf="txt-b-field"],
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + [data-nf="rc-box"]{grid-column:2;border-left:none !important;border-radius:0 8px 8px 0 !important;}
+}
+
+/* 37 · Reference card — flat and subtle (user 2026-10-21): no gradient or shadow; a soft tint + border on hover */
+[data-ref-card]:hover{background:#F6F1FE !important;border-color:#DCCDF8 !important;}

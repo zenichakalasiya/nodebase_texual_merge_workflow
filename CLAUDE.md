@@ -529,16 +529,25 @@ Functional edits made inside V8 (all in `linear/index.html`):
     button for a new value.
   - **Sections:** uppercase grey section titles, separated by a 14px gap
     (no hairline).
-  - **Reference card:** a purple card with a `{x}` tile. Picking a
-    reference adds it to Added and returns to Specific.
-  - **Commit:** Apply commits. An outside click / Esc discards. There is
-    no f(x) button on the field and no Cancel.
-- **Technician groups** read as grey chips with a people icon + member count
-  (`VlChip group`), hover lists the members.
+  - **Reference card:** a flat, subtle lavender card (`#FBF9FF`, no
+    gradient or shadow; hover tint in skin section 37) with a `{x}` tile.
+    Picking a reference adds it to Added and returns to Specific.
+  - **Commit:** LIVE — every change reaches the field at once, no Apply
+    (`footerApply` is kept in code, unused). Outside click / Esc closes.
+  - **Empty states:** `rcEmptyArt(kind, more)` — envelope (email) or phone
+    (SMS) art, "No emails yet"; a compact "Add another …" once values exist.
+  - **Variants:** `maxOne` (Create User › Email — one value, replaces);
+    SMS To takes typed numbers only. Create/Update "Cc emails" uses the
+    same To-style popup. Send email has To + a separate Technician group
+    multi-select (Cc/Bcc removed).
+- **Technician group popup rows** show the name only (no icon / count).
 - **Dynamic (reference) values** show the value only, light purple
   (`--ref-bg #f0e8fc` / `--ref-fg #8a24d6`), never a `{ }` icon.
 - **VPicker** (the IF node's Category value popup) is the ONE multi-select popup
-  everywhere else, and follows the top bar's **Picker** Version 1 / 2 switch.
+  everywhere else. Its Version 2 is final (the Picker switch is gone): title
+  on top, selected pills above the search, search icon on the right turning
+  into a blue + when the value can be added, checkboxes on the right. Changes
+  apply LIVE (no Apply) except Merge's "which branches" (`vp.keepApply`).
   - **Where:** condition values, Create/Update multi rows (Business
     services, Add Roles), Create deployment "Notify to", Create
     announcement groups, the Get Hardware Asset asset-type filter, and
@@ -555,8 +564,31 @@ Functional edits made inside V8 (all in `linear/index.html`):
   tabs.
 - **Yes / No fields** (Spam, Known error, Associate parent entity) are one
   switch chip (`tgl-chip`). Untouched counts as "No" (`toggleVal`).
-- **Send email:** To and Cc always shown; "Bcc" sits at the Cc label's right.
-  Insert from Template / Insert Knowledge were removed from the reply toolbar.
+- **Send email:** "Message" + "Use template" row above a borderless card;
+  To + Technician group. Insert from Template / Insert Knowledge were removed
+  from the reply toolbar.
+- **Sidebar popup rules (shared helpers next to `popCommitMode`):**
+  - `popSide(el)` = opened from a sidebar field (or the gallery's sidebar
+    view). Saving: sidebar → click / Enter ("Press Enter" hint, no button);
+    canvas blanks → Apply button bottom right.
+  - **Width:** `popSideW` — a sidebar popup is as wide as the value field it
+    opened from, min 280px, growing leftward when wider. Applies to Popover,
+    `RcptField` and the plain `Picker` dropdown.
+  - **V1 / V2** (top bar **Popup** switch, `window.__popVer`, `popV2()`):
+    V1 opens below the field; V2 opens ON the field — its Specific | Dynamic
+    tabs cover the field (title row hidden), lifted to fit near the bottom.
+    Saving is identical in both. Still a trial — not finalised.
+- **Get records:** Single / Multiple in the sentence; "up to [N]" fetch limit;
+  on a periodic workflow Multiple's subtext states the per-cycle cap
+  (`getCycle()` — only hourly = 100 so far, a PLACEHOLDER awaiting real
+  numbers); the full sentence is the hover text.
+- **Field gallery** (`?embed=1&gallery=1`, `GALLERY`): every unique field in
+  one page, two views — **Sidebar fields** (V1 / V2 tabs) and **Canvas
+  blanks** (real canvas rows via `renderFlow(flow, [], {only:i})` from the
+  gallery-only `GALLERY_DEMO_DOC`, so every blank opens its real popup; in
+  gallery mode `document.querySelector('[data-anchor=…]')` prefers the
+  gallery's copy). Published as a claude.ai artifact, built by a scratch
+  script that precompiles the JSX and inlines skin + vendor (not in repo).
 - **Search highlight** in every list popup is yellow (`SEARCH_MARK`, `#FDE68A`).
 - **Ask for approval** stage headings are tinted `#F6F9FC`.
 - **Request Signature** is a new step under Approval (template list is
@@ -570,8 +602,11 @@ Reference docs in the repo root (generated this project):
 - `OPERATORS.md`: Linear vs the real product's operators, side by side.
 - `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
 
-The top bar's only design switch left is **Picker** (Version 1 / 2). The Email
-and Tags switches were removed once both were finalised.
+The top bar's design switches (Linear view only) are **Text field** (A / B / C,
+default B) and **Popup** (V1 / V2). Picker, Email and Tags switches were
+removed once those were finalised. Side-by-side field rows (panel > 510px)
+are CSS container queries in `node-skin.css` (14e, plus section 36 that keeps
+them side by side while a value popup is open).
 
 Gotchas: `workflow-canvas.html` and `workflow-nodes.css` use CRLF line
 endings, `linear/index.html` uses LF. When patching V8 with a script, use

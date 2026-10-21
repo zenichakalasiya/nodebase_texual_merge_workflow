@@ -100,7 +100,8 @@
       if(i.header){ html += `<div class="wfpop-group">${esc(i.header)}</div>`; return; }
       if(i.chips){ html += chipsHTML(i, n); return; }
       const slot = cur.pick.indexOf(n);
-      html += itemHTML(i, n, slot === cur.active, cur.opts.selected != null && i.id === cur.opts.selected);
+      const sel = cur.opts.selected;   // one id, or an array of ids for a multi-pick (several rows ticked)
+      html += itemHTML(i, n, slot === cur.active, sel != null && (Array.isArray(sel) ? sel.includes(i.id) : i.id === sel));
     });
     cur.listEl.innerHTML = html;
     scrollActiveIntoView();

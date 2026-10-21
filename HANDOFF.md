@@ -1,115 +1,99 @@
-# Handoff — 2026-10-19 16:19
+# Handoff — 2026-10-22 00:05
 
 ## Read first
 
-In `CLAUDE.md`, read the **"Functional edits made inside V8"** list under
-"Linear view". It now describes the finalised pieces:
+In `CLAUDE.md`, under "Linear view" → "Functional edits made inside V8", read
+these bullets:
 
-- **`RcptField`:** the recipient popup.
-- **`VPicker` everywhere:** the multi-select popup.
-- **Tags:** its own Specific | Dynamic flow.
-- **The `{ }` and toggle rules.**
+- **Sidebar popup rules:** saving, width = value field, V1 / V2.
+- **Field gallery:** what it is and how it is built.
+- **`RcptField`** and **VPicker:** both are now live (no Apply).
+- **Get records.**
 
-Also read the three reference docs in the repo root: `PICKER-INVENTORY.md`,
-`OPERATORS.md` and `CONDITION-FIELDS.md`.
+All the work this session is in the Linear view (`linear/index.html`, `linear/node-skin.css`). The only Node-side file touched is the top bar (`workflow-chrome.js`).
 
 ## What we worked on this session
 
-Long design-polish session on the **Linear view's value pickers**:
+A long polish session on the Linear view's popups:
 
-- **Email field:** finalised design version 1.2.
-- **Same popup elsewhere:** Send SMS and Ask for approval now use that popup too.
-- **Tags:** rebuilt with Specific | Dynamic tabs.
-- **Every other multi-select:** moved onto the IF node's Category popup (VPicker).
-- **Small fixes:** placeholder `{ }` button, toggles, search highlight, dynamic-value look.
-- **Research:** compared operators against the real ServiceOps product.
+- **Text fields:** a trial of three options (A / B / C).
+- **Saving:** sidebar popups save with Enter; canvas popups save with Apply.
+- **Live multi-select:** no more Apply.
+- **Email / SMS / Cc popups:** reworked.
+- **Get records:** Single / Multiple.
+- **Field Gallery artifact:** now includes every canvas-blank popup.
+- **Sidebar popups:** a V1 / V2 placement trial, and width matched to the value field.
 
 ## Completed
 
-- **Category popup (VPicker):**
-  - Category › Subcategory tree, with no dots.
-  - Figma row states.
-  - Selected Items plus a joined left side panel.
-  - Version 1 / 2, chosen from the top bar's **Picker** switch.
-- **Email (`RcptField`, finalised on 1.2):**
-  - Search-or-add box with the icon on the right; it turns into a blue + for a new value.
-  - Smart placeholder, and no helper line under the search box.
-  - "Specific" and "Reference" headings.
-  - Uppercase section titles with a 14px gap (no hairline).
-  - Red "Clear all".
-  - All-added panel on the left, tinted `#F6F9FC`, with the Apply bar spanning full width and no gap under the panel.
-  - Purple `{x}` Reference card. A picked reference joins Added and returns to Specific.
-  - No f(x) button on the field and no Cancel; Apply commits and an outside click discards.
-  - Technician-group chips show a people icon and member count.
-  - To and Cc are always shown, with "Bcc" at the Cc label's right.
-  - Removed Insert from Template / Insert Knowledge.
-- **Send SMS To** (`kind:"phone"`) and **Ask for approval** stage lists (`kind:"pick"`) use the same `RcptField`.
-- **Tags:**
-  - `vpCtrl` with VPicker plus Specific | Dynamic tabs: several specific tags OR one dynamic value.
-  - Empty-state illustration until the user searches.
-- **Moved to VPicker:**
-  - Create/Update multi rows (Business services, Add Roles)
-  - Create deployment "Notify to"
-  - Create announcement groups
-  - Get Hardware Asset asset-type filter
-  - Merge "which branches"
-- **`{ }` placeholder button:**
-  - Grey square, 6px inset on every field.
-  - Always opens the simple "Insert placeholder" list, including text and description rows.
-  - Email Content: aligned with the "Write the email…" line.
-- **Smaller pieces:**
-  - Yes/No fields are a switch chip; untouched counts as "No".
-  - Dynamic values show as a purple value with no `{ }`.
-  - Yellow search highlight in every list popup.
-  - Approval stage headings tinted.
-- **Top bar:** the Email and Tags switches were removed. The view switch now repositions when entering Linear, and its gap maths was fixed.
-- **Docs:** `PICKER-INVENTORY.md`, `OPERATORS.md` (with real-product operators collected from the demo portal) and `CONDITION-FIELDS.md`.
+- **Text fields:**
+  - The top-bar **Text field** switch offers A / B / C (default B).
+  - Option B = the editor in a popup.
+  - The URL field and Header values get a `{ }` placeholder popup (`TxtPhPop`).
+- **Saving rule:**
+  - Sidebar popups show a "Press Enter ↵" hint below the field, outside its box, and have no button.
+  - Canvas popups have an Apply button.
+- **Multi-select (VPicker, `RcptField`):**
+  - Changes apply live; the only Apply left is Merge's "which branches".
+  - The field shows the newest value + "+N", with every value in a tooltip.
+  - Checkboxes sit on the right.
+  - Picker Version 2 is final and its switch was removed. It has a title, pills above the search, and a search icon that turns into a blue +.
+- **Email & SMS:**
+  - Send email: Cc/Bcc removed, plus a separate Technician group field. Group rows show the name only.
+  - Create User › Email takes one value (`maxOne`).
+  - Cc emails uses the same To-style popup.
+  - SMS To takes typed numbers only.
+  - Empty-state art: envelope or phone, with a compact "Add another …" version once values exist.
+- **Reference card:** restyled flat and subtle, with no gradient and no shadow.
+- **Get records:**
+  - Single / Multiple, and an "up to [N]" fetch limit.
+  - Conditions always sit on lines below.
+  - On a periodic workflow, Multiple's subtext shows the per-cycle cap, with the full sentence on hover.
+- **Others:**
+  - Packages: an Add Packages side panel.
+  - Yes/No fields: a plain dropdown.
+  - The IF/Else Expression card is amber.
+  - Tooltips are portalled so containers never clip them.
+- **Field Gallery:**
+  - Artifact: https://claude.ai/artifact/BjmE5zqX4dAHFyzdpYCZ7Y (Version 9).
+  - **Sidebar fields** view: about 33 cards, with V1 / V2 tabs.
+  - **Canvas blanks** view: one real canvas row per step kind. All 72 blanks open their real popups.
+- **Sidebar popup V1 / V2** (top bar **Popup**):
+  - V1 opens below the field.
+  - V2 opens on the field, with its Specific | Dynamic tabs covering it.
+  - Both save the same way: click or Enter fills the field and closes. In multi-select, Enter adds and the popup stays open.
+- **Popup width:** the value field's width, minimum 280px, in both versions.
+- **Bugs fixed:**
+  - Side-by-side rows no longer collapse while a popup is open (skin section 36).
+  - The Tags search now gets focus.
 
 ## In progress
 
-- The user's last message ended mid-sentence ("…and"). Ask what the remaining request was.
-- **Switched to VPicker but not browser-tested yet:**
-  - Merge feeder picker
-  - Get Hardware Asset preset
-  - Create announcement groups
-  - Create deployment Notify to
-- **Tested:** Tags, Add Roles, Email, SMS and Approval.
+Nothing mid-flight. V1 / V2 is waiting for the user to pick one.
 
 ## Next steps
 
-- Test the untested VPicker callers above. Merge chips should show branch names, not ids.
-- **Open questions for the user:**
-  - Should stage forms allow placeholders? Approval description's `{ }` is disabled.
-  - Should Service Request and the other record types get tag suggestions?
-  - Should canvas-sentence dynamic badges also drop the `{ }`?
-  - Should search highlight every match in a row, or only the first?
-- **Operator gaps vs the product** (`OPERATORS.md` §H):
-  - is empty / is not empty
-  - date between / exactly next / last
-  - Match All for tags
-  - "any" on the trigger's "to" side
-  - periodic Interval
-  - Wait "up to" (Max Wait Time)
-- **Older open threads** (from the previous handoff):
-  - WhatsApp and Add Relation parity with the real product
-  - sidebar card vs flush
-  - button colours
-  - Inter vs Poppins
+1. **V1 / V2:** the user picks one. Then remove the top-bar **Popup** switch and the gallery tabs. To keep only V1, delete the `popV2()` branches. Each one is marked "V2" in Popover's `placePos`, the smart header, `RcptField`'s `place` and `Picker`.
+2. **Text field:** the user picks A / B / C. Then remove the **Text field** switch.
+3. **Get records cap:** get the real per-schedule caps (every N minutes, hourly, daily…) and the fetch-limit default (10 vs 1). Fill them into `getCycle()`.
+4. **Open questions:**
+   - Should Description allow placeholders?
+   - Should the Node view Guide still say email isn't built?
 
 ## Decisions made
 
-- **Only Email, SMS and Approval mix specific + dynamic values** in one list (`RcptField`). Every other multi-select uses VPicker, following the Picker switch.
-- **Tags take several specific values OR one dynamic value**, never mixed.
-- **`{ }` has one meaning:** the simple placeholder list. Specific | Dynamic belongs to value fields.
-- **Reference card is purple tinted:** the user picked it from 4 options.
-- **Technician-group chips use icon + count**, not a new colour.
-- **An outside click discards** unapplied Email changes. The user was asked; no change requested.
+- **V2 position:** the popup covers the field and its tabs land on it. The title row is hidden. There is no Apply. The user chose this from three sketched options after the first V2 (above the field, with Apply) was rejected.
+- **Saving, both versions:**
+  - Single-choice lists save on click.
+  - Text saves with Enter, which also closes the popup.
+  - In multi-select, Enter adds and the popup stays open.
+- **Popup width:** match the value field, minimum 280px. When the field is narrower than 280px, the popup grows leftward.
+- **Gallery canvas view:** reuses real canvas rows rather than copies, so the popups stay identical.
 
 ## Gotchas & notes
 
-- **Patching `linear/index.html`:** shell `node -e` / sed strip backslashes in regexes. Write patch scripts to a scratch file and use exact-string replace with a count check.
-- **Line endings:** `workflow-chrome.js` is CRLF, so use the Edit tool on it.
-- **Playwright on the If Else drawer:** Esc closes the whole drawer. In the real product's builder, clicks right after closing a menu get swallowed.
-- **Demo portal (real product):** the address is in local memory, not the repo. The user signs in themselves; never type the password. A test draft was left unsaved there.
-- **Dev server:** this session used port 8780 (`$env:PORT='8780'; node server.js`).
-- **Pre-existing, not fixed:** in the Node view, redo after undo doesn't restore a new node.
+- **Patching `linear/index.html`:** use an exact-string replace script with a count check. `sed` mangles `&` and backslashes.
+- **Side-by-side CSS:** the rules key on inline style strings (`1px solid var(--border2)`). A new value control needs a `data-nf` hook added to skin section 36, or its row will stack.
+- **Gallery anchors:** in gallery mode, `document.querySelector` is patched so `[data-anchor=…]` lookups prefer the gallery's copy of a row.
+- **Gallery build:** the build script lives in the session scratchpad, not in the repo. It precompiles the JSX with Babel and inlines the skin and vendor files. A Read-permission rule blocked publishing supporting files.
+- **Demo server:** never put the internal demo server address in this public repo.
