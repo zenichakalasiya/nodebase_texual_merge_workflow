@@ -1857,8 +1857,10 @@ const rcEmptyArt = (kind, more)=>{ const sms = kind==="phone";
         <g transform="translate(30 20) rotate(-8)"><rect width="34" height="58" rx="7" fill="#E2E8F0"/></g>
         <g transform="translate(42 24)"><rect width="34" height="58" rx="7" fill="#fff" stroke="#8E9FBC" strokeWidth="1.8"/><path d="M13 7h8" stroke="#DCE3EC" strokeWidth="2.4" strokeLinecap="round"/>
           <rect x="6" y="16" width="18" height="9" rx="4.5" fill="#E2E8F0"/><rect x="10" y="29" width="18" height="9" rx="4.5" fill="#DCE3EC"/></g>
-        <circle cx="89" cy="68" r="11" fill="#7B8FA5"/>
-        <path d="M84.5 63.5h9a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H88l-3 2.5V71h-.5A1.5 1.5 0 0 1 83 69.5v-4.5a1.5 1.5 0 0 1 1.5-1.5z" fill="#fff"/>
+        {/* the SMS badge (user 2026-10-22: bigger, so it reads as "text message") — a chat bubble with typing dots */}
+        <circle cx="90" cy="66" r="16" fill="#7B8FA5" stroke="#fff" strokeWidth="2.5"/>
+        <path d="M82.5 58h15a2.5 2.5 0 0 1 2.5 2.5v8a2.5 2.5 0 0 1-2.5 2.5H88.5l-4.5 3.8V71h-1.5a2.5 2.5 0 0 1-2.5-2.5v-8a2.5 2.5 0 0 1 2.5-2.5z" fill="#fff"/>
+        <circle cx="85.8" cy="64.5" r="1.3" fill="#7B8FA5"/><circle cx="90" cy="64.5" r="1.3" fill="#7B8FA5"/><circle cx="94.2" cy="64.5" r="1.3" fill="#7B8FA5"/>
       </>) : (<>
         <g transform="translate(24 30) rotate(-10)"><rect width="52" height="36" rx="6" fill="#E2E8F0"/></g>
         <g transform="translate(36 38) rotate(6)"><rect width="54" height="38" rx="6" fill="#fff" stroke="#8E9FBC" strokeWidth="1.8"/>
@@ -3531,6 +3533,10 @@ function NodeRefDetail({ doc }){
 const EMBED = (typeof window!=="undefined") && (window.self !== window.top || location.search.indexOf("embed=1") >= 0 || !!window.__GALLERY);
 // the Field gallery page (user 2026-10-21) — ?gallery=1, or window.__GALLERY in the published artifact
 const GALLERY = (typeof window!=="undefined") && (!!window.__GALLERY || location.search.indexOf("gallery=1") >= 0);
+// the Workflow Field Lab page (user 2026-10-22): gallery mode, but the page is the Lab's field-type cards and only
+// their Linear column is ours (portalled in). window.__LAB in the published page, ?lab=1 locally.
+const LAB = GALLERY && typeof window!=="undefined" && (!!window.__LAB || location.search.indexOf("lab=1") >= 0);
+if (LAB && typeof document!=="undefined") document.documentElement.classList.add("lab");
 if (GALLERY && typeof document!=="undefined") { const _qs = Document.prototype.querySelector;
   document.querySelector = function(sel){ if (typeof sel==="string" && sel.indexOf("[data-anchor=")===0) { const g = _qs.call(this, '[data-nf="gallery"] '+sel); if (g) return g; } return _qs.call(this, sel); }; }
 // Saved experiment builds — single shared source of truth in builds.js (window.BUILDS),
@@ -3728,7 +3734,7 @@ const PUBLISH_BLOCKED_TIP = "Add a trigger and at least one action to publish.";
 // where a popup was opened from decides how it saves (user 2026-10-21): a RIGHT-SIDEBAR field → "enter" (a "Press Enter"
 // hint inside the input, no button) · a CANVAS sentence slot → "apply" (an Apply button, bottom right)
 // a popup opened from a RIGHT-SIDEBAR field (or the Field gallery's sidebar view)
-const popSide = (el)=> !!(el && el.closest && (el.closest('[data-nf="side"]') || (typeof window!=="undefined" && window.__galSide && el.closest('[data-nf="gallery"]'))));
+const popSide = (el)=> !!(el && el.closest && (el.closest('[data-nf="side"]') || (typeof window!=="undefined" && window.__galSide && el.closest('[data-nf="gallery"]') && !el.closest('[data-nf="g-canvas"]'))));
 // sidebar popup design (top bar "Popup"): V1 opens below the field · V2 (user 2026-10-22) opens ON the field — its top
 // (the Specific | Dynamic tabs) covers the field. Both save the same way: click / Enter fills the field and closes.
 const popV2 = ()=> typeof window!=="undefined" && window.__popVer==="2";
@@ -5646,7 +5652,8 @@ function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, on
     // so the user never loses a value they typed and clicked Done without pressing + first (user 2026-07-08).
     // LIVE multi-pick (user 2026-10-21): each change is applied as it happens — no Apply. A picker that BUILDS something
     // when confirmed (Merge's "which branches") opts out with vp.keepApply.
-    const live = !!(vp && (inputType==="multi" || inputType==="tokens") && !vp.keepApply);
+    // live only in the SIDEBAR; a canvas blank's multi-pick commits with Apply, bottom right (user 2026-10-22)
+    const live = !!(vp && (inputType==="multi" || inputType==="tokens") && !vp.keepApply && onSide);
     const liveFirst = useRef(true);
     useEffect(()=>{ if (!live) return; if (liveFirst.current) { liveFirst.current = false; return; }
       onPick({ id: multiVal.length ? multiVal : null, label:"" }, { live:true }); }, [multiVal]);
@@ -5745,7 +5752,8 @@ function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, on
             placeholder="0" className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-sm outline-none"
             style={{background:"var(--panel)",border:"1px solid var(--border2)",color:"var(--text)"}}/>
         </div>
-        <button onClick={commitDur} className="mt-2.5 w-full rounded-lg py-1.5 text-sm font-medium" style={{background:"var(--accent)",color:"#fff"}}>Set</button>
+        {/* Apply, bottom right — the canvas popups' commit button (user 2026-10-22; was a full-width "Set") */}
+        <div className="mt-2.5 flex justify-end"><button type="button" data-nf="spec-apply" onClick={commitDur} className="rounded-md px-3.5 h-8 text-[length:var(--fs-12)] font-semibold" style={{background:"var(--accent)",color:"#fff"}}>Apply</button></div>
       </div>
       {smartExprFooter}
     </>, smart ? SMART_W : "w-52");
@@ -6506,7 +6514,8 @@ function App() {
   const showBuilder = activeSuite==="automation" && (activeModule==="workflows" || isUsecase);
   const pickSuite = (s) => { setActiveSuite(s.id); setActiveModule((s.modules[0]||{}).id); };
   // editable document (trigger + flow tree) behind an undo/redo history
-  const [doc, setDoc] = useState(()=> EMBED ? JSON.parse(JSON.stringify(GALLERY ? GALLERY_DEMO_DOC : EMBED_DEMO_DOC)) : { triggers:[], flow:[] });
+  const [doc, setDoc] = useState(()=> EMBED ? JSON.parse(JSON.stringify(GALLERY ? (LAB ? { ...GALLERY_DEMO_DOC, triggers:[...GALLERY_DEMO_DOC.triggers,
+    { id:"t_daily", typeId:"daily", vals:{ time:"09:00" } }, { id:"t_weekly", typeId:"weekly", vals:{ weekday:"Monday", time:"09:00" } }] } : GALLERY_DEMO_DOC) : EMBED_DEMO_DOC)) : { triggers:[], flow:[] });
   const [qaDone, setQaDone] = useState([]); // dismissed QA-checklist item ids (sidebar dev aid)
   const triggers = doc.triggers, flow = doc.flow;
   const flowRef = useRef(flow); flowRef.current = flow; // always-current flow → deferred callbacks (rAF/popovers) never read a stale closure
@@ -6699,6 +6708,10 @@ function App() {
   const [popVer, setPopVer] = useState("1");   // sidebar popup design V1 / V2 (top bar "Popup", user 2026-10-21)
   if (typeof window!=="undefined") window.__popVer = popVer;
   const [gal, setGal] = useState({});            // Field gallery values (GALLERY only)
+  const [labMounts, setLabMounts] = useState(()=> (LAB && window.__LAB_MOUNTS) ? { ...window.__LAB_MOUNTS } : {});
+  const labRootRef = useRef(null);
+  useEffect(()=>{ if (!LAB) return; const on = ()=> setLabMounts({ ...(window.__LAB_MOUNTS||{}) });
+    window.addEventListener("lab-mounts", on); on(); return ()=> window.removeEventListener("lab-mounts", on); }, []);
   const [galPkg, setGalPkg] = useState(false);   // Field gallery: the Add packages panel is open
   const [galView, setGalView] = useState("sidebar"); // Field gallery: Sidebar fields | Canvas blanks
   const [galMode, setGalMode] = useState("enter");  // Field gallery: popups save like the SIDEBAR (enter) or the CANVAS (apply)
@@ -7359,7 +7372,8 @@ function App() {
       requestAnimationFrame(()=> open(anchorEl||null, flowMenu(branchNode, branchPath),
         (i)=>{ const t=flowFD(branchNode,i.id,branchPath)?.type||"enum"; updatePathClause(branchPath, pi, 0, {field:i.id, op:defaultOp(t), value:null});
                requestAnimationFrame(()=>openPathOpByKey(branchPath, branchNode, pi, 0, pId, i.id, t)); },
-        "Which field", {wide:true, help:NODE_HELP.condition, anchorKey:`pcond:${pId}:0`}));
+        "Which field", {wide:true, help:NODE_HELP.condition, anchorKey:`pcond:${pId}:0`,
+          footer: recordsInScope(branchPath).length ? exprEscapeFooter("Write an expression", ()=>openPathExpr(branchPath, nodeAt(flowRef.current, branchPath) || branchNode, pi, 0)) : undefined}));
     } else if (firstStep==="condition-node") {
       // the condition NODE already sits at children[0]; open ITS field picker (inline-condition style)
       requestAnimationFrame(()=> openCondFieldPicker([...lanePath,0], lane.children[0].id, 0, anchorEl||null));
@@ -7578,9 +7592,11 @@ function App() {
   // ── GET ("get {qty} {module} sorted by name {sort} where {condition}") — PROGRESSIVE: qty → module → sort → where,
   //    each step revealed only once the prior is filled. The pickers auto-chain to guide the user.
   // Multiple's one-liner (user 2026-10-21): on a periodic workflow it states the per-cycle cap; the full sentence is the hover text
-  const multiSub = () => { const cyc = getCycle(); if (!cyc) return "Get a list of matching records, up to a fetch limit";
+  // ALWAYS shown (user 2026-10-22, replaces "Get a list of matching records…"): the per-cycle cap. Cap / interval are
+  // placeholders (hourly = 100) until the real per-schedule numbers are confirmed; the full sentence is the hover text.
+  const multiSub = () => { const cyc = getCycle() || { every:"every 2 minutes", cap:100 };
     return <span title={"You've set this workflow to run "+cyc.every+". At this frequency, only up to "+cyc.cap+" records will be processed per cycle. To run more, increase the time interval."}>
-      Runs {cyc.every} — up to <b style={{color:"#F08A24", fontWeight:600}}>{cyc.cap} records</b> per cycle</span>; };
+      Max <b style={{color:"#F08A24", fontWeight:600}}>{cyc.cap} records</b> per cycle · longer interval for more</span>; };
   const pickGetQty = (path, node, e) => { setOpenSlot(`${pathKey(path)}:qty`); const el = e?.currentTarget||null;
     // Single / Multiple (user 2026-10-21) — replaces the 1 / 10 / 100 / 500 / Custom limit menu. The settings (sort,
     // order, fetch limit, conditions) then open in the sidebar; a new step first asks for the record type.
@@ -9165,7 +9181,8 @@ function App() {
     requestAnimationFrame(()=> open(condSlotRefs.current[`${node.id}:0`], flowMenu(node, path),
       (i)=>{ const t = flowFD(node,i.id,path)?.type || "enum"; updateClause(path, ci, {field:i.id,op:defaultOp(t),value:null});
              requestAnimationFrame(()=>openClauseOpByKey(path, node.id, ci, i.id, t)); },
-      "Which field", {wide:true, help:NODE_HELP.condition, anchorKey:`cond:${node.id}:${ci}`}));
+      "Which field", {wide:true, help:NODE_HELP.condition, anchorKey:`cond:${node.id}:${ci}`,
+        footer: recordsInScope(path).length ? exprEscapeFooter("Write an expression", ()=>openClauseExpr(path, nodeAt(flowRef.current, path) || node, ci)) : undefined}));
   };
   const toggleCombiner = (path, node) => update(path, { combiner: node.combiner==="or" ? "and" : "or" });
 
@@ -9298,7 +9315,8 @@ function App() {
     requestAnimationFrame(()=> open(condSlotRefs.current[`${p.id}:0`], flowMenu(node, path),
       (i)=>{ const t=flowFD(node,i.id,path)?.type||"enum"; updatePathClause(path, pi, ci, {field:i.id,op:defaultOp(t),value:null});
              requestAnimationFrame(()=>openPathOpByKey(path,node,pi,ci,p.id,i.id,t)); },
-      "Which field", {wide:true, help:NODE_HELP.condition, anchorKey:`pcond:${p.id}:${ci}`}));
+      "Which field", {wide:true, help:NODE_HELP.condition, anchorKey:`pcond:${p.id}:${ci}`,
+        footer: recordsInScope(path).length ? exprEscapeFooter("Write an expression", ()=>openPathExpr(path, nodeAt(flowRef.current, path) || node, pi, ci)) : undefined}));
   };
   // pickers for a branch path's clause slots
   const pickPathField = (path, node, pi, ci, e) => { setOpenSlot(`${pathKey(path)}:p${pi}:c${ci}:field`); open(e.currentTarget, flowMenu(node, path),
@@ -9356,14 +9374,14 @@ function App() {
   // the EXPRESSION card (user 2026-10-21) — the Reference card's shape in the expression colour (amber): white→amber
   // gradient, a gradient "fx" tile, title + one line, a round arrow that nudges on hover
   const exprEscapeFooter = (label, onGo) => (
-    <button data-nf="expr-card" onMouseDown={(e)=>{ e.preventDefault(); onGo(); }} className="group/ex w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-[border-color,box-shadow] hover:border-[#FDBA74]"
-      style={{background:"linear-gradient(135deg, #FFFFFF 0%, #FFF7ED 100%)", border:"1px solid #FED7AA", boxShadow:"0 1px 2px rgba(234,88,12,.06), 0 4px 12px -6px rgba(234,88,12,.25)"}}>
-      <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-semibold italic text-[length:var(--fs-13)]" style={{background:"linear-gradient(135deg, #FB923C 0%, #EA580C 100%)", color:"#fff", boxShadow:"0 2px 6px -1px rgba(234,88,12,.45)", fontFamily:"Georgia, serif"}}>fx</span>
+    <button data-nf="expr-card" onMouseDown={(e)=>{ e.preventDefault(); onGo(); }} className="group/ex w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors"
+      style={{background:"#FFFBF6", border:"1px solid #F8E6CF"}}>{/* flat + subtle (user 2026-10-22): no gradient, no shadow; hover tint in skin 42 */}
+      <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-semibold italic text-[length:var(--fs-13)]" style={{background:"#FDEEDB", color:"#C2410C", fontFamily:"Georgia, serif"}}>fx</span>
       <span className="flex flex-col min-w-0 flex-1">
         <span className="text-[length:var(--fs-125)] font-semibold leading-tight" style={{color:"#9A3412"}}>Expression</span>
-        <span className="text-[length:var(--fs-11)] leading-tight truncate mt-0.5" style={{color:"#EA580C"}}>{/write/i.test(label) ? "Write a formula that is true or false" : label}</span>
+        <span className="text-[length:var(--fs-11)] leading-tight truncate mt-0.5" style={{color:"#8E9FBC"}}>{/write/i.test(label) ? "Write a formula that is true or false" : label}</span>
       </span>
-      <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-transform group-hover/ex:translate-x-0.5" style={{background:"#FFEDD5", color:"#EA580C"}}>{RC_CHEV_R}</span>
+      <span className="shrink-0 w-6 h-6 flex items-center justify-center transition-transform group-hover/ex:translate-x-0.5" style={{color:"#F59E0B"}}>{RC_CHEV_R}</span>
     </button>);
   const openClauseExpr = (path, node, ci) => {
     const scope = recordsInScope(path); if(!scope.length) return; // no referenceable record → nothing to write against
@@ -12572,7 +12590,8 @@ function App() {
                           {/* EMAIL: the ticket reply-box toolbar (user 2026-10-15) — AI Assist · quick actions · T formatting row
                               (auto-opens on selecting text) · undo/redo. SMS is plain text, so it keeps the old bar below. */}
                           {/* the Content's { } is back in the editor's top-right corner (user 2026-10-19 — the toolbar trial was dropped) */}
-                          {!isSms && <ReplyTools api={bodyApi} px="px-3" />}
+                          {/* the email toolbar joins the writing box like SMS's (cbar): one white box, toolbar at its bottom (user 2026-10-22) */}
+                          {!isSms && <div data-nf="cbar" data-rt=""><ReplyTools api={bodyApi} px="px-0" /></div>}
                           {/* expanded formatting bar — appears ABOVE the main row when the ▾ is toggled (Gmail) */}
                           {isSms && more && (
                             <div data-nf="cbar" className="px-3 py-1 flex flex-wrap items-center gap-x-0.5 gap-y-0.5 border-t" style={{borderColor:"var(--border2)"}}>
@@ -13165,10 +13184,26 @@ function App() {
         const gn = flow.find(n=>n && n.kind==="action") || flow[0]; const gp = gn ? treeFindPath(flow, gn.id) : [0];
         const G = (k)=> gal[k]; const S = (k)=> (v)=> setGal(g=>({ ...g, [k]: v }));
         const lbl = (s, req)=> <label className="text-[length:var(--fs-12)]" style={{color:"#7b8fa5"}}>{s}{req && <span className="ml-0.5" style={{color:"var(--red)"}}>*</span>}</label>;
-        const card = (key, title, where, ctrl, wide)=> (<section key={key} data-nf="g-card" className={"rounded-xl p-4 flex flex-col gap-2.5 min-w-0 " + (wide ? "lg:col-span-2" : "")} style={{background:"#fff", border:"1px solid #E8EEF5"}}>
+        const ctrlByKey = {};
+        const card = (key, title, where, ctrl, wide)=> (ctrlByKey[key] = ctrl, <section key={key} data-nf="g-card" className={"rounded-xl p-4 flex flex-col gap-2.5 min-w-0 " + (wide ? "lg:col-span-2" : "")} style={{background:"#fff", border:"1px solid #E8EEF5"}}>
           <div className="flex items-baseline justify-between gap-3"><h3 className="text-[length:var(--fs-13)] font-semibold" style={{color:"#364658"}}>{title}</h3><span className="text-[length:var(--fs-11)] text-right" style={{color:"#a5bad0"}}>{where}</span></div>
           {ctrl}</section>);
         const boxSty = {background:"#fff", border:"1px solid #dfe5ed"};
+        // the sidebar's OPTIONAL field row: "Field 1" + trash, a fixed attribute cell, then the value control
+        const frow = (fieldLabel, ctrl)=> (<div data-nf="side" data-gal-side className="min-w-0"><div>
+          <div data-nf="frow" className="flex flex-col gap-3">
+            <div data-nf="fhead" className="flex items-center justify-between">
+              <span className="text-[length:var(--fs-10)] font-semibold uppercase tracking-[0.1em]" style={{color:"var(--faint)"}}>Field 1</span>
+              <span data-nf="rm" aria-hidden="true" className="w-6 h-6 rounded-md flex items-center justify-center" style={{color:"var(--red)"}}><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M10 11v6M14 11v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
+            </div>
+            <button data-nf="fcell" type="button" tabIndex={-1} className="w-full rounded-lg pl-3 pr-2.5 py-2.5 text-[length:var(--fs-135)] flex items-center gap-2 text-left" style={{ background:"var(--panel2)", border:"1px solid var(--border2)", color:"var(--muted)", cursor:"default" }}>
+              <span className="flex-1 min-w-0 truncate">{"Field - " + fieldLabel}</span>
+              <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" style={{color:"var(--faint)"}}><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+            {ctrl}
+          </div></div></div>);
+        const rcRow = (key, title, extra)=> (<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{background:"#fff", border:"1px solid var(--border2)", padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
+          <RcptField variant="1.2" kind="email" title={title} values={G(key)||[]} onChange={(n)=>S(key)(n||[])} refSources={recordsInScope(gp)} {...extra}
+            emptyUntilSearch searchPh="Search people, or type an email and press Enter" sections={[{header:"People", items:people}]} /></div>);
         const popBox = (key, value, ph, onOpen)=> (<button type="button" data-anchor={key} onClick={(e)=>{ setOpenSlot(key); onOpen(e.currentTarget); }}
           className="w-full rounded-lg pl-3 pr-2.5 py-2.5 flex items-center gap-2 text-left text-[length:var(--fs-135)] transition-colors hover:bg-[var(--pop-hover)]"
           style={{...boxSty, border:"1px solid "+(openSlot===key ? "var(--accent2)" : "#dfe5ed"), color: value ? "var(--text)" : "var(--faint)"}}>
@@ -13230,11 +13265,11 @@ function App() {
         const sections = [
           ["Text & writing", [
             card("subject", "Single-line text", "Create / Update record › Subject",
-              <>{lbl("Subject", true)}{textFieldCtrl(gp, {id:"subject", label:"Subject", type:"text"}, G("subject"), S("subject"), "g:subject", "enter text…")}</>),
+              frow("Subject", textFieldCtrl(gp, {id:"subject", label:"Subject", type:"text"}, G("subject"), S("subject"), "g:subject", "enter text…"))),
             card("url", "Text with placeholders", "HTTP request › URL",
               <>{lbl("URL", true)}{textBCtrl(gp, {k:"url", label:"URL", type:"phtext", phDyn:true}, G("url")||null, S("url"), "g:url", "https://api.example.com/…")}</>),
             card("desc", "Long text", "Create / Update record › Description",
-              <>{lbl("Description")}{textareaFieldCtrl(gp, {id:"description", label:"Description", type:"textarea"}, G("desc"), S("desc"), "g:desc")}</>),
+              frow("Description", textareaFieldCtrl(gp, {id:"description", label:"Description", type:"textarea"}, G("desc"), S("desc"), "g:desc"))),
             card("phtext", "Inline placeholder text", "Create deployment › Name · Email subject",
               <>{lbl("Deployment name", true)}<div className="rounded-lg px-3 py-2" style={boxSty}><RichBody single value={G("dname")||""} onChange={S("dname")} placeholder="e.g. Chrome rollout for the Finance team" canPlaceholder={true} onRequestPlaceholder={(el, apply)=>openPhPicker("g:dname", el, apply)} /></div></>),
             card("rich", "Rich text", "Send email › Content · Announcement · Notes",
@@ -13244,14 +13279,14 @@ function App() {
           ]],
           ["Choice", [
             card("prio", "Dropdown · Specific | Dynamic", "Record fields: Priority, Status, Impact…",
-              <>{lbl("Priority")}{fieldCtrl(gp, {id:"priority", label:"Priority", type:"enum", values:["Urgent","High","Medium","Low"]}, G("prio"), S("prio"), "g:prio", "choose a value…")}</>),
+              frow("Priority", fieldCtrl(gp, {id:"priority", label:"Priority", type:"enum", values:["Urgent","High","Medium","Low"]}, G("prio"), S("prio"), "g:prio", "choose a value…"))),
             card("proxy", "Plain dropdown", "HTTP request › Proxy server · Credential",
               <>{lbl("Proxy server")}<Dropdown options={["Corporate proxy","DMZ proxy","Cloud egress proxy"].map(o=>({id:o, label:o}))} value={G("proxy")} onChange={S("proxy")} placeholder="Proxy server" /></>),
             card("spam", "Yes / No", "Record fields: Spam, Known error…",
-              <>{lbl("Spam")}<button type="button" data-anchor="g:spam" onClick={(e)=>openToggleValue(gp, {id:"spam", label:"Spam", type:"toggle"}, G("spam"), S("spam"), "g:spam", e.currentTarget)}
-                className="w-full rounded-lg pl-3 pr-2.5 py-2.5 flex items-center gap-2 text-left text-[length:var(--fs-135)] transition-colors hover:bg-[var(--pop-hover)]" style={{...boxSty, border:"1px solid "+(openSlot==="g:spam" ? "var(--accent2)" : "#dfe5ed"), color: G("spam") ? "var(--text)" : "var(--faint)"}}>
+              frow("Spam", <button type="button" data-nf="yn-field" data-anchor="g:spam" onClick={(e)=>openToggleValue(gp, {id:"spam", label:"Spam", type:"toggle"}, G("spam"), S("spam"), "g:spam", e.currentTarget)}
+                className="w-full rounded-lg pl-3 pr-2.5 py-2.5 flex items-center gap-2 text-left text-[length:var(--fs-135)] transition-colors hover:bg-[var(--pop-hover)]" style={{background:"var(--panel2)", border:"1px solid "+(openSlot==="g:spam" ? "var(--accent2)" : "var(--border2)"), color: G("spam") ? "var(--text)" : "var(--faint)"}}>
                 <span className="flex-1 min-w-0 flex items-center">{G("spam")==="Yes" || G("spam")==="No" ? G("spam") : (smartKindOf(G("spam")) ? valueDisplay(G("spam")) : "Select Yes or No")}</span>
-                <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" style={{color:"var(--faint)"}}><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button></>),
+                <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" style={{color:"var(--faint)"}}><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>)),
             card("gate", "Required first pick", "Create record › Service catalog · User type · Asset ID",
               <>{lbl(galGate.label, true)}{popBox("g:gate", G("gate"), galGate.ph, (el)=>open(el, createGateItems(galGate), (i)=>S("gate")(i.id), galGate.label, { selected:G("gate"), matchWidth:true }))}</>),
             card("tmpl", "Use template", "Send email › Message › Use template",
@@ -13272,13 +13307,13 @@ function App() {
           ]],
           ["People", [
             card("asg", "Person", "Record fields: Assignee, Requester…",
-              <>{lbl("Assignee")}{entityFieldCtrl(gp, {id:"assignee", label:"Assignee", type:"user"}, G("asg"), S("asg"), "g:asg", "user")}</>),
+              frow("Assignee", entityFieldCtrl(gp, {id:"assignee", label:"Assignee", type:"user"}, G("asg"), S("asg"), "g:asg", "user"))),
             card("grp", "Group", "Record fields: Technician group",
-              <>{lbl("Technician group")}{entityFieldCtrl(gp, {id:"tech_group", label:"Technician group", type:"enum", values:SAMPLE_GROUPS}, G("grp"), S("grp"), "g:grp", "group")}</>),
+              frow("Technician group", entityFieldCtrl(gp, {id:"tech_group", label:"Technician group", type:"enum", values:SAMPLE_GROUPS}, G("grp"), S("grp"), "g:grp", "group"))),
           ]],
           ["Multi-selection", [
             card("roles", "Multi-select list", "Create user › Add roles · Notify to · Merge…",
-              <>{lbl("Add Roles", true)}{vpCtrl({ ...vpCfgFor(gp, {id:"user_roles", label:"Add Roles", type:"multi", values:["Service Desk Technician","Asset Manager","Change Manager","Problem Manager","Administrator","Self Service User"]}), dpath:gp, slotKey:"g:roles", values:G("roles"), onChange:S("roles") })}</>),
+              frow("Add Roles", vpCtrl({ ...vpCfgFor(gp, {id:"user_roles", label:"Add Roles", type:"multi", values:["Service Desk Technician","Asset Manager","Change Manager","Problem Manager","Administrator","Self Service User"]}), dpath:gp, slotKey:"g:roles", values:G("roles"), onChange:S("roles") }))),
             card("cat", "Category tree", "IF / Branch › category is …",
               <>{lbl("Category")}<Tooltip wrap label={openSlot==="g:cat" || !catV.length ? null : tipList([...catV].reverse())}><button type="button" data-nf="vp-field" data-anchor="g:cat"
                 onClick={(e)=>{ setOpenSlot("g:cat"); open(e.currentTarget, [], (i)=>S("cat")(Array.isArray(i.id) ? i.id : []), "Category", { inputType:"multi", vp:{ tree:CATEGORY_TREE }, selected:catV, matchWidth:true, wide:true }); }}
@@ -13286,15 +13321,11 @@ function App() {
                 {newestPlus(catV, (x)=>x) || <span className="flex-1 min-w-0 truncate">choose one or more…</span>}
                 <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" style={{color:"var(--faint)"}}><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button></Tooltip></>),
             card("tags", "Tags", "Create / Update record › Tags",
-              <>{lbl("Tags")}{vpCtrl({ ...vpCfgFor(gp, {id:"tags", label:"Tags", type:"tokens"}), dpath:gp, slotKey:"g:tags", values:G("tags"), onChange:S("tags") })}</>),
+              frow("Tags", vpCtrl({ ...vpCfgFor(gp, {id:"tags", label:"Tags", type:"tokens"}), dpath:gp, slotKey:"g:tags", values:G("tags"), onChange:S("tags") }))),
             card("cc", "Email list", "Create / Update record › Cc emails",
-              <>{lbl("Cc emails")}<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{...boxSty, padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
-                <RcptField variant="1.2" kind="email" title="Cc emails" values={G("cc")||[]} onChange={(n)=>S("cc")(n||[])} refSources={recordsInScope(gp)} placeholder="Search people or add an email…"
-                  emptyUntilSearch searchPh="Search people, or type an email and press Enter" sections={[{header:"People", items:people}]} /></div></>),
+              frow("Cc emails", rcRow("cc", "Cc emails", { placeholder:"Search people or add an email…" }))),
             card("uemail", "Single email", "Create user › Email",
-              <>{lbl("Email", true)}<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{...boxSty, padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
-                <RcptField variant="1.2" kind="email" title="Email" maxOne values={G("uemail")||[]} onChange={(n)=>S("uemail")(n||[])} refSources={recordsInScope(gp)} placeholder="Search people or add the email…"
-                  emptyUntilSearch searchPh="Search people, or type an email and press Enter" sections={[{header:"People", items:people}]} /></div></>),
+              frow("Email", rcRow("uemail", "Email", { maxOne:true, placeholder:"Search people or add the email…" }))),
             card("to", "Recipients — email", "Send email › To",
               <>{lbl("To", true)}<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{...boxSty, padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
                 <RcptField variant="1.2" kind="email" title="To recipients" values={G("to")||[]} onChange={(n)=>S("to")(n||[])} refSources={recordsInScope(gp)} placeholder="Search people or add an email…"
@@ -13312,17 +13343,17 @@ function App() {
           ]],
           ["Numbers & dates", [
             card("num", "Number", "Asset › Cost · Task › Estimated time",
-              <>{lbl("Cost")}{fieldCtrl(gp, {id:"cost", label:"Cost", type:"number"}, G("num"), S("num"), "g:num", "a number…")}</>),
+              frow("Cost", fieldCtrl(gp, {id:"cost", label:"Cost", type:"number"}, G("num"), S("num"), "g:num", "a number…"))),
             card("date", "Date", "Change › Start / End date",
-              <>{lbl("Due by")}{fieldCtrl(gp, {id:"due_by", label:"Due by", type:"date"}, G("date"), S("date"), "g:date", "pick a date…")}</>),
+              frow("Due by", fieldCtrl(gp, {id:"due_by", label:"Due by", type:"date"}, G("date"), S("date"), "g:date", "pick a date…"))),
             card("dt", "Date & time", "Task › End date",
-              <>{lbl("Task end date")}{fieldCtrl(gp, {id:"task_end", label:"Task end date", type:"datetime"}, G("dt"), S("dt"), "g:dt", "pick a date and time…")}</>),
+              frow("Task end date", fieldCtrl(gp, {id:"task_end", label:"Task end date", type:"datetime"}, G("dt"), S("dt"), "g:dt", "pick a date and time…"))),
             card("dur", "Number + unit", "Create announcement › Duration",
               <>{lbl("Duration")}<div className="flex gap-2">
                 <input type="number" value={G("durn")||""} onChange={e=>S("durn")(e.target.value)} placeholder="0" className="flex-1 min-w-0 h-[38px] rounded-lg px-3 text-[length:var(--fs-13)] outline-none focus:border-[var(--accent)]" style={boxSty} />
                 <div className="w-28 shrink-0"><Dropdown value={G("duru")||"Hours"} options={["Minutes","Hours","Days"].map(u=>({id:u,label:u}))} onChange={S("duru")} /></div></div></>),
             card("tstart", "Date presets", "Add task › Task start date",
-              <>{lbl("Task start date", true)}{fieldCtrl(gp, {id:"task_start", label:"Task start date", type:"taskdate"}, G("ts"), S("ts"), "g:ts", "choose a start date…")}</>),
+              frow("Task start date", fieldCtrl(gp, {id:"task_start", label:"Task start date", type:"taskdate"}, G("ts"), S("ts"), "g:ts", "choose a start date…"))),
           ]],
           ["Structure", [
             card("kv", "Key – value rows", "HTTP request › Header",
@@ -13354,6 +13385,40 @@ function App() {
                 {galPkg && <PkgPickModal initial={pkgs.map(r=>r.id)} mode="Install" onClose={()=>setGalPkg(false)} onApply={(sel)=>{ S("pkgs")(DEPLOY_PACKAGES.filter(p=>sel.includes(p.id))); setGalPkg(false); }} />}</>, true),
           ]],
         ];
+        if (LAB) {
+          // field types that only exist inside the real sidebar → open that node's real sidebar
+          const sideBtn = (nodeId, label, note)=> (<div className="flex flex-col gap-2">
+            <span className="text-[length:var(--fs-12)]" style={{color:"#7b8fa5"}}>{note}</span>
+            <button type="button" data-nf="addbtn" onClick={()=>{ close(); setDrawer(nodeId); }} className="self-start inline-flex items-center gap-1.5 rounded-md px-3 text-[length:var(--fs-12)] font-medium" style={{height:30, border:"1px solid #1d2a3e", color:"#1d2a3e", background:"#fff"}}>
+              {label}<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button></div>);
+          const trigRow = (tid)=>{ const t = triggers.find(x=>x.id===tid); if (!t) return null;
+            return (<div data-nf="g-canvas" className="flex flex-wrap items-center gap-2 text-[length:var(--fs-15)]" style={{color:"var(--muted)"}}>
+              <span className="text-[length:var(--fs-11)] font-semibold uppercase tracking-[0.1em] px-2 py-1 rounded-md" style={{color:"var(--c-when)", background:"var(--c-when-bg)"}}>When</span>
+              <Template tpl={triggerView(t).tpl} vals={t.vals} openKey={openSlot && openSlot.startsWith(`trig:${t.id}:`) ? openSlot.slice(`trig:${t.id}:`.length) : null}
+                onSlot={(key,e)=>pickTriggerSlot(t,key,e)} slotRef={(k,el)=>setTriggerSlotRef(t.id,k,el)} /></div>); };
+          const LAB_CTRL = {
+            select:()=>ctrlByKey.prio, multi:()=>ctrlByKey.roles, category:()=>ctrlByKey.cat, tags:()=>ctrlByKey.tags, yesno:()=>ctrlByKey.spam,
+            switch:()=>ctrlByKey.switch, segment:()=>ctrlByKey.seg, people:()=>ctrlByKey.asg, group:()=>ctrlByKey.grp,
+            "rcpt-email":()=>ctrlByKey.to, "rcpt-phone":()=>ctrlByKey.sms, approvers:()=>ctrlByKey.appr,
+            text:()=>ctrlByKey.subject, phtext:()=>ctrlByKey.phtext, textarea:()=>ctrlByKey.desc, richtext:()=>ctrlByKey.rich, tokens:()=>ctrlByKey.cc,
+            number:()=>ctrlByKey.num, duration:()=><>{row("g_w1")}{ctrlByKey.dur}</>, datetime:()=><>{ctrlByKey.date}{ctrlByKey.dt}</>,
+            time:()=>trigRow("t_daily"), weekdays:()=>trigRow("t_weekly"),
+            "field-rows":()=><>{ctrlByKey.addf}{sideBtn("d2", "Open Update record in the sidebar", "Each row = a field cell + the value control for that field's type — try it in the real sidebar:")}</>,
+            condition:()=>row("d0"), keyval:()=>ctrlByKey.kv,
+            "ph-config":()=>sideBtn("d6", "Open Send email in the sidebar", "Placeholder configuration lives in Send email's sidebar (More options):"),
+            stages:()=>sideBtn("d3", "Open Ask for approval in the sidebar", "Stage cards live in Ask for approval's sidebar:"),
+            record:()=>row("d6"), attach:()=>ctrlByKey.attach, packages:()=>ctrlByKey.pkgs, password:()=>ctrlByKey.pwd,
+            expression:()=>(<>{lbl("Value")}<button type="button" data-anchor="g:expr" onClick={()=>openExprBuilder((v)=>S("expr")(v), G("expr"), "Value", recordsInScope(gp), "g:expr")}
+              className="w-full rounded-lg pl-2 pr-3 py-2 flex items-center gap-2 text-left text-[length:var(--fs-135)] transition-colors hover:bg-[var(--pop-hover)]" style={{...boxSty, color: G("expr") ? "var(--text)" : "var(--faint)"}}>
+              <span className="shrink-0 w-6 h-6 rounded flex items-center justify-center" style={{background:"var(--panel2)", color:"var(--muted)"}}><FxGlyph/></span>
+              <span className="flex-1 min-w-0 truncate">{G("expr") && G("expr").expr ? G("expr").expr : "Build a formula…"}</span></button></>),
+          };
+          return (<div data-nf="gallery" className="fixed inset-0 z-[48] overflow-y-auto" style={{background:"#F7F9FB"}}>
+            {/* the Lab page (static markup + its own script) is moved in here once, untouched by React */}
+            <div ref={(el)=>{ labRootRef.current = el; const pg = document.getElementById("lab-page"); if (el && pg && pg.parentNode!==el) el.appendChild(pg); }} />
+            {Object.entries(labMounts).map(([id, el])=> (el && LAB_CTRL[id]) ? ReactDOM.createPortal(<div data-nf="lab-lin" className="flex flex-col gap-2.5 min-w-0">{LAB_CTRL[id]()}</div>, el, "lab-"+id) : null)}
+          </div>);
+        }
         return (<div data-nf="gallery" className="fixed inset-0 z-[48] overflow-y-auto" style={{background:"#F7F9FB"}}>
           <div className="mx-auto px-6 py-8 flex flex-col gap-7" style={{maxWidth:1120}}>
             <header className="flex flex-col gap-1 relative">

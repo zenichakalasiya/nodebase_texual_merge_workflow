@@ -951,3 +951,65 @@ html.embed [data-nf="gallery"] [data-nf="pk-btn"]{background:#fff !important;min
 
 /* 37 · Reference card — flat and subtle (user 2026-10-21): no gradient or shadow; a soft tint + border on hover */
 [data-ref-card]:hover{background:#F6F1FE !important;border-color:#DCCDF8 !important;}
+
+/* 38 · Field Lab page (html.lab): the real right sidebar (opened from a lab card — field rows, stages, placeholder
+   configuration, Expression builder) floats over the lab page instead of sitting in the hidden builder layout */
+html.lab aside[data-nf="side"]{position:fixed !important;top:10px;right:10px;bottom:10px;height:auto !important;z-index:49;}
+
+/* 39 · An open value cell keeps its size (user 2026-10-22): focus = the blue OUTLINE only. The height rule above keys
+   on the resting border (var(--border2)); an open control's border turns var(--accent2), so it used to fall back to
+   its own taller size and stop lining up with the attribute cell beside / above it. */
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + button[style*="1px solid var(--accent2)"]:not([data-multi]),
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + .relative > button[style*="1px solid var(--accent2)"]:first-child,
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + button[data-nf="txt-b-field"]:not([data-multi]),
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + button[data-nf="vp-field"]{
+  height:32px !important;min-height:32px !important;padding-top:0 !important;padding-bottom:0 !important;padding-left:11px !important;padding-right:11px !important;font-size:12.8px !important;
+}
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + div[style*="1px solid var(--accent2)"]:not(.overflow-hidden){height:32px;min-height:32px !important;}
+/* side by side: the open cell shows its whole outline (the resting join hides its left edge) */
+@container side (min-width: 510px){
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + [style*="1px solid var(--accent2)"]:not(.overflow-hidden){
+    border-left:1px solid var(--accent2) !important;margin-left:-1px;position:relative;z-index:2;
+  }
+}
+/* …and no jump: the "+ non-field" 8px gap (8b) doesn't apply to an open cell; it stays joined to its attribute cell.
+   Some open cells use var(--accent), others var(--accent2) — both covered. Stacked: the top edge shows (outline). */
+html.embed [data-nf="side"] [data-nf="fcell"] + [style*="1px solid var(--accent2)"]:not(.overflow-hidden),
+html.embed [data-nf="side"] [data-nf="fcell"] + [style*="1px solid var(--accent)"]:not(.overflow-hidden){
+  margin-top:-1px !important;border-radius:0 0 8px 8px !important;position:relative;z-index:2;
+}
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + button[style*="1px solid var(--accent)"]:not([data-multi]){
+  height:32px !important;min-height:32px !important;padding-top:0 !important;padding-bottom:0 !important;padding-left:11px !important;padding-right:11px !important;font-size:12.8px !important;
+}
+@container side (min-width: 510px){
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + [style*="1px solid var(--accent2)"]:not(.overflow-hidden),
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + [style*="1px solid var(--accent)"]:not(.overflow-hidden){
+    margin-top:0 !important;margin-left:-1px;border-left:1px solid var(--accent2) !important;border-radius:0 8px 8px 0 !important;grid-column:2;
+  }
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"]:has(+ [style*="1px solid var(--accent)"]:not(.overflow-hidden)){grid-column:1;border-radius:8px 0 0 8px !important;}
+}
+
+/* 40 · Gallery / Field Lab record-field rows (user 2026-10-22) sit in a [data-nf=side] box so the real sidebar skin
+   styles them — but that box is not the floating sidebar card: no panel, padding or shadow */
+html.embed [data-nf="side"][data-gal-side]{background:transparent !important;padding:0 !important;}
+html.embed [data-nf="side"][data-gal-side] > *{background:transparent !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;overflow:visible !important;}
+
+/* 41 · …and the ATTRIBUTE cell stays joined to its open value cell (user 2026-10-22): square bottom corners when
+   stacked, square right corners when side by side — exactly as at rest, only the value's outline turns blue */
+html.embed [data-nf="side"] [data-nf="fcell"]:has(+ [style*="1px solid var(--accent2)"]:not(.overflow-hidden)),
+html.embed [data-nf="side"] [data-nf="fcell"]:has(+ [style*="1px solid var(--accent)"]:not(.overflow-hidden)){border-radius:8px 8px 0 0 !important;}
+@container side (min-width: 510px){
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"]:has(+ [style*="1px solid var(--accent2)"]:not(.overflow-hidden)),
+  html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"]:has(+ [style*="1px solid var(--accent)"]:not(.overflow-hidden)){border-radius:8px 0 0 8px !important;}
+}
+
+/* 42 · "+N more" Selected / All-added side panel (user 2026-10-22): tighter rows — 28px, 2px apart (was 32px + 4px) */
+[data-nf="rc-card"],[data-nf="vp-side-row"]{height:28px !important;min-height:28px !important;margin-bottom:2px !important;}
+/* Expression card — flat and subtle like the Reference card: no gradient, no shadow; a soft tint + border on hover */
+[data-nf="expr-card"]:hover{background:#FEF5EA !important;border-color:#F3D2A6 !important;}
+
+/* 43 · Send email › Content (user 2026-10-22): the reply toolbar sits INSIDE the writing box, like the SMS bar — one
+   white box, one hairline above the toolbar (the toolbar's own border-t / grey fill are dropped inside the cbar) */
+html.embed [data-nf="cbar"][data-rt]{padding:4px 8px 6px !important;}
+html.embed [data-nf="cbar"][data-rt] [data-nf="rte-row"], html.embed [data-nf="cbar"][data-rt] [data-nf="rte-bar"],
+html.embed [data-nf="cbar"][data-rt] [data-nf="rte-fmt"]{border-top:none !important;background:transparent !important;}

@@ -569,8 +569,15 @@ Functional edits made inside V8 (all in `linear/index.html`):
   from the reply toolbar.
 - **Sidebar popup rules (shared helpers next to `popCommitMode`):**
   - `popSide(el)` = opened from a sidebar field (or the gallery's sidebar
-    view). Saving: sidebar → click / Enter ("Press Enter" hint, no button);
-    canvas blanks → Apply button bottom right.
+    view). Saving: sidebar → click / Enter ("Press Enter" hint, no button),
+    multi-select live; canvas blanks → every VALUE popup (text, number, date,
+    duration, multi-select) has Apply bottom right (multi-select is only live
+    in the sidebar: `live = … && onSide`); single-choice menus pick on click.
+  - **Open value cell:** keeps its 32px height and joined shape — focus is
+    the blue outline only (skin sections 39–41).
+  - **Condition "Which field" popups** all carry the sticky Expression card
+    (`exprEscapeFooter`, flat amber) — including the first popup of a new
+    IF/Else, Branching, and a new and/or row.
   - **Width:** `popSideW` — a sidebar popup is as wide as the value field it
     opened from, min 280px, growing leftward when wider. Applies to Popover,
     `RcptField` and the plain `Picker` dropdown.
@@ -579,16 +586,26 @@ Functional edits made inside V8 (all in `linear/index.html`):
     tabs cover the field (title row hidden), lifted to fit near the bottom.
     Saving is identical in both. Still a trial — not finalised.
 - **Get records:** Single / Multiple in the sentence; "up to [N]" fetch limit;
-  on a periodic workflow Multiple's subtext states the per-cycle cap
-  (`getCycle()` — only hourly = 100 so far, a PLACEHOLDER awaiting real
-  numbers); the full sentence is the hover text.
+  Multiple's subtext ALWAYS reads "Max 100 records per cycle · longer interval
+  for more" (`multiSub()`), the user's full sentence on hover. Cap / interval
+  come from `getCycle()` — only hourly = 100, else "every 2 minutes" / 100 —
+  PLACEHOLDERS awaiting the real per-schedule numbers.
 - **Field gallery** (`?embed=1&gallery=1`, `GALLERY`): every unique field in
   one page, two views — **Sidebar fields** (V1 / V2 tabs) and **Canvas
   blanks** (real canvas rows via `renderFlow(flow, [], {only:i})` from the
   gallery-only `GALLERY_DEMO_DOC`, so every blank opens its real popup; in
   gallery mode `document.querySelector('[data-anchor=…]')` prefers the
-  gallery's copy). Published as a claude.ai artifact, built by a scratch
-  script that precompiles the JSX and inlines skin + vendor (not in repo).
+  gallery's copy). Record fields show as the sidebar's optional "Field 1"
+  row (`frow()` in a `[data-nf=side][data-gal-side]` box, skin 40).
+  Published as a claude.ai artifact, built by a scratch script that
+  precompiles the JSX and inlines skin + vendor (not in repo).
+- **Field Lab mode** (`LAB`, `window.__LAB` / `?lab=1`): the "Workflow Field
+  Lab" artifact — the Lab's own page (field-type cards, Node-based demos,
+  light only) with each card's Linear column portalled in from the gallery's
+  real controls (`LAB_CTRL`); drawer-only types open the real sidebar, lifted
+  over the page (`html.lab aside[data-nf=side]`, skin 38).
+- **Content (Send email)**: the reply toolbar sits inside the writing box via
+  the `cbar` hook (`data-rt`, skin 43).
 - **Search highlight** in every list popup is yellow (`SEARCH_MARK`, `#FDE68A`).
 - **Ask for approval** stage headings are tinted `#F6F9FC`.
 - **Request Signature** is a new step under Approval (template list is
