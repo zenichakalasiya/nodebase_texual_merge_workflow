@@ -22,6 +22,8 @@
 }
 .edge-hot.v{width:56px;height:70px;}
 .edge-hot.h{width:90px;height:48px;}
+/* a split path's tag: hover it and its delete shows just after the tag */
+.edge-hot.sp{transform:translateY(-50%);height:40px;justify-content:flex-end;}
 .edge-ctl{
   display:flex;gap:3px;padding:3px;border-radius:9px;
   background:var(--white);border:1px solid var(--border);

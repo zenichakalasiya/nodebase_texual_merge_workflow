@@ -41,6 +41,7 @@ scripts are written, run, and deleted. None are checked in.
 | `workflow-popover.js` / `.css` | The anchored picker popover, ported from the textual builder: search, grouped rows, second-level drill-down, keyboard nav, a checkmark on the already-picked row, and a caret help bubble that tracks the highlighted row. Light theme, matching the rest of the app. Also serves the plain `⋮` command menus. |
 | `workflow-chrome.js` / `.css` | The product frame: two-row top bar (including the Run history / Publish / Version history / More actions on the right), hover-out left navigation, the single floating bottom toolbar, tooltips (with key-badge shortcuts). Also builds the Run History/Version History/Guide/Shortcuts row markup and mock run/version data. |
 | `workflow-nodes.css` | Canvas node cards, connectors, edge hover controls, node states, sticky notes. |
+| `workflow-skeleton.css` / `.js` | Loading skeletons for both views (4 designs, see "Loading skeletons"). The `.js` only drives design 2 (step by step). |
 | `linear/index.html` | The **Linear view** — Pranjal's textual builder (V8: React + Tailwind + Babel in one ~12k-line file), embedded in an iframe. Carries our own functional edits (see "Linear view" below). |
 | `linear/node-skin.css` | Every visual change to the Linear view, scoped `html.embed …`, so it looks like the Node view. Loaded from `linear/index.html`'s `<head>`. |
 | `linear/vendor/` | Local copies of React, ReactDOM, Babel and Tailwind for the Linear view (no CDN). |
@@ -619,14 +620,55 @@ Reference docs in the repo root (generated this project):
 - `OPERATORS.md`: Linear vs the real product's operators, side by side.
 - `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
 
-The top bar's design switches (Linear view only) are **Text field** (A / B / C,
-default B) and **Popup** (V1 / V2). Picker, Email and Tags switches were
-removed once those were finalised. Side-by-side field rows (panel > 510px)
-are CSS container queries in `node-skin.css` (14e, plus section 36 that keeps
-them side by side while a value popup is open).
+**Detached steps (Linear view, skin sections 47–54).** Hover the line between
+two steps → a trash icon cuts everything below it into a "detached" piece
+(`detachAt`). Pieces live in `doc.detached`, so undo/redo covers them. They
+never run, and they are never folded or stored away: the stack stays on the
+right until each piece is reattached or deleted (the toolbar "Detached N"
+button and the fold button were removed; `dtFold` is dead code).
+- **Two designs**, top bar **Detach** switch (`dtVer`, message `wf:'dtver'`):
+  **1 · Panel** — click a card → drill-down detail with Reattach + Delete under
+  the title; **2 · Popover** — hover a card → Reattach/Delete icons on the card
+  and a popover to its LEFT. The stack stays spread while a popover is open.
+- **Detail content:** 2-line summary + Read more (plain text), then the steps
+  drawn like the canvas (`DtCanvas` / `dtCanvasOf`, `dc-*` CSS): lanes branch
+  80px right, dot-to-dot connectors, no stubs. No time, no "Was in", no
+  warning notes.
+- **Reattach:** a step list on the left (`DtPicker`, `dtTargets`); hovering a
+  row outlines that step on the canvas (one dashed box + "Goes here"), click
+  attaches with a landing glow (`dtPick`). Rules live in `dtCanDrop()`.
+- **Drag:** cards and the panel/popover title drag onto the canvas (`dtDrag`)
+  — ONE "Put it here" line follows the pointer (grey + reason where it can't
+  go); nothing else on the canvas reacts. Empty paths aren't drop targets
+  (Reattach covers them). The old "Put it here" everywhere spots
+  (`placing` / `dtDropBar`) are unused.
+- Every rendered step is wrapped in `<div data-dtn={id} style="display:contents">`
+  so the highlight can find it.
+- `EMBED_DEMO_DOC` is the full demo flow (IF/Else, 3-lane split, merge,
+  branch, loop); `EMBED_ACTIONS_DOC` is the old flat list, used by the gallery.
+
+**Loading skeletons** (`workflow-skeleton.css` / `.js`, markup in
+`workflow-canvas.html`; Node view `.nskel`, Linear view `.lskel`). The top
+bar's **Skeleton** button holds the skeleton on screen; the **Skeleton**
+switch next to it (both views, every load starts on 1) picks the design:
+1 · Whole (static), 2 · Step by step (`SkelV2` builds it node by node — Node:
+the blue line draws at a constant speed and each node lands as it arrives;
+Linear: the column is revealed top to bottom with a blue rail tip),
+3 · New workflow (trigger only + the empty next spot), 4 · Loader (a small
+workflow icon animation, CSS only). All grey except the blue line. No loading
+text (screen-reader label only).
+
+The top bar's design switches (Linear view only) are **Text field** (A / B / C
+/ D, always starts on B) and **Detach** (1 / 2). The **Popup** switch is
+hidden (V1 always). Picker, Email and Tags switches were removed once those
+were finalised. Side-by-side field rows (panel > 510px) are CSS container
+queries in `node-skin.css` (14e, plus section 36 that keeps them side by side
+while a value popup is open).
 
 Gotchas: `workflow-canvas.html` and `workflow-nodes.css` use CRLF line
-endings, `linear/index.html` uses LF. When patching V8 with a script, use
+endings, `linear/index.html` uses LF. (`workflow-canvas.html` is actually LF
+in git now.) Heredoc patch scripts containing curly quotes can break the
+shell — write the script to a file and run it instead. When patching V8 with a script, use
 exact-string replace with a count check — the file is too big to eyeball.
 The real product used as reference (an internal ServiceOps demo server — ask
 the user for the address) needs a login

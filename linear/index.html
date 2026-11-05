@@ -530,9 +530,9 @@ const USECASE_DOCS = {
 //    site (*.github.io), only locally. Each item loads a pre-made scenario for fast eyeballing, dismissed
 //    with the ✓. Add new items here while iterating; they auto-clear on publish via the IS_LIVE gate.
 //    (Currently empty — the action-field + universal-Esc items were resolved & cleared 2026-06-28.)
-// EMBED: the Linear view opens with one of each main action already on the canvas, so every node's
-// sidebar can be checked without building the flow by hand (requested 2026-10-14).
-const EMBED_DEMO_DOC = {
+// EMBED_ACTIONS_DOC: one of each main action in a flat list (requested 2026-10-14). The Field gallery builds its
+// cards from it by position, so it stays as it is.
+const EMBED_ACTIONS_DOC = {
   triggers: [{ id:"t1", typeId:"created", vals:{ module:"Incident" } }],
   flow: [
     { id:"d0",  kind:"condition", combiner:"and", clauses:[{ field:"category", op:"is", value:"Hardware" }, { field:"subject", op:"contains", value:"password" }] },
@@ -548,12 +548,46 @@ const EMBED_DEMO_DOC = {
     { id:"d10", kind:"action", action:"create_announcement" },
   ],
 };
+// EMBED: the Linear view opens on ONE full workflow that uses every flow node (user 2026-11-05) — IF / Else, a 3-path
+// Split + its Merge, a Branching with 3 branches + Otherwise, a Loop and Waits — with every main action placed inside
+// it, so each node's sidebar AND detaching / reattaching can be checked without building the flow by hand.
+const EMBED_DEMO_DOC = {
+  triggers: [{ id:"t1", typeId:"created", vals:{ module:"Incident" } }],
+  flow: [
+    { id:"e_a1", kind:"action", action:"assign", arg:"the service desk" },
+    { id:"e_if", kind:"branch", ifelse:true, otherwise:null, paths:[
+      { id:"e_if1", combiner:"and", clauses:[{ field:"category", op:"is", value:"Hardware" }], children:[
+        { id:"e_cr", kind:"action", action:"create", arg:"Service Request" },
+        { id:"e_up", kind:"action", action:"update", fields:[] } ] },
+      { id:"e_if2", isElse:true, combiner:"and", clauses:[], children:[
+        { id:"e_em1", kind:"action", action:"send_email", arg:"the requester", data:{} } ] } ] },
+    { id:"e_sp", kind:"branch", paths:[
+      { id:"e_spa", feeds:"e_m", children:[ { id:"e_em2", kind:"action", action:"send_email", arg:"the on-call team", data:{} } ] },
+      { id:"e_spb", feeds:"e_m", children:[ { id:"e_sms", kind:"action", action:"send_sms", data:{} } ] },
+      { id:"e_spc", feeds:"e_m", children:[ { id:"e_ann", kind:"action", action:"create_announcement" } ] } ] },
+    { id:"e_m", kind:"merge", num:1, wait:"all", deadline:{ amount:15, unit:"minutes" }, feeders:["e_spa", "e_spb", "e_spc"],
+      success:{ id:"e_msx", children:[
+        { id:"e_br", kind:"branch", paths:[
+          { id:"e_b1", combiner:"and", clauses:[{ field:"priority", op:"is", value:"High" }], children:[
+            { id:"e_ap", kind:"action", action:"ask_approval" },
+            { id:"e_lp", kind:"loop", mode:"until", clauses:[{ field:"status", op:"is", value:"Resolved" }], children:[
+              { id:"e_w1", kind:"delay", mode:"for", amount:30, unit:"minutes", hours:"calendar" },
+              { id:"e_pl", kind:"action", action:"run_plugin" } ] } ] },
+          { id:"e_b2", combiner:"and", clauses:[{ field:"priority", op:"is", value:"Medium" }], children:[
+            { id:"e_ra", kind:"action", action:"run_approval" } ] },
+          { id:"e_b3", combiner:"and", clauses:[{ field:"priority", op:"is", value:"Low" }], children:[
+            { id:"e_w2", kind:"delay", mode:"for", amount:1, unit:"hours", hours:"calendar" },
+            { id:"e_http", kind:"action", action:"http_request", data:{} } ] } ],
+          otherwise:{ id:"e_bo", children:[ { id:"e_int", kind:"action", action:"execute_integration", arg:"Slack" } ] } } ] },
+      otherwise:{ id:"e_mto", children:[ { id:"e_a2", kind:"action", action:"assign", arg:"the IT Head" } ] } },
+  ],
+};
 // Field gallery (canvas view): the embed demo plus one step of every other kind — each card renders ONE real canvas
 // row from this flow, so its blanks open the exact canvas popups. Sample data.
 const GALLERY_DEMO_DOC = {
-  triggers: EMBED_DEMO_DOC.triggers,
+  triggers: EMBED_ACTIONS_DOC.triggers,
   flow: [
-    ...EMBED_DEMO_DOC.flow,
+    ...EMBED_ACTIONS_DOC.flow,
     { id:"g_get", kind:"get", module:"Incident", mode:"multiple", qty:"multiple", limit:10, sort:"asc", sortBy:"Id", clauses:[{ field:"priority", op:"is", value:"High" }] },
     { id:"g_c", kind:"condition", combiner:"and", clauses:[
       { field:"priority", op:"is", value:"High" },
@@ -4355,7 +4389,7 @@ function RichBody({ value, onChange, placeholder, canPlaceholder, onRequestPlace
     try{ document.execCommand("styleWithCSS", false, /^(foreColor|hiliteColor|backColor|fontSize)$/.test(cmd)); }catch(_e){}
     document.execCommand(cmd, false, val==null ? null : val); emit(); };
   const ownApi = React.useRef(null);
-  React.useEffect(()=>{ const a = { insert:(el)=>clickInsert(el), expand:()=>setExpanded(true), el:ref.current,
+  React.useEffect(()=>{ const a = { insert:(el)=>clickInsert(el), expand:()=>setExpanded(true), el:ref.current, applyRef:(l, f)=>applyRef(l, f), startChip:()=>{ activeChip.current=null; },
     format:(cmd, val)=>execCmd(cmd, val), saveSel:()=>saveSel() };
     ownApi.current = a; if(api) api.current = a; });
   // typing "{{" opens the SAME picker inline at the caret (Braze pattern). A single "{" types normally,
@@ -4621,6 +4655,242 @@ function TxtInlineC({ value, onChange, single, placeholder, canDynamic, onDynami
         <div className="px-2.5 pt-2 pb-1"><RichBody frameless noFooter noPhBtn api={api} value={value} onChange={onChange} placeholder={placeholder} minRows={4} canPlaceholder={false} /></div>
         <ReplyTools api={api} />
         {panel}</div>;
+}
+
+// D (user 2026-10-22) — no Specific | Dynamic popup: the field IS the input (Specific = type straight in). Top-right,
+// two grey #eef2f6 squares: { } (the "Insert placeholder" list) and f(x) just right of it. f(x) opens ONLY the Dynamic
+// record drill and the pick REPLACES the whole value (a purple value-only pill in the field; × brings the typed text
+// back). While f(x)'s popup is open, or the value is dynamic, the { } hides. Every node except Send email / SMS /
+// Approval reminder (their own composer) and Ask for approval's group fields (the recipient popup).
+const FX_GLYPH = <span className="font-serif italic leading-none text-[length:var(--fs-13)]">f<span className="not-italic text-[length:var(--fs-10)] align-[1px]">(x)</span></span>;
+function FxBtn({ on, can, onClick }){
+  return <Tooltip label={can ? "Use a value from the record" : "Add a Get or Create step above to use record values"}><button type="button" data-nf="fxd-fx" data-on={on || undefined} disabled={!can} aria-label="Dynamic value"
+    onClick={onClick} className="w-6 h-6 rounded flex items-center justify-center">{FX_GLYPH}</button></Tooltip>;
+}
+// the dynamic value inside a D field: value only, light purple; click = change it, × = back to the typed value
+function FxRefPill({ label, onOpen, onClear }){
+  return <span data-nf="fxd-ref" title={label} onClick={onOpen} className="inline-flex items-center gap-1 min-w-0 max-w-full rounded pl-1.5 pr-0.5 h-6 text-[length:var(--fs-13)] cursor-pointer" style={{background:"var(--ref-bg)", color:"var(--ref-fg)"}}>
+    <span className="truncate">{label}</span>
+    <span role="button" aria-label="Remove dynamic value" data-tip="Remove" onClick={e=>{ e.stopPropagation(); onClear(); }} className="shrink-0 w-5 h-5 rounded flex items-center justify-center hover:bg-[rgba(138,36,214,.12)]">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg></span></span>;
+}
+function TxtFxD({ value, refVal, onChange, single, placeholder, canDynamic, onFx, onClearRef, onPh, fxOn, anchorKey, tools, mix, bare }){
+  const wrapRef = React.useRef(null), api = React.useRef(null);
+  const isRef = refVal!=null;
+  // mix (Send email › Subject): the pick lands at the caret as a placeholder; otherwise it replaces the value
+  const openFx = ()=>{ if(!canDynamic) return; if (mix && api.current){ api.current.startChip(); onFx(wrapRef.current, api.current.applyRef); } else onFx(wrapRef.current); };
+  const btns = <div data-nf="fxd-btns" className="absolute flex items-center gap-1" style={{top:3, right:3}}
+    onMouseDown={e=>{ e.preventDefault(); if(api.current) api.current.saveSel(); }}>{/* keep the caret where the user left it */}
+    {(mix || !fxOn) && !isRef && <Tooltip label={canDynamic ? "Insert placeholder" : "Add a Get or Create step above to insert placeholders"}><button type="button" data-nf="ph-btn" data-fxd="" disabled={!canDynamic} aria-label="Insert placeholder"
+      onClick={e=>{ if(canDynamic && api.current) api.current.insert(e.currentTarget); }} className="w-6 h-6 rounded flex items-center justify-center font-mono">{"{ }"}</button></Tooltip>}
+    <FxBtn on={fxOn || isRef} can={canDynamic} onClick={openFx} />
+  </div>;
+  const border = "1px solid "+(fxOn ? "var(--accent)" : "var(--border2)");
+  if (isRef) return <div ref={wrapRef} data-nf="txt-d" data-ref="" data-anchor={anchorKey} className="relative w-full rounded-lg pl-1.5 py-[3px] flex items-center" style={{background:"var(--panel)", border, paddingRight:32}}>
+      <FxRefPill label={refVal} onOpen={openFx} onClear={onClearRef} />{btns}</div>;
+  if (bare) return <div ref={wrapRef} data-nf="txt-d" data-bare="" data-anchor={anchorKey} className="relative w-full flex items-center cursor-text" style={{paddingRight:28}}>
+      <div className="flex-1 min-w-0"><RichBody single noPhBtn api={api} value={value} onChange={onChange} placeholder={placeholder} canPlaceholder={canDynamic} onRequestPlaceholder={onPh} /></div>
+      {btns}</div>;
+  return single
+    ? <div ref={wrapRef} data-nf="txt-d" data-anchor={anchorKey} className="relative w-full rounded-lg pl-3 py-[3px] flex items-center cursor-text focus-within:border-[var(--accent)]" style={{background:"var(--panel)", border, paddingRight:28}}>
+        <div className="flex-1 min-w-0"><RichBody single noPhBtn api={api} value={value} onChange={onChange} placeholder={placeholder} canPlaceholder={canDynamic} onRequestPlaceholder={onPh} /></div>
+        {btns}</div>
+    : <div ref={wrapRef} data-nf="txt-d" data-multi="" data-anchor={anchorKey} className="relative rounded-lg focus-within:border-[var(--accent)]" style={{border, background:"var(--panel)"}}>
+        <div className="pl-2.5 pr-6 pt-2 pb-1"><RichBody frameless noFooter noPhBtn api={api} value={value} onChange={onChange} placeholder={placeholder} minRows={tools ? 4 : 3} canPlaceholder={canDynamic} onRequestPlaceholder={onPh} /></div>
+        {tools && <ReplyTools api={api} />}
+        {btns}</div>;
+}
+// D · Number / Date / Date & time / Duration (user 2026-10-22): no Specific | Dynamic popup — the field IS the input.
+// Number: type digits (no spinner). Date / Date & time: clicking anywhere opens the calendar straight away (the
+// browser's own picker — the same one the old popup held). Duration: the number and its unit (Minutes / Hours / Days)
+// in ONE field, the unit a quiet menu at its right. f(x) (top-right) swaps the whole value for one dynamic value (the
+// purple pill; × brings the typed value back).
+const IN_D_ICON = {
+  date: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="5" width="17" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.7"/><path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
+  datetime: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="5" width="17" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.7"/><path d="M3.5 9.5h17M8 3v4M16 3v4M12 12.5v2.6l1.8 1.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+};
+const inDFmt = (kind, v)=>{ if (!v) return ""; const d = new Date(kind==="date" ? v+"T00:00" : v); if (isNaN(d)) return v;
+  return kind==="date" ? d.toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" })
+    : d.toLocaleString("en-GB", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }); };
+function InFxD({ kind, value, onChange, placeholder, canDynamic, onFx, refVal, onClearRef, fxOn, anchorKey, unit, units, onUnit }){
+  const wrapRef = React.useRef(null), inRef = React.useRef(null);
+  const openFx = ()=>{ if (canDynamic) onFx(wrapRef.current); };
+  const fxBtn = <div className="absolute" style={{top:3, right:3}} onMouseDown={e=>e.preventDefault()}><FxBtn on={fxOn || refVal!=null} can={canDynamic} onClick={openFx} /></div>;
+  const border = "1px solid "+(fxOn ? "var(--accent)" : "var(--border2)");
+  if (refVal!=null) return <div ref={wrapRef} data-nf="in-d" data-ref="" data-anchor={anchorKey} className="relative w-full rounded-lg pl-1.5 py-[3px] flex items-center" style={{background:"var(--panel)", border, paddingRight:32, minHeight:32}}>
+    <FxRefPill label={refVal} onOpen={openFx} onClear={onClearRef} />{fxBtn}</div>;
+  const isDate = kind==="date" || kind==="datetime";
+  const v = value==null ? "" : String(value);
+  const pick = ()=>{ const el = inRef.current; if (!el) return; el.focus(); try { el.showPicker && el.showPicker(); } catch(_e){} };
+  return <div ref={wrapRef} data-nf="in-d" data-kind={kind} data-anchor={anchorKey} onClick={(e)=>{ if (isDate && !(e.target.closest && e.target.closest("[data-nf=fxd-fx],[data-nf=in-d-unit]"))) pick(); }}
+    className={"relative w-full rounded-lg flex items-center gap-2 focus-within:border-[var(--accent)] "+(isDate ? "pl-2.5 cursor-pointer" : "pl-3 cursor-text")} style={{background:"var(--panel)", border, paddingRight:32, minHeight:32}}>
+    {isDate && <span className="shrink-0 flex" style={{color: v ? "var(--muted)" : "var(--faint)"}}>{IN_D_ICON[kind]}</span>}
+    <div className="relative flex-1 min-w-0 h-[30px] flex items-center">
+      {isDate && <span data-nf="in-d-text" className="truncate text-[length:var(--fs-13)] pointer-events-none" style={{color: v ? "var(--text)" : "var(--faint)"}}>{v ? inDFmt(kind, v) : (placeholder || (kind==="date" ? "Pick a date" : "Pick a date and time"))}</span>}
+      <input ref={inRef} data-nf="in-d-input" type={kind==="datetime" ? "datetime-local" : kind==="date" ? "date" : "number"} value={v} inputMode={isDate ? undefined : "decimal"}
+        onChange={e=>onChange(e.target.value==="" ? null : e.target.value)} placeholder={isDate ? undefined : (placeholder || "Enter a number")}
+        className={isDate ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : "w-full h-full bg-transparent outline-none text-[length:var(--fs-13)] tabular-nums"} style={{color:"var(--text)"}} />
+    </div>
+    {units && <button type="button" data-nf="in-d-unit" onClick={(e)=>{ e.stopPropagation(); onUnit(e.currentTarget); }}
+      className="shrink-0 inline-flex items-center gap-1 h-6 pl-2 pr-1.5 rounded-md text-[length:var(--fs-12)] font-medium hover:bg-[var(--pop-hover)]" style={{color:"var(--muted)", background:"#F4F7FA"}}>
+      {unit}<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>}
+    {fxBtn}
+  </div>;
+}
+// D · Yes / No: the switch sits right in the field (untouched = No); f(x) swaps the whole value for a record field
+function TglFxD({ value, refVal, onChange, canDynamic, onFx, onClearRef, fxOn, anchorKey }){
+  const wrapRef = React.useRef(null); const on = value==="Yes";
+  const openFx = ()=>{ if(canDynamic) onFx(wrapRef.current); };
+  return <div ref={wrapRef} data-nf="txt-d" data-tgl="" data-anchor={anchorKey} className={"relative w-full rounded-lg py-[3px] flex items-center "+(refVal!=null ? "pl-1.5" : "pl-3")} style={{background:"var(--panel)", border:"1px solid "+(fxOn ? "var(--accent)" : "var(--border2)"), paddingRight:32}}>
+    {refVal!=null ? <FxRefPill label={refVal} onOpen={openFx} onClear={onClearRef} />
+    : <button type="button" role="switch" aria-checked={on} data-nf="fxd-switch" onClick={()=>onChange(on ? "No" : "Yes")} className="inline-flex items-center gap-2 h-6 text-[length:var(--fs-13)]" style={{color:"var(--text)"}}>
+      <span className="relative inline-block w-7 h-4 rounded-full transition-colors" style={{background: on ? "#37c15f" : "#cbd5df"}}>
+        <span className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all" style={{left: on ? 14 : 2, boxShadow:"0 1px 2px rgba(0,0,0,.2)"}} /></span>
+      {on ? "Yes" : "No"}</button>}
+    <div className="absolute" style={{top:3, right:3}}><FxBtn on={fxOn || refVal!=null} can={canDynamic} onClick={openFx} /></div>
+  </div>;
+}
+
+// D · multi-value fields — Email (To · Cc emails · Create user Email), SMS To and Tags (user 2026-10-22). No Specific |
+// Dynamic popup: the field IS a chip input. Click it → every value shows as a chip and an input sits after the last
+// one; the field grows with the values up to 4 rows (124px), then scrolls. Typing shows autocomplete suggestions
+// (only after typing); Enter / comma / ; adds a typed value or the highlighted suggestion; Backspace in an empty box
+// removes the last chip. Click outside → it collapses to the FIRST value + "+N"; "+N" opens a popup with all values,
+// search and remove. f(x) (top-right) adds a dynamic value: mix (Send email / SMS) → as one more chip in the same
+// field; otherwise it REPLACES all values with one purple dynamic value (× brings the typed values back).
+const CHIP_D_MAX = 124;
+function ChipFxD({ values, onChange, kind, suggest, mix, maxOne, placeholder, canDynamic, onFx, refVal, onClearRef, fxOn, anchorKey }){
+  const K = VL_KIND[kind] || VL_KIND.email;
+  const vals = Array.isArray(values) ? values : [];
+  const [editing, setEditing] = React.useState(false);
+  const [q, setQ] = React.useState(""); const [hi, setHi] = React.useState(-1); const [msg, setMsg] = React.useState(null);
+  const [all, setAll] = React.useState(false); const [aq, setAq] = React.useState("");
+  const [pos, setPos] = React.useState(null);
+  const wrapRef = React.useRef(null), inRef = React.useRef(null), listRef = React.useRef(null), sugRef = React.useRef(null), allRef = React.useRef(null);
+  const valsRef = React.useRef(vals); valsRef.current = vals;
+  const keys = new Set(vals.map(vlKey));
+  const noun = kind==="tag" ? "tag" : kind==="phone" ? "number" : "email";
+  const ql = q.trim().toLowerCase();
+  const sugs = ql ? (suggest||[]).filter(sg=> !keys.has(vlKey(sg.id)) && (sg.label+" "+(sg.sub||"")+" "+sg.id).toLowerCase().includes(ql)).slice(0, 8) : [];
+  // highlight the first suggestion unless what's typed is already a complete new value (then Enter adds it as typed)
+  React.useEffect(()=>{ setHi(sugs.length && !(kind!=="tag" && K.rx.test(q.trim())) && !(kind==="tag" && !sugs[0].label.toLowerCase().startsWith(ql)) ? 0 : -1); }, [q]);
+  const add = (list)=>{ let cur = valsRef.current.slice();
+    list.forEach(v=>{ if (!cur.some(x=>vlKey(x)===vlKey(v))) cur = maxOne ? [v] : [...cur, v]; });
+    valsRef.current = cur; onChange(cur.length ? cur : null);
+    requestAnimationFrame(()=>{ if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }); };
+  const remove = (v)=>{ const cur = valsRef.current.filter(x=>vlKey(x)!==vlKey(v)); valsRef.current = cur; onChange(cur.length ? cur : null); };
+  // typed text → values. Invalid parts stay in the box with a note; on leaving the field they're dropped.
+  const commitTyped = (raw, leaving)=>{ const parts = String(raw||"").split(K.split).map(x=>x.trim()).filter(Boolean);
+    if (!parts.length){ setQ(""); setMsg(null); return; }
+    const good = parts.filter(p=>K.rx.test(p)), bad = parts.filter(p=>!K.rx.test(p));
+    const dup = good.length && good.every(p=>keys.has(vlKey(p)));
+    if (good.length) add(good);
+    if (bad.length && !leaving){ setQ(bad.join(", ")); setMsg("Enter a valid "+(kind==="phone" ? "mobile number" : "email")); return; }
+    setQ(""); setMsg(dup && !leaving ? "Already added" : null); };
+  const pick = (sg)=>{ add([sg.id]); setQ(""); setMsg(null); if (inRef.current) inRef.current.focus(); };
+  const startEdit = ()=>{ if (all) setAll(false); setEditing(true); requestAnimationFrame(()=>{ if (inRef.current) inRef.current.focus();
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }); };
+  const stopEdit = ()=>{ commitTyped(inRef.current ? inRef.current.value : q, true); setEditing(false); setMsg(null); };
+  // leaving: a click anywhere outside the field and its suggestion list
+  React.useEffect(()=>{ if (!editing) return;
+    const h = (e)=>{ if ((wrapRef.current && wrapRef.current.contains(e.target)) || (sugRef.current && sugRef.current.contains(e.target)) || e.target.closest && e.target.closest("[data-pop-root]")) return; stopEdit(); };
+    document.addEventListener("mousedown", h, true); window.addEventListener("blur", stopEdit);
+    return ()=>{ document.removeEventListener("mousedown", h, true); window.removeEventListener("blur", stopEdit); }; }, [editing, q, values]);
+  // the "+N" popup: outside click / Esc closes it
+  React.useEffect(()=>{ if (!all) return;
+    const h = (e)=>{ if ((allRef.current && allRef.current.contains(e.target)) || (wrapRef.current && wrapRef.current.contains(e.target))) return; setAll(false); setAq(""); };
+    const k = (e)=>{ if (e.key==="Escape"){ e.stopPropagation(); setAll(false); setAq(""); } };
+    document.addEventListener("mousedown", h, true); document.addEventListener("keydown", k, true);
+    return ()=>{ document.removeEventListener("mousedown", h, true); document.removeEventListener("keydown", k, true); }; }, [all]);
+  // suggestion list / "+N" popup: as wide as the field (min 280px, growing leftward), opened where it has the room
+  // (user 2026-10-22) — below the field, or above when there's more space there; kept inside the window on every side,
+  // and if neither side fits it whole, it takes the bigger side and its list scrolls
+  React.useLayoutEffect(()=>{ if (!(all || (editing && sugs.length))) return;
+    const place = ()=>{ const w = wrapRef.current; if (!w) return; const r = w.getBoundingClientRect(); const W = window.innerWidth, H = window.innerHeight, m = 8, g = 4;
+      const width = Math.min(Math.max(280, r.width), W - 2*m);
+      const el = all ? allRef.current : sugRef.current; const h = el ? el.scrollHeight + 2 : 0;
+      const below = H - r.bottom - g - m, above = r.top - g - m;
+      const up = h > below && above > below; const maxH = Math.max(120, Math.floor(up ? above : below));
+      const top = up ? Math.max(m, r.top - g - Math.min(h, maxH)) : r.bottom + g;
+      const left = Math.max(m, Math.min(r.right - width, W - width - m));
+      setPos(o=> o && o.left===left && o.top===top && o.width===width && o.maxH===maxH ? o : { left, top, width, maxH }); };
+    place(); window.addEventListener("scroll", place, true); window.addEventListener("resize", place);
+    const ro = new ResizeObserver(place); if (wrapRef.current) ro.observe(wrapRef.current);
+    const pe = all ? allRef.current : sugRef.current; if (pe && pe.firstElementChild) Array.from(pe.children).forEach(ch=>ro.observe(ch));
+    return ()=>{ window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place); ro.disconnect(); }; }, [all, editing, sugs.length]);
+  const onKey = (e)=>{
+    if (e.key==="ArrowDown" && sugs.length){ e.preventDefault(); setHi(h=> Math.min(sugs.length-1, h+1)); }
+    else if (e.key==="ArrowUp" && sugs.length){ e.preventDefault(); setHi(h=> Math.max(-1, h-1)); }
+    else if (e.key==="Enter"){ e.preventDefault(); if (hi>=0 && sugs[hi]) pick(sugs[hi]); else commitTyped(q); }
+    else if (e.key===","||e.key===";"){ e.preventDefault(); commitTyped(q); }
+    else if (e.key==="Backspace" && !q && vals.length){ remove(vals[vals.length-1]); }
+    else if (e.key==="Escape"){ e.stopPropagation(); if (q){ setQ(""); setMsg(null); } else stopEdit(); }
+    else if (e.key==="Tab"){ stopEdit(); } };
+  const mark = (txt)=>{ const t = String(txt), i = ql ? t.toLowerCase().indexOf(ql) : -1;
+    return i<0 ? t : <>{t.slice(0,i)}<mark style={SEARCH_MARK}>{t.slice(i, i+ql.length)}</mark>{t.slice(i+ql.length)}</>; };
+  // f(x): mix → one more chip, refined live as the drill goes deeper; else the caller swaps the whole value
+  const fx = ()=>{ if (!canDynamic) return; setAll(false);
+    if (!mix) return onFx(wrapRef.current);
+    if (editing) commitTyped(q, true);
+    const sess = { idx:null };
+    onFx(wrapRef.current, (ref)=>{ const cur = valsRef.current, v = {ref};
+      if (sess.idx==null || sess.idx>=cur.length){ sess.idx = cur.length; add([v]); }
+      else { const nx = cur.map((x,i)=> i===sess.idx ? v : x); valsRef.current = nx; onChange(nx); } }); };
+  const fxBtn = <div className="absolute" style={{top:3, right:3}} onMouseDown={e=>e.preventDefault()}><FxBtn on={fxOn || refVal!=null} can={canDynamic} onClick={fx} /></div>;
+  const border = "1px solid "+((editing || fxOn) ? "var(--accent)" : "var(--border2)");
+  if (refVal!=null) return <div ref={wrapRef} data-nf="chip-d" data-ref="" data-anchor={anchorKey} className="relative w-full rounded-lg pl-1.5 py-[3px] flex items-center" style={{background:"var(--panel)", border, paddingRight:32, minHeight:32}}>
+    <FxRefPill label={refVal} onOpen={fx} onClear={onClearRef} />{fxBtn}</div>;
+  const aql = aq.trim().toLowerCase();
+  const allList = aql ? vals.filter(v=>vlLabel(v).toLowerCase().includes(aql)) : vals;
+  const P = pos || { left:-9999, top:-9999, width:320, maxH:400 };   // first frame off-screen: measured, then placed
+  const sugPop = (editing && sugs.length) ? ReactDOM.createPortal(
+    <div ref={sugRef} data-nf="chip-d-sug" role="listbox" className="fixed z-[60] rounded-lg p-1 flex flex-col overflow-y-auto" onMouseDown={e=>e.preventDefault()}
+      style={{left:P.left, top:P.top, width:P.width, maxHeight:Math.min(260, P.maxH), background:"var(--pop-bg)", border:"1px solid var(--border2)", boxShadow:"var(--shadow-pop)"}}>
+      {sugs.map((sg, i)=> <button key={String(sg.id)} type="button" role="option" aria-selected={i===hi} onMouseEnter={()=>setHi(i)} onClick={()=>pick(sg)}
+        className="w-full text-left rounded-md px-2.5 py-1.5 flex flex-col" style={{background: i===hi ? "var(--pop-hover)" : "transparent"}}>
+        <span className="text-[length:var(--fs-13)] truncate" style={{color:"var(--text)"}}>{mark(sg.label)}</span>
+        {sg.sub && sg.sub!==sg.label && <span className="text-[length:var(--fs-115)] truncate" style={{color:"var(--muted)"}}>{mark(sg.sub)}</span>}
+      </button>)}
+    </div>, document.body) : null;
+  const allPop = all ? ReactDOM.createPortal(
+    <div ref={allRef} data-nf="chip-d-all" className="fixed z-[60] rounded-xl flex flex-col"
+      style={{left:P.left, top:P.top, width:P.width, maxHeight:P.maxH, background:"var(--pop-bg)", border:"1px solid var(--border2)", boxShadow:"var(--shadow-pop)"}}>
+      <div className="px-3 pt-2.5 pb-1.5 flex items-center justify-between gap-2">
+        <span className="text-[length:var(--fs-13)] font-semibold" style={{color:"var(--text)"}}>{aql ? allList.length+" of "+vals.length : vals.length}{" "+noun+(vals.length===1 ? "" : "s")}</span>
+      </div>
+      <div className="px-2.5 pb-1.5"><div className="flex items-center gap-2 rounded-lg px-2.5 h-8" style={{border:"1px solid var(--border2)"}}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{color:"var(--faint)"}}><circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2"/><path d="M16 16l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+        <input autoFocus value={aq} onChange={e=>setAq(e.target.value)} placeholder={"Search "+noun+"s"} className="flex-1 min-w-0 bg-transparent outline-none text-[length:var(--fs-13)]" style={{color:"var(--text)"}} /></div></div>
+      <div className="px-1.5 pb-1.5 max-h-[300px] min-h-0 flex-1 overflow-y-auto flex flex-col">
+        {allList.length ? allList.map(v=> <div key={vlKey(v)} data-nf="chip-d-row" className="group/cr flex items-center gap-2 rounded-md pl-2 pr-1 h-8 hover:bg-[var(--pop-hover)]">
+            <span className="flex-1 min-w-0 truncate text-[length:var(--fs-13)]" style={{color: vlIsRef(v) ? "var(--ref-fg)" : "var(--text)"}}>{(()=>{ const t = vlLabel(v), i = aql ? t.toLowerCase().indexOf(aql) : -1;
+              return i<0 ? t : <>{t.slice(0,i)}<mark style={SEARCH_MARK}>{t.slice(i, i+aql.length)}</mark>{t.slice(i+aql.length)}</>; })()}</span>
+            <button type="button" aria-label={"Remove "+vlLabel(v)} onClick={()=>{ remove(v); if (valsRef.current.length<2){ setAll(false); setAq(""); } }}
+              className="shrink-0 w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover/cr:opacity-100 focus:opacity-100 hover:text-[var(--red)]" style={{color:"var(--muted)"}}>{VL_X}</button>
+          </div>)
+          : <div className="px-2 py-3 text-center text-[length:var(--fs-12)]" style={{color:"var(--faint)"}}>No {noun}s match</div>}
+      </div>
+    </div>, document.body) : null;
+  return <div ref={wrapRef} data-nf="chip-d" data-anchor={anchorKey} data-editing={editing || undefined} onClick={(e)=>{ if (!wrapRef.current || !wrapRef.current.contains(e.target)) return;   /* clicks inside the portalled popups bubble here too */
+    if (!editing && !(e.target.closest && e.target.closest("[data-nf=chip-d-more]"))) startEdit(); else if (editing && inRef.current && e.target===listRef.current) inRef.current.focus(); }}
+    className="relative w-full rounded-lg cursor-text" style={{background:"var(--panel)", border, paddingRight:32}}>
+    <div ref={listRef} className={"flex items-center gap-1 pl-1.5 py-[3px] min-h-[30px] "+(editing ? "flex-wrap" : "")} style={editing ? {maxHeight:CHIP_D_MAX-2, overflowY:"auto"} : {overflow:"hidden"}}>
+      {editing
+        ? <>{vals.map(v=> <VlChip key={vlKey(v)} v={v} bare onRemove={()=>remove(v)} />)}
+            <input ref={inRef} data-nf="chip-d-in" autoFocus value={q} onChange={e=>{ setQ(e.target.value); setMsg(null); }} onKeyDown={onKey}
+              onPaste={e=>{ const t = e.clipboardData && e.clipboardData.getData("text/plain"); if (t && K.split.test(t)){ e.preventDefault(); commitTyped(q + t); } }}
+              placeholder={vals.length ? (maxOne ? "" : "Add another "+noun+"…") : (placeholder || "Type "+(kind==="tag" ? "a tag" : kind==="phone" ? "a mobile number" : "an email")+"…")}
+              className="flex-1 min-w-[90px] h-6 bg-transparent outline-none pl-1 text-[length:var(--fs-13)]" style={{color:"var(--text)"}} /></>
+        : vals.length
+          ? <><span className="min-w-0 flex overflow-hidden"><VlChip v={vals[0]} bare /></span>
+              {vals.length>1 && <button type="button" data-nf="chip-d-more" onClick={(e)=>{ e.stopPropagation(); setAll(a=>!a); setAq(""); }} title={"See all "+vals.length+" "+noun+"s"}
+                className="shrink-0 inline-flex items-center px-1.5 rounded-full text-[length:var(--fs-115)] font-medium leading-[20px] tabular-nums hover:bg-[var(--pop-hover)]" style={{background:"var(--panel2)", border:"1px solid var(--border2)", color:"var(--muted)"}}>+{vals.length-1}</button>}</>
+          : <span className="pl-1.5 truncate text-[length:var(--fs-13)]" style={{color:"var(--faint)"}}>{placeholder || "Type "+(kind==="tag" ? "a tag" : kind==="phone" ? "a mobile number" : "an email")+"…"}</span>}
+    </div>
+    {fxBtn}
+    {msg && editing && <div data-nf="chip-d-msg" className="px-2.5 pb-1.5 text-[length:var(--fs-115)]" style={{color:"var(--red)"}}>{msg}</div>}
+    {sugPop}{allPop}
+  </div>;
 }
 
 // ── ADD PACKAGES overlay (user 2026-10-21, per the product's "Add Packages" dialog): a centred modal over the whole
@@ -6482,6 +6752,228 @@ function ExpressionBuilder({ text, setText, scope, onDone, onClose, onBack, back
 /* ---------------------------------------------------------------------------
    App
 --------------------------------------------------------------------------- */
+// ── DETACHED STEPS (user 2026-11-05) ─────────────────────────────────────────────────────────────────────────────
+// Deleting the LINE between two steps (the trash on a gap's InsertZone) lifts every step below it — on that path only —
+// into a see-through stack on the right, newest on top. Detached steps don't run. Hover the stack → the cards spread out;
+// click one → its full summary + the steps drawn like the canvas, with Reattach (a step list; hover lights the step up on
+// the canvas) and Delete. Two designs via the top bar's Detach switch: 1 Panel (drill-down) · 2 Popover (user 2026-11-05). Pieces live in doc.detached, so Undo / Redo / Reset cover
+// them like any other edit. Linear view (EMBED) only; styled in node-skin.css § 47.
+const DT_P = {
+  trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  collapse:'<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
+  layers:'<path d="m12 2 10 5-10 5L2 7l10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
+  bolt:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',
+  diamond:'<path d="M12 3 21 12 12 21 3 12Z"/>',
+  branch:'<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 7v10M6 13c0-3 6-2 10-4"/>',
+  split:'<circle cx="12" cy="4.5" r="2"/><circle cx="5.5" cy="19.5" r="2"/><circle cx="18.5" cy="19.5" r="2"/><path d="M12 6.5V10c0 3-6.5 3.5-6.5 7.5M12 10c0 3 6.5 3.5 6.5 7.5"/>',
+  merge:'<circle cx="5.5" cy="4.5" r="2"/><circle cx="18.5" cy="4.5" r="2"/><circle cx="12" cy="19.5" r="2"/><path d="M5.5 6.5c0 4 6.5 4.5 6.5 8v3M18.5 6.5c0 4-6.5 4.5-6.5 8"/>',
+  loop:'<path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  db:'<ellipse cx="12" cy="5.5" rx="7.5" ry="3"/><path d="M4.5 5.5v13c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-13M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/>',
+  back:'<path d="m15 18-6-6 6-6"/>',
+  link:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  warn:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/>',
+  down:'<path d="M12 5v14M6 13l6 6 6-6"/>',
+};
+const DtIc = ({ n, s=16, w=1.8 }) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{__html:DT_P[n]}}/>;
+const DT_TYPE = {
+  action:{ k:"Action", c:"t-act", ic:"bolt" },      get:{ k:"Get records", c:"t-get", ic:"db" },     wait:{ k:"Wait", c:"t-wait", ic:"clock" },
+  cond:{ k:"Check if", c:"t-if", ic:"diamond" },    ifelse:{ k:"IF / Else", c:"t-if", ic:"diamond" }, branch:{ k:"Branching", c:"t-if", ic:"branch" },
+  split:{ k:"Split path", c:"t-split", ic:"split" }, merge:{ k:"Merge", c:"t-merge", ic:"merge" },    loop:{ k:"Loop", c:"t-loop", ic:"loop" },
+};
+const dtSteps = (k) => k + (k===1 ? " step" : " steps");
+const dtAgo = (t) => { const s = (Date.now()-t)/1000; return s<45 ? "now" : s<3600 ? Math.round(s/60)+"m ago" : Math.round(s/3600)+"h ago"; };
+const dtShort = (s, n=38) => (s && s.length>n) ? s.slice(0, n-1)+"…" : s;
+const dtCalm = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch(e){ return false; } };
+
+// the piece's steps drawn like the Linear canvas itself — the same rail, markers, uppercase badges and lane elbows,
+// read-only. Rows never wrap, so a deep piece grows WIDE; the panel / popover follows its width up to a cap, then scrolls.
+function DtCanvas({ items }) {
+  return (<div className="dc-path">{items.map((it, i) => (
+    <div key={i} className="dc-node">
+      {it.badge && <div className="dc-row"><span className={"dc-mk m-"+it.mk}/><span className={"dc-b t-"+it.tone}>{it.badge}</span><span className="dc-t">{it.text}</span></div>}
+      {it.lanes && <div className={"dc-lanes"+(it.boxed ? " boxed" : "")}>{it.lanes.map((l, li) => (
+        <div key={li} className={"dc-lane"+(l.label ? " has-l" : "")+(l.head ? "" : " no-h")}>
+          {l.label && <div className="dc-ll">{l.label}</div>}
+          {l.head && <div className="dc-row"><span className={"dc-mk m-"+l.head.mk}/><span className={"dc-b t-"+l.head.tone}>{l.head.badge}</span><span className="dc-t dim">{l.head.text}</span></div>}
+          {l.items.length ? <DtCanvas items={l.items}/> : <div className="dc-empty">No steps yet</div>}
+        </div>))}</div>}
+    </div>))}</div>);
+}
+// two-line summary; each step's phrase is highlighted in its node colour so it maps onto the drawn flow. Read more expands.
+function DtSummary({ parts }) {
+  const [open, setOpen] = React.useState(false), [over, setOver] = React.useState(false), ref = React.useRef(null);
+  React.useLayoutEffect(()=>{ const el = ref.current; if (el && !open) setOver(el.scrollHeight > el.clientHeight + 1); });
+  return (<div className="dt-sumw">
+    <p ref={ref} className={"dt-sum"+(open ? " open" : "")}>{React.Children.toArray(parts)}</p>
+    {(over || open) && <button type="button" className="dt-readmore" onClick={()=>setOpen(o=>!o)}>{open ? "Show less" : "Read more"}</button>}
+  </div>);
+}
+const DtHead = ({ p }) => { const t = DT_TYPE[p.kind] || DT_TYPE.action; return (
+  <div className="dt-ndhd"><span className={"dt-vi "+t.c}><DtIc n={t.ic} s={17}/></span>
+    <span className="dt-nkt">{t.k}{p.steps>1 ? " · "+dtSteps(p.steps) : ""}</span><h3>{p.title}</h3></div>); };
+const DtBody = ({ p }) => (<>
+  <DtSummary parts={p.summary}/>
+  <span className="dt-lbl">Steps</span>
+  <div className="dt-flowbox"><div className="dc-root"><DtCanvas items={p.canvas}/></div></div>
+  {/* no warning notes in the detail (user 2026-11-05) — a place the piece can't go still says why in the step list and while dragging */}
+</>);
+
+// Reattach: a list of every step by name, opened to the LEFT of the panel / card. Hovering a row highlights that step on
+// the canvas (and where the piece would land); clicking puts the piece right after it.
+function DtPicker({ piece, targets, anchor, onHover, onPick, onClose }) {
+  const [q, setQ] = React.useState(""), [pos, setPos] = React.useState(null), ref = React.useRef(null);
+  React.useLayoutEffect(()=>{ const el = ref.current; if (!el || !anchor) return;
+    const r = anchor.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+    const left = Math.max(8, r.left - w - 10), top = Math.max(12, Math.min(r.top, window.innerHeight - h - 12));
+    if (!pos || pos.left!==left || pos.top!==top) setPos({ left, top }); });
+  React.useEffect(()=>{
+    const k = (e)=>{ if (e.key==="Escape") { e.stopPropagation(); e.preventDefault(); onClose(); } };
+    const d = (e)=>{ if (ref.current && !ref.current.contains(e.target) && !(anchor && anchor.contains(e.target))) onClose(); };
+    window.addEventListener("keydown", k, true); document.addEventListener("mousedown", d, true);
+    return ()=>{ window.removeEventListener("keydown", k, true); document.removeEventListener("mousedown", d, true); onHover(null); }; }, []);
+  const ql = q.trim().toLowerCase();
+  const list = ql ? targets.filter(t => !t.start && (t.label+" "+t.where).toLowerCase().includes(ql)) : targets;
+  return (<div ref={ref} data-nf="dt-pick" role="dialog" aria-label="Reattach after a step" style={pos ? { left:pos.left+"px", top:pos.top+"px" } : { visibility:"hidden" }} onMouseLeave={()=>onHover(null)}>
+    <div className="dp-h"><div className="dp-ht"><b>Reattach “{dtShort(piece.title, 30)}”</b><small>Pick a step. The {dtSteps(piece.steps)} go right below it.</small></div>
+      <button type="button" className="dp-x" aria-label="Close" onClick={onClose}><DtIc n="x" s={13} w={2}/></button></div>
+    <div className="dp-s"><input autoFocus value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Search steps" aria-label="Search steps"/></div>
+    <div className="dp-l" role="listbox">
+      {list.map(t => { const ty = DT_TYPE[t.kind] || DT_TYPE.action; return (
+        <button key={t.key} type="button" role="option" className={"dp-r"+(t.ok ? "" : " off")+(t.start ? " start" : "")} disabled={!t.ok}
+          title={t.ok ? undefined : "Can’t go here: "+t.why} style={{ paddingLeft:(8 + (ql ? 0 : t.depth*16))+"px" }}
+          onMouseEnter={()=>onHover(t)} onFocus={()=>onHover(t)} onClick={()=>onPick(t)}>
+          {t.start ? <span className="dp-start"><DtIc n="down" s={11} w={2.2}/></span> : <span className={"dt-vi sm "+ty.c}><DtIc n={ty.ic} s={12}/></span>}
+          <span className="dp-t"><b>{t.label}</b><small>{t.ok ? t.where : "Can’t go here · "+t.why}</small></span>
+        </button>); })}
+      {!list.length && <div className="dp-empty">No step matches “{q}”.</div>}
+    </div>
+  </div>);
+}
+
+// the see-through stack (a notification centre). ver "1" = Panel: a card opens its detail in place (drill-down).
+// ver "2" = Popover: hovering a card shows its Reattach / Delete icons and opens the detail in a popover on its left.
+function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, targetsFor, onHoverTarget, onPick, onDrag, dragged }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [detailId, setDetailId] = React.useState(null);
+  const [confirmId, setConfirmId] = React.useState(null);
+  const [pick, setPick] = React.useState(null);          // { id, anchor } while the Reattach list is open
+  const [popId, setPopId] = React.useState(null);        // ver 2: the card whose popover is open
+  const [dragging, setDragging] = React.useState(false);  // a piece is being dragged onto the canvas — popover + step list step aside
+  const [, setTick] = React.useState(0);
+  const boxRef = React.useRef(null), stackRef = React.useRef(null), prevN = React.useRef(pieces.length), prevExp = React.useRef(expanded), popT = React.useRef(null);
+  const v2 = ver==="2";
+  React.useEffect(()=>{ const t = setInterval(()=>setTick(x=>x+1), 20000); return ()=>clearInterval(t); }, []);
+  React.useEffect(()=>{ if (pieces.length > prevN.current) { setDetailId(null); setExpanded(false); setPopId(null); } prevN.current = pieces.length; }, [pieces.length]);
+  React.useEffect(()=>{ setDetailId(null); setPopId(null); setPick(null); }, [ver]);
+  const detail = (!v2 && detailId) ? pieces.find(p=>p.id===detailId) : null;
+  const popP = (v2 && popId && !pick && !dragging) ? pieces.find(p=>p.id===popId) : null;
+  const grab = (id) => (e) => { if (onDrag) onDrag(id, e, (on)=>{ setDragging(on); if (on) { setPick(null); setPopId(null); onHoverTarget(null); } }); };
+  // ver 2: the stack stays spread while a card's popover is open, so moving into the popover never folds the cards away
+  // under it — that card keeps its highlight and the popover stays lined up with it (user 2026-11-05)
+  const spread = expanded || !!popP;
+  const pickP = pick ? pieces.find(p=>p.id===pick.id) : null;
+  React.useEffect(()=>{ if (detailId && !pieces.some(p=>p.id===detailId)) setDetailId(null); if (pick && !pickP) setPick(null); });
+  React.useEffect(()=>{ if (!confirmId) return; const k = (e)=>{ if (e.key==="Escape") { e.stopPropagation(); e.preventDefault(); setConfirmId(null); } };
+    window.addEventListener("keydown", k, true); return ()=>window.removeEventListener("keydown", k, true); }, [confirmId]);
+  // stacked: the front card at full size, the next two peek out below it, slightly smaller.
+  // spread (hover / focus): every card at full size with an 8px gap, like a notification list.
+  React.useLayoutEffect(()=>{
+    const st = stackRef.current; if (!st) return;
+    const animate = prevExp.current !== spread; prevExp.current = spread;
+    const cards = [...st.querySelectorAll("[data-dt-card]")];
+    if (!animate) st.classList.add("instant");
+    cards.forEach(c => { c.style.height = "auto"; });
+    const hs = cards.map(c => c.offsetHeight), open = spread && cards.length>1;
+    let y = 0;
+    cards.forEach((c, i) => {
+      c.style.zIndex = cards.length - i;
+      if (open) { c.style.height = hs[i]+"px"; c.style.transform = `translateY(${y}px)`; c.style.opacity = 1; c.classList.remove("behind"); c.style.pointerEvents = ""; y += hs[i] + 8; }
+      else { const d = Math.min(i, 2); c.style.height = hs[0]+"px"; c.style.transform = `translateY(${d*12}px) scale(${1-d*0.05})`; c.style.opacity = i>2 ? 0 : 1; c.classList.toggle("behind", i>0); c.style.pointerEvents = i>0 ? "none" : ""; }
+    });
+    st.style.height = (open ? y-8 : (hs[0]||0) + Math.min(cards.length-1, 2)*12) + "px";
+    if (!animate) { void st.offsetHeight; st.classList.remove("instant"); }
+  });
+  // unfold: grow back out of the toolbar's Detached button
+  React.useLayoutEffect(()=>{
+    const b = unfoldFrom && unfoldFrom.current, box = boxRef.current;
+    if (!b || !box || folded) return; unfoldFrom.current = null; if (dtCalm()) return;
+    const r = box.getBoundingClientRect();
+    box.animate([{ transformOrigin:"0 0", transform:`translate(${b.left-r.left}px,${b.top-r.top}px) scale(${b.width/r.width},${b.height/r.height})`, opacity:0.2 },
+                 { transformOrigin:"0 0", transform:"none", opacity:1 }], { duration:420, easing:"cubic-bezier(.4,0,.2,1)" });
+  });
+  if (folded || !pieces.length) return null;
+  const setOpen = (v)=>{ if (!detail && !pick) setExpanded(v); };
+  const conf = confirmId ? pieces.find(p=>p.id===confirmId) : null;
+  const openPick = (id, anchor)=>{ clearTimeout(popT.current); setPopId(null); setPick(p => p && p.id===id ? null : { id, anchor }); };
+  // ver 2 hover intent: open after a short pause, stay open while the pointer moves card → popover
+  const popIn = (id)=>{ clearTimeout(popT.current); if (pick) return; popT.current = setTimeout(()=>setPopId(id), popId ? 0 : 140); };
+  const popOut = ()=>{ clearTimeout(popT.current); popT.current = setTimeout(()=>setPopId(null), 220); };
+  const popCard = popP && boxRef.current && boxRef.current.querySelector(`[data-dt-card="${popP.id}"]`);
+  const popTop = popCard ? Math.max(12, Math.min(popCard.getBoundingClientRect().top, window.innerHeight - 320)) : 0;
+  return (<>
+    <aside ref={boxRef} data-nf="dt-nc" data-ver={ver} data-detail={detail ? "" : undefined} aria-label="Detached steps" style={{ right:right+"px" }}
+      onMouseEnter={()=>setOpen(true)} onMouseLeave={()=>{ setOpen(false); if (v2) popOut(); }}
+      onFocus={()=>setOpen(true)} onBlur={(e)=>{ if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
+      <div className="dt-h">
+        <div className="dt-ti">{detail
+          ? <button type="button" className="dt-backb" onClick={()=>{ setDetailId(null); setPick(null); }}><DtIc n="back" s={14} w={2.2}/>{pieces.length>1 ? "All detached · "+pieces.length : "Back"}</button>
+          : <span className="dt-pill"><b>Detached</b><small>{pieces.length} · won’t run until reattached</small></span>}</div>
+      </div>
+      <div className="dt-body">
+        {detail ? (
+          <div key="dt-detail" className="dt-nd"><div className="dt-ndcard">
+            <div className="dt-fix">
+              <div className="dt-grab" onPointerDown={grab(detail.id)} title="Drag into the workflow"><DtHead p={detail}/></div>
+              {/* the actions sit right under the title, never below the fold */}
+              <div className="dt-ndf">
+                <button type="button" className="dt-btnp" aria-expanded={!!pick} onClick={(e)=>openPick(detail.id, e.currentTarget.closest("[data-nf='dt-nc']"))}><DtIc n="link" s={13}/>Reattach after a step</button>
+                <Tooltip label="Delete these steps" side="bottom"><button type="button" className="dt-btnd" aria-label="Delete these steps" onClick={()=>setConfirmId(detail.id)}><DtIc n="trash" s={14}/></button></Tooltip>
+              </div>
+            </div>
+            <DtBody p={detail}/>
+          </div></div>)
+        : (<React.Fragment key="dt-list">
+          <div ref={stackRef} className="dt-stack" role="list">
+            {pieces.map(p => { const t = DT_TYPE[p.kind] || DT_TYPE.action; return (
+              <div key={p.id} data-dt-card={p.id} className={"dt-card"+(popId===p.id || (pick && pick.id===p.id) ? " on" : "")} role="button" tabIndex={0}
+                aria-label={`${p.title}, ${dtSteps(p.steps)}.${v2 ? "" : " Open details"}`}
+                onMouseEnter={v2 ? ()=>popIn(p.id) : undefined} onMouseLeave={v2 ? popOut : undefined} onPointerDown={grab(p.id)}
+                onClick={(e)=>{ if (e.target.closest("button") || (dragged && dragged.current)) return; if (v2) { setPopId(id=>id===p.id ? null : p.id); } else setDetailId(p.id); }}
+                onKeyDown={(e)=>{ if ((e.key==="Enter" || e.key===" ") && e.target===e.currentTarget) { e.preventDefault(); if (v2) setPopId(p.id); else setDetailId(p.id); } }}>
+                <div className="dt-in"><span className={"dt-vi "+t.c}><DtIc n={t.ic} s={17}/></span>
+                  <div className="dt-nk"><span className="dt-nkt">{t.k}</span><span className="dt-ago">{dtAgo(p.at)}</span>
+                    {v2 && <span className="dt-cacts">
+                      <Tooltip label="Reattach after a step" side="top"><button type="button" className="dt-ib pri" aria-label="Reattach after a step" onClick={(e)=>openPick(p.id, e.currentTarget.closest("[data-dt-card]"))}><DtIc n="link" s={13}/></button></Tooltip>
+                      <Tooltip label="Delete" side="top"><button type="button" className="dt-ib red" aria-label="Delete these steps" onClick={()=>setConfirmId(p.id)}><DtIc n="trash" s={13}/></button></Tooltip>
+                    </span>}</div>
+                  <div className="dt-ntl">{p.title}</div>
+                  <div className="dt-nbd"><span className="dt-cnt">{dtSteps(p.steps)}</span><span className="dt-dot"/><span className="dt-frm">from {p.from}</span></div>
+                </div>
+              </div>); })}
+          </div>
+          {pieces.length>1 && <div className="dt-more">{spread ? (v2 ? "Hover a card to read it" : "Click a card to read it") : "Hover to see all "+pieces.length}</div>}
+        </React.Fragment>)}
+      </div>
+    </aside>
+    {/* ver 2: the detail, in a popover to the LEFT of the hovered card — as wide and tall as the piece needs */}
+    {popP && <div data-nf="dt-pop" role="dialog" aria-label={popP.title} style={{ right:(right+352)+"px", top:popTop+"px", maxHeight:`calc(100vh - ${popTop+16}px)` }}
+      onMouseEnter={()=>clearTimeout(popT.current)} onMouseLeave={popOut}>
+      <div className="dt-ndcard"><div className="dt-fix dt-grab" onPointerDown={grab(popP.id)} title="Drag into the workflow"><DtHead p={popP}/></div><DtBody p={popP}/></div>
+    </div>}
+    {pickP && <DtPicker piece={pickP} targets={targetsFor(pickP.id)} anchor={pick.anchor} onHover={onHoverTarget}
+      onPick={(t)=>{ setPick(null); onHoverTarget(null); setDetailId(null); onPick(pickP.id, t); }} onClose={()=>setPick(null)} />}
+    {conf && <div data-nf="dt-modal-bg" onMouseDown={(e)=>{ if (e.target===e.currentTarget) setConfirmId(null); }}>
+      <div className="dt-modal" role="dialog" aria-modal="true" aria-label="Delete detached steps">
+        <h4>Delete “{dtShort(conf.title)}”{conf.steps>1 ? " and what’s in it" : ""}?</h4>
+        <p>{dtSteps(conf.steps)} will be deleted. You can undo this right after.</p>
+        <div className="dt-mb"><button type="button" className="dt-btno" autoFocus onClick={()=>setConfirmId(null)}>Cancel</button>
+          <button type="button" className="dt-btnred" onClick={()=>{ onDelete(conf.id); setConfirmId(null); setDetailId(null); setPopId(null); }}>Delete steps</button></div>
+      </div></div>}
+  </>);
+}
+
 function App() {
   // app shell: which suite/module is selected (default Automation → Workflows = the builder)
   const [activeSuite, setActiveSuite] = useState("automation");
@@ -6729,7 +7221,8 @@ function App() {
       if (m.wf === "open" && (m.panel === "save" || m.panel === "publish")) { setHelpOpen(false); setRefOpen(false); setSavePanel(m.panel); }
       else if (m.wf === "details") { if (typeof m.name === "string") setName(m.name); if (typeof m.desc === "string" && m.desc.trim()) setDesc(m.desc); }
       else if (m.wf === "pickver" && ["1","2"].includes(m.v)) setPickVer(m.v);
-      else if (m.wf === "textver" && ["A","B","C"].includes(m.v)) setTextVer(m.v);
+      else if (m.wf === "textver" && ["A","B","C","D"].includes(m.v)) setTextVer(m.v);
+      else if (m.wf === "dtver" && ["1","2"].includes(m.v)) setDtVer(m.v);   // Detach design: 1 Panel · 2 Popover (user 2026-11-05)
       else if (m.wf === "popver" && ["1","2"].includes(m.v)) { setPop(null); setOpenSlot(null); setPopVer(m.v); }
       else if (m.wf === "selpanel" && ["white","tinted"].includes(m.v)) document.documentElement.dataset.selpanel = m.v;   // Selected-side look (user 2026-10-21)
     };
@@ -6745,6 +7238,7 @@ function App() {
   }, [name, desc, published]);
 
   const [openSlot, setOpenSlot] = useState(null); // unique key of the slot whose popover is open
+  const [fxSlot, setFxSlot] = useState(null);     // text trial D: the slot whose f(x) Dynamic popup is open (its { } hides)
   const [smartPreview, setSmartPreview] = useState(null); // slotKey whose value popover is on the "Smart value" tab → preview a badge in the sentence
   const [openInsertKey, setOpenInsertKey] = useState(null); // which InsertZone's add-menu is open → keep that zone expanded (no collapse-jump)
   useEffect(()=>{ if(!pop) setOpenInsertKey(null); }, [pop]); // clear once the menu closes
@@ -9036,6 +9530,8 @@ function App() {
       { matchWidth:true, wide:true, ...(sm ? {smart:sm} : {}), inputType: allowAdd ? "tokens" : "multi",
         vp:{ allowAdd:!!allowAdd, emptyUntilSearch:!!emptyUntilSearch, emptyState, searchPh }, choices, selected: arr }); };
   const vpCtrl = (cfg) => { const { dpath, slotKey, values, choices, onChange, ph } = cfg;
+    if (EMBED && textVer==="D" && cfg.allowAdd && cfg.dynamic)   // text trial D: Tags type straight in (user 2026-10-22)
+      return chipD({ dpath, slotKey, values, onChange, kind:"tag", suggest:(choices||[]).map(c=> typeof c==="object" ? c : { id:c, label:c }), mix:false, ph:"Type a tag…" });
     const opened = openSlot===slotKey; const isRef = !!smartKindOf(values);
     const arr = Array.isArray(values) ? values : (typeof values==="string" && values ? [values] : []);
     const labelOf = (v)=>{ const c = (choices||[]).find(x=>x && typeof x==="object" && x.id===v); return c ? c.label : String(v); };
@@ -9103,6 +9599,7 @@ function App() {
   const textFieldCtrl = (dpath, fd, v, commit, slotKey, ph) => {
     if (EMBED && textVer==="A") return fieldCtrl(dpath, fd, v, commit, slotKey, ph);   // text trial A: the either/or popup
     if (EMBED && textVer==="B") return textBCtrl(dpath, fd, v, commit, slotKey, ph);  // text trial B: editor in the popup
+    if (EMBED && textVer==="D") return txtD(dpath, fd, v, commit, slotKey, ph);         // text trial D: type in the field · { } · f(x)
     if (smartKindOf(v)) return fieldCtrl(dpath, fd, v, commit, slotKey, ph);
     if (EMBED && textVer==="C") return <TxtInlineC single anchorKey={slotKey} value={typeof v==="string"?v:""} onChange={(val)=>commit(val||null)} placeholder={ph||"enter text…"} canDynamic={recordsInScope(dpath).length>0} onDynamic={(el)=>openTextDynC(dpath, v, commit, slotKey, el)} />; // an older {ref}/{expr} value → its badge (× clears back to the input)
     const canRef = recordsInScope(dpath).length>0;
@@ -9114,6 +9611,7 @@ function App() {
   const textareaFieldCtrl = (dpath, fd, v, commit, slotKey) => {
     if (EMBED && textVer==="A") return fieldCtrl(dpath, fd, v, commit, slotKey, fd.ph||"enter text…");
     if (EMBED && textVer==="B") return textBCtrl(dpath, fd, v, commit, slotKey, fd.ph||"enter text…");
+    if (EMBED && textVer==="D") return txtD(dpath, fd, v, commit, slotKey, fd.ph||"enter text…");
     if (EMBED && textVer==="C") return smartKindOf(v) ? fieldCtrl(dpath, fd, v, commit, slotKey, fd.ph||"enter text…")
       : <TxtInlineC anchorKey={slotKey} value={typeof v==="string"?v:""} onChange={(val)=>commit(val)} placeholder={fd.ph||"enter text…"} canDynamic={recordsInScope(dpath).length>0} onDynamic={(el)=>openTextDynC(dpath, v, commit, slotKey, el)} />;
     const bodyVal = typeof v==="string" ? v : (v && v.ref ? "{{"+refPathLabels(v).join(" › ")+"}}" : ""); // back-compat: an old whole-field {ref} → one {{token}}
@@ -9144,6 +9642,45 @@ function App() {
   // C: Dynamic → the record drill anchored on the field; its Specific tab returns to typing, with the earlier text back
   const openTextDynC = (dpath, v, commit, slotKey, el) => { const prev = typeof v==="string" ? v : null;
     openSmartRef(dpath, slotKey, el, null, (ref)=>commit({ref}), { onSpecific: ()=>{ close(); commit(prev); focusTextSlot(slotKey); } }, { matchWidth:true }); };
+  // text trial D (user 2026-10-22): type in the field; { } + f(x) top-right; f(x) = the Dynamic drill only, and the
+  // pick REPLACES the value. fxPrev remembers what was typed so the pill's × can bring it back.
+  const fxPrev = useRef({});
+  const fxOnFor = (slotKey)=> fxSlot===slotKey && openSlot===slotKey;
+  const openFxDyn = (dpath, slotKey, el, v, commit)=>{ if(!smartKindOf(v)) fxPrev.current[slotKey] = v;
+    setFxSlot(slotKey); openSmartRef(dpath, slotKey, el, slotKey, (ref)=>commit({ref}), { refOnly:true }, { matchWidth:true }); };
+  const fxClear = (slotKey, commit, refocus)=>{ const p = fxPrev.current[slotKey]; delete fxPrev.current[slotKey];
+    commit(p==null || p==="" ? null : p); if (refocus) focusTextSlot(slotKey); };
+  const txtD = (dpath, fd, v, commit, slotKey, ph, canRef=true, tools) => { const single = fd.type!=="textarea"; const sk = smartKindOf(v);
+    if (sk==="expr") return fieldCtrl(dpath, fd, v, commit, slotKey, ph);   // an expression keeps its badge
+    const can = canRef && recordsInScope(dpath).length>0;
+    return <TxtFxD single={single} tools={tools==null ? !single : tools} anchorKey={slotKey} value={typeof v==="string" ? v : ""} refVal={sk==="ref" ? valueDisplay(v, openSlot===slotKey) : null}
+      onChange={(val)=>commit(single ? (val||null) : val)} placeholder={ph||"enter text…"} canDynamic={can} fxOn={fxOnFor(slotKey)}
+      onPh={(el, applyRef)=>{ setFxSlot(null); openPhPicker(slotKey, el, applyRef); }}
+      onFx={(el)=> openFxDyn(dpath, slotKey, el, v, commit)} onClearRef={()=> fxClear(slotKey, commit, true)} />; };
+  // D · number / date / date & time / duration (user 2026-10-22). Duration's unit lives in its own key (unit / setUnit).
+  const DUR_UNITS = ["Minutes","Hours","Days"];
+  const inD = (dpath, fd, v, commit, slotKey, ph, dur) => { const sk = smartKindOf(v);
+    const kind = fd.type==="datetime" ? "datetime" : fd.type==="date" ? "date" : "number";
+    return <InFxD kind={kind} anchorKey={slotKey} value={sk ? null : v} onChange={commit} placeholder={ph}
+      refVal={sk==="ref" ? valueDisplay(v, openSlot===slotKey) : sk==="expr" ? valueDisplay(v) : null}
+      canDynamic={recordsInScope(dpath).length>0} fxOn={fxOnFor(slotKey)}
+      onFx={(el)=> openFxDyn(dpath, slotKey, el, v, commit)} onClearRef={()=> fxClear(slotKey, commit, false)}
+      {...(dur ? { units:DUR_UNITS, unit:dur.unit||"Hours", onUnit:(el)=>{ setOpenSlot(slotKey+":unit");
+        open(el, DUR_UNITS.map(u=>({id:u, label:u})), (i)=>dur.setUnit(i.id), "Unit", { selected:dur.unit||"Hours", noSearch:true }); } } : {})} />; };
+  const tglD = (dpath, fd, v, commit, slotKey) => { const sk = smartKindOf(v);
+    if (sk==="expr") return fieldCtrl(dpath, fd, v, commit, slotKey, "Select Yes or No");
+    return <TglFxD anchorKey={slotKey} value={v} refVal={sk==="ref" ? valueDisplay(v, openSlot===slotKey) : null} onChange={commit} canDynamic={recordsInScope(dpath).length>0} fxOn={fxOnFor(slotKey)}
+      onFx={(el)=> openFxDyn(dpath, slotKey, el, v, commit)} onClearRef={()=> fxClear(slotKey, commit, false)} />; };
+  // D · Email / SMS To / Tags (user 2026-10-22): the chip input. mix = dynamic values join the list (Send email / SMS);
+  // otherwise f(x) swaps the whole value for one dynamic value (× restores what was there)
+  const chipD = ({ dpath, slotKey, values, onChange, kind, suggest, mix, maxOne, ph }) => { const sk = smartKindOf(values);
+    return <ChipFxD kind={kind} suggest={suggest} mix={mix} maxOne={maxOne} placeholder={ph} anchorKey={slotKey}
+      values={sk ? [] : values} onChange={onChange} refVal={sk==="ref" ? valueDisplay(values, openSlot===slotKey) : sk==="expr" ? valueDisplay(values) : null}
+      canDynamic={recordsInScope(dpath).length>0} fxOn={fxOnFor(slotKey)}
+      onFx={(el, addRef)=>{ if (mix){ setFxSlot(slotKey); openSmartRef(dpath, slotKey, el, slotKey, addRef, { refOnly:true }, { matchWidth:true }); }
+        else openFxDyn(dpath, slotKey, el, values, onChange); }}
+      onClearRef={()=> fxClear(slotKey, onChange, false)} />; };
+  const PEOPLE_SUGGEST = SAMPLE_USERS.map(u=>({ id:u.email, label:u.name, sub:u.email }));
   const textBCtrl = (dpath, fd, v, commit, slotKey, ph) => {
     if (smartKindOf(v)) return fieldCtrl(dpath, fd, v, commit, slotKey, ph);   // a whole-value reference → the purple badge (× clears)
     const single = fd.type!=="textarea"; const opened = openSlot===slotKey; const has = typeof v==="string" && v.trim();
@@ -10035,6 +10572,244 @@ function App() {
   };
   const countKind = (nodes, kind) => (nodes||[]).reduce((a,n)=> a + (n.kind===kind?1:0) + countKind(branchKids(n), kind), 0);
 
+  // ── DETACHED STEPS (user 2026-11-05) — the stack itself is DetachTray (above App); styles in node-skin.css § 47 ──
+  const detached = doc.detached || [];
+  const [cutHover, setCutHover] = useState(null);     // "pathKey:index" while the pointer is on a gap's trash → red cut set
+  const [placing, setPlacing] = useState(null);       // piece id being attached (Attach… or dragging its card) → drop spots
+  const [trayFolded, setTrayFolded] = useState(false);
+  const [dtToast, setDtToast] = useState(null);
+  const dtToastT = useRef(null), dtFly = useRef(null), dtUnfold = useRef(null), dtDragged = useRef(false);
+  const dtFlash = (msg, undoable) => { setDtToast({ msg, undoable }); clearTimeout(dtToastT.current); dtToastT.current = setTimeout(()=>setDtToast(null), 6000); };
+  const dtCap = (s) => s ? s.charAt(0).toUpperCase()+s.slice(1) : s;
+  const dtLow = (s) => s ? s.charAt(0).toLowerCase()+s.slice(1) : s;
+  const dtKindOf = (n) => !n ? "action" : n.kind==="get" ? "get" : n.kind==="condition" ? "cond" : n.kind==="delay" ? "wait" : n.kind==="loop" ? "loop" : n.kind==="merge" ? "merge"
+    : n.kind==="branch" ? (isIfElse(n) ? "ifelse" : isSplitBranch(n) ? "split" : "branch") : "action";
+  const dtCount = (nodes) => (nodes||[]).reduce((a,n)=> a + 1 + dtCount(branchKids(n)), 0);
+  const dtCond = (x) => condText(x) || "…";
+  // one line per step, in the builder's own words (summaryLines covers action / wait / get / check if)
+  const dtLine = (n) => { const k = dtKindOf(n);
+    if (k==="cond") return "check if " + dtCond(n);
+    if (k==="action" || k==="wait" || k==="get") { const l = summaryLines([n], 0, false)[0]; return l ? l.text : "a step"; }
+    if (k==="ifelse") return "if " + dtCond((n.paths||[])[0]||{});
+    if (k==="branch") { const ps = n.paths||[]; return "check if " + dtCond(ps[0]||{}) + (ps.length>1 ? ` (+${ps.length-1} more branch${ps.length>2?"es":""})` : ""); }
+    if (k==="split") return `run ${(n.paths||[]).length} paths at the same time`;
+    if (k==="loop") return n.mode==="until" ? "repeat until " + dtCond(n) : `repeat for each ${n.itemLabel||"item"}${n.sourceLabel ? " in "+n.sourceLabel : ""}`;
+    if (k==="merge") return (n.wait==="all" ? "wait for all paths" : "wait for the first path") + (n.deadline && n.deadline.amount ? ` · up to ${n.deadline.amount} ${n.deadline.unit||""}` : "");
+    return "a step"; };
+  // the paths a flow node opens: tag = the drawn fork's label, say = how it reads inside the summary sentence
+  const dtLanes = (n) => { const k = dtKindOf(n), ps = n.paths||[];
+    if (k==="loop") return [{ tag: n.mode==="until" ? "Every pass, until "+dtCond(n) : "For each "+(n.itemLabel||"item"), say:"each pass", items:n.children||[] }];
+    if (k==="merge") return [{ tag:"When the paths join", say:"then", items:(n.success&&n.success.children)||[] }, ...(n.otherwise ? [{ tag:"If time runs out", say:"if time runs out", items:n.otherwise.children||[] }] : [])];
+    if (k==="ifelse") return ps.map((p,i)=>{ const g = (p.clauses||[]).length; return { tag: i===0 ? "If "+dtCond(p) : (g ? "Else if "+dtCond(p) : "Else"), say: i===0 ? "if "+dtCond(p) : (g ? "else if "+dtCond(p) : "otherwise"), items:p.children||[] }; });
+    if (k==="split") return ps.map((p,i)=>({ tag:p.name || "Path "+(i+1), say:(p.name || "path "+(i+1)), items:p.children||[] }));
+    if (k==="branch") return [...ps.map((p,i)=>({ tag:(p.name || "Branch "+(i+1))+" · if "+dtCond(p), say:"if "+dtCond(p), items:p.children||[] })),
+                              ...(n.otherwise ? [{ tag:"Otherwise", say:"otherwise", items:n.otherwise.children||[] }] : [])];
+    return null; };
+  const dtChain = (nodes) => (nodes||[]).length ? nodes.map(dtSay).join(", then ") : "do nothing";
+  const dtSay = (n) => { const k = dtKindOf(n), L = dtLanes(n);
+    if (k==="ifelse" || k==="branch") return "check the record: " + L.map(l=>`${l.say}, ${dtChain(l.items)}`).join("; ");
+    if (k==="split") return `run ${L.length} paths at the same time (` + L.map(l=>`${l.say}: ${dtChain(l.items)}`).join("; ") + ")";
+    if (k==="loop") return `${dtLine(n)} (each pass: ${dtChain(L[0].items)})`;
+    if (k==="merge") return dtLine(n) + L.map(l=>`, ${l.say} ${dtChain(l.items)}`).join(";");
+    return dtLow(dtLine(n)); };
+  const dtModel = (nodes) => (nodes||[]).map(n => { const L = dtLanes(n);
+    return { kind:dtKindOf(n), text:dtCap(dtLine(n)), lanes: L && L.map(l=>({ tag:l.tag, items:dtModel(l.items), count:dtCount(l.items) })) }; });
+  // a piece holding a split path or a merge can only go at the END of a path (a split is never followed by plain steps)
+  const dtEndOnly = (items) => (items||[]).some(n => isSplitBranch(n) || n.kind==="merge");
+  const dtPathLabel = (bp, f) => { if (!bp.length) return "the main path"; const seg = bp[bp.length-1];
+    if (!isBranchSeg(seg)) return "the loop";
+    const par = nodeAt(f, bp.slice(0,-1)) || {};
+    if (seg.success) return "the merge’s join path";
+    if (seg.otherwise) return par.kind==="merge" ? "the merge’s timeout path" : "Otherwise";
+    const lane = (par.paths||[])[seg.path] || {};
+    if (isIfElse(par)) return seg.path===0 ? "the IF path" : "the Else path";
+    if (isSplitBranch(par)) return lane.name || "Path "+(seg.path+1);
+    return lane.name ? `Branch ${seg.path+1} : ${lane.name}` : "Branch "+(seg.path+1); };
+  const dtView = (p) => { const f = p.items[0];
+    return { id:p.id, at:p.at, from:p.from, kind:dtKindOf(f), title:dtCap(dtLine(f)), steps:dtCount(p.items),
+      summary: ["It will ", ...dtChainR(p.items), "."], canvas:dtCanvasOf(p.items),
+      notes: dtEndOnly(p.items) ? ["It contains a split path, so it can only go at the end of a path."] : [] }; };
+  // can piece `pid` go into the gap `index` of the path at `bp`? → { ok, why }
+  const dtCanDrop = (pid, bp, index) => { const p = detached.find(x=>x.id===pid); if (!p) return { ok:false, why:"" };
+    const arr = childrenAt(flowRef.current, bp), prev = arr[index-1], next = arr[index];
+    if (prev && isSplitBranch(prev)) return { ok:false, why:"only a Merge can follow a split" };
+    if (next && next.kind==="merge") return { ok:false, why:"a Merge has to follow its paths" };
+    if (index < arr.length && dtEndOnly(p.items)) return { ok:false, why:"it holds a split, so only the end of a path" };
+    return { ok:true, why:"" }; };
+  const dtScrollerOf = (el) => { let s = el && el.parentElement;
+    while (s && s!==document.body) { const oy = getComputedStyle(s).overflowY; if ((oy==="auto"||oy==="scroll") && s.scrollHeight>s.clientHeight) return s; s = s.parentElement; }
+    return null; };
+  const dtScrollTo = (el) => { const s = dtScrollerOf(el);
+    if (!s) return; const r = el.getBoundingClientRect(), sr = s.getBoundingClientRect();
+    if (r.top < sr.top+70 || r.bottom > sr.bottom-90) s.scrollBy({ top:r.top - sr.top - sr.height/3, behavior:"smooth" }); };
+  const detachAt = (bp, index) => {
+    const f0 = flowRef.current, arr = childrenAt(f0, bp), tail = arr.slice(index); if (!tail.length) return;
+    const id = "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    const cut = document.querySelector('[data-nf="cutset"]');
+    dtFly.current = cut ? { id, rect:cut.getBoundingClientRect(), el:cut.cloneNode(true) } : null;
+    const piece = { id, at:Date.now(), from:dtPathLabel(bp, f0), above: index>0 ? dtCap(dtLine(arr[index-1])) : null, items:tail };
+    commit(prev => ({ ...prev, flow: treeSetLevel(prev.flow, bp, childrenAt(prev.flow, bp).slice(0, index)), detached:[piece, ...(prev.detached||[])] }));
+    const ids = new Set(); const walk = (ns)=> (ns||[]).forEach(n=>{ ids.add(n.id); walk(branchKids(n)); }); walk(tail);
+    if (drawer!=null && ids.has(drawer)) setDrawer(null);
+    setCutHover(null); setPlacing(null); setTrayFolded(false);
+    dtFlash(`Detached ${dtSteps(dtCount(tail))} · it won’t run until you attach it`, true);
+  };
+  const attachAt = (pid, bp, index) => { const p = detached.find(x=>x.id===pid); if (!p) return;
+    const where = dtPathLabel(bp, flowRef.current);
+    commit(prev => { const arr = childrenAt(prev.flow, bp), at = Math.min(index, arr.length);
+      return { ...prev, flow: treeSetLevel(prev.flow, bp, [...arr.slice(0, at), ...p.items, ...arr.slice(at)]), detached:(prev.detached||[]).filter(x=>x.id!==pid) }; });
+    setPlacing(null); dtFlash(`Attached ${dtSteps(dtCount(p.items))} to ${where}`, true); };
+  const dtDelete = (pid) => { const p = detached.find(x=>x.id===pid); if (!p) return;
+    commit(prev => ({ ...prev, detached:(prev.detached||[]).filter(x=>x.id!==pid) })); setPlacing(null);
+    dtFlash(`Deleted ${dtSteps(dtCount(p.items))}`, true); };
+  // ── Detached steps v2 (user 2026-11-05): two designs behind the top bar's "Detach" switch — "1" Panel (drill-down)
+  //    and "2" Popover. Both reattach through a step list (no drop spots): hover a step → it lights up on the canvas.
+  const [dtVer, setDtVer] = useState("1");
+  const dtArrive = useRef(null), dtHl = useRef({ box:null, line:null, raf:0 });
+  const DtMark = (t, k) => <mark data-k={k}>{t}</mark>;
+  // the summary as parts: every step's phrase is wrapped in a <mark> of its node colour
+  const dtSayR = (n) => { const k = dtKindOf(n), L = dtLanes(n);
+    if (k==="ifelse" || k==="branch") return ["check the record: ", ...L.flatMap((l, i)=>[i ? "; " : "", DtMark(l.say, "if"), ", ", ...dtChainR(l.items)])];
+    if (k==="split") return [DtMark(`run ${L.length} paths at the same time`, "split"), " (", ...L.flatMap((l, i)=>[i ? "; " : "", l.say+": ", ...dtChainR(l.items)]), ")"];
+    if (k==="loop") return [DtMark(dtLine(n), "loop"), " (each pass: ", ...dtChainR(L[0].items), ")"];
+    if (k==="merge") return [DtMark(dtLine(n), "merge"), ...L.flatMap(l=>[", "+l.say+" ", ...dtChainR(l.items)])];
+    return [DtMark(dtLow(dtLine(n)), k==="wait" ? "wait" : k==="cond" ? "if" : "then")]; };
+  const dtChainR = (nodes) => (nodes||[]).length ? nodes.flatMap((n, i)=>[i ? ", then " : "", ...dtSayR(n)]) : ["do nothing"];
+  // the steps as the canvas draws them: badge + sentence per row, lanes with their own headers
+  const dtCanvasOf = (nodes) => { let acted = false; return (nodes||[]).map(n => { const k = dtKindOf(n), ps = n.paths||[];
+    if (k==="action" || k==="get") { const b = acted ? "And" : "Then"; acted = true; const l = summaryLines([n], 0, false)[0]; return { mk:"act", tone:"then", badge:k==="get" ? "Get" : b, text:l ? l.text : "a step" }; }
+    if (k==="wait") return { mk:"wait", tone:"wait", badge:"Wait", text:dtLine(n).replace(/^wait /, "") };
+    if (k==="cond") return { mk:"if", tone:"if", badge:"Check if", text:dtCond(n) };
+    if (k==="ifelse") return { lanes: ps.map((p, i)=>{ const g = (p.clauses||[]).length; return { head:{ mk:"if", tone:"if", badge: i===0 ? "If" : (g ? "Else if" : "Else"), text: (i===0 || g) ? dtCond(p) : "when the IF condition isn’t met" }, items:dtCanvasOf(p.children) }; }) };
+    if (k==="branch") return { lanes: [...ps.map((p, i)=>({ label:p.name ? `Branch ${i+1} : ${p.name}` : `Branch ${i+1}`, head:{ mk:"if", tone:"if", badge:"Check if", text:dtCond(p) }, items:dtCanvasOf(p.children) })),
+      ...(n.otherwise ? [{ head:{ mk:"if", tone:"if", badge:"Otherwise", text:"nothing above matched" }, items:dtCanvasOf(n.otherwise.children) }] : [])] };
+    if (k==="split") return { lanes: ps.map((p, i)=>({ head:{ mk:"split", tone:"split", badge:`Split path ${i+1}`, text:"runs in parallel with the other paths" }, items:dtCanvasOf(p.children) })) };
+    if (k==="merge") return { mk:"merge", tone:"merge", badge:("Merge "+(n.num||"")).trim(), text:(n.wait==="all" ? "wait until all paths finish" : "wait until the first path finishes") + (n.deadline && n.deadline.amount ? ` · up to ${n.deadline.amount} ${n.deadline.unit||""}` : ""),
+      lanes: [{ head:{ mk:"merge", tone:"merge", badge:"Success", text:"runs once the paths finish" }, items:dtCanvasOf((n.success && n.success.children)||[]) },
+              ...(n.otherwise ? [{ head:{ mk:"merge", tone:"merge", badge:"Timeout", text:"runs if they don’t finish in time" }, items:dtCanvasOf(n.otherwise.children) }] : [])] };
+    if (k==="loop") return { mk:"loop", tone:"loop", badge:"Loop", text:dtLine(n), boxed:true, lanes:[{ items:dtCanvasOf(n.children) }] };
+    return { mk:"act", tone:"then", badge:"Then", text:"a step" }; }); };
+  // every place a piece can go: the start of each path, and right after each step (a flow node = after its whole block)
+  const dtTargets = (pid) => { const out = [], f = flowRef.current;
+    const walk = (arr, bp, depth) => {
+      const where = dtPathLabel(bp, f), r0 = dtCanDrop(pid, bp, 0);
+      out.push({ key:pathKey(bp)+":0", bp, index:0, depth, start:true, label: bp.length ? "Start of "+where : "Right after the trigger", where: bp.length ? "before its first step" : "first step of the main path", ok:r0.ok, why:r0.why, firstId:arr[0] && arr[0].id });
+      arr.forEach((n, i) => { const r = dtCanDrop(pid, bp, i+1), k = dtKindOf(n), block = !!dtLanes(n), p = [...bp, i];
+        out.push({ key:pathKey(bp)+":"+(i+1), bp, index:i+1, depth, kind:k, label:dtCap(dtLine(n)), where:(block ? "after the whole "+DT_TYPE[k].k+" · " : "")+"in "+where, ok:r.ok, why:r.why, nodeId:n.id });
+        if (n.kind==="branch" || n.kind==="merge") { (n.paths||[]).forEach((pp, k2)=>walk(pp.children||[], [...p, { path:k2 }], depth+1));
+          if (n.success) walk(n.success.children||[], [...p, { success:true }], depth+1); if (n.otherwise) walk(n.otherwise.children||[], [...p, { otherwise:true }], depth+1); }
+        else if (n.kind==="loop") walk(n.children||[], p, depth+1);
+      }); };
+    walk(f, [], 0); return out; };
+  // the canvas highlight while a step is hovered in the list: a soft box over that step + a "goes here" line under it
+  const dtRectOf = (id) => { const w = id && document.querySelector(`[data-dtn="${id}"]`); if (!w) return null;
+    let l = 1e9, t = 1e9, r = -1e9, b = -1e9; [...w.children].forEach(c => { const x = c.getBoundingClientRect(); if (!x.width && !x.height) return; l = Math.min(l, x.left); t = Math.min(t, x.top); r = Math.max(r, x.right); b = Math.max(b, x.bottom); });
+    return r > l ? { l, t, r, b, el:w.children[0] } : null; };
+  const dtHighlight = (tg) => { const h = dtHl.current; cancelAnimationFrame(h.raf);
+    if (!h.box) { h.box = document.createElement("div"); h.box.setAttribute("data-nf", "dt-hl"); h.line = document.createElement("div"); h.line.setAttribute("data-nf", "dt-hl-line");
+      const s = document.createElement("span"); s.textContent = "Goes here"; h.line.appendChild(s); document.body.appendChild(h.box); document.body.appendChild(h.line); }
+    const off = () => { h.box.classList.remove("on"); h.line.classList.remove("on"); };
+    const id = tg && (tg.nodeId || tg.firstId); const R0 = id && dtRectOf(id); if (!R0) { off(); return; }
+    dtScrollTo(R0.el);
+    const tick = () => { const R = dtRectOf(id); if (!R) { off(); return; }
+      if (tg.nodeId) { Object.assign(h.box.style, { left:(R.l+4)+"px", top:(R.t-2)+"px", width:(R.r-R.l-8)+"px", height:(R.b-R.t+4)+"px" }); h.box.classList.add("on"); } else h.box.classList.remove("on");
+      Object.assign(h.line.style, { left:(R.l+24)+"px", top:(tg.nodeId ? R.b+2 : R.t-6)+"px", width:Math.max(120, R.r-R.l-48)+"px" }); h.line.classList.add("on");
+      h.line.classList.toggle("onbox", !!tg.nodeId);   // over a step: the box's own dashed edge is the line, only the label shows
+      h.raf = requestAnimationFrame(tick); };
+    tick(); };
+  const dtPick = (pid, tg) => { const p = detached.find(x=>x.id===pid); if (!p || !tg.ok) return; dtArrive.current = p.items[0].id; attachAt(pid, tg.bp, tg.index); };
+  // drag a piece (its card, or the panel / popover title) onto the canvas (user 2026-11-05): nothing on the canvas moves and
+  // no drop spots appear — ONE "Put it here" line follows the pointer, at the place in the flow nearest to it (grey with the
+  // reason where the piece can't go). Let go there → it attaches with the landing glow. Esc or letting go elsewhere cancels.
+  const dtDrag = (pid, e, onState) => { if (e.button!==0 || (e.target.closest && e.target.closest("button,a,input"))) return;
+    const p = detached.find(x=>x.id===pid); if (!p) return; const v = dtView(p);
+    const sx = e.clientX, sy = e.clientY; let lx = sx, ly = sy, ghost = null, tick = null, best = null, scroller = null;
+    const h = dtHl.current; const targets = dtTargets(pid).filter(t => t.nodeId || t.firstId);
+    const ensure = () => { if (h.box) return; h.box = document.createElement("div"); h.box.setAttribute("data-nf", "dt-hl"); h.line = document.createElement("div"); h.line.setAttribute("data-nf", "dt-hl-line");
+      h.line.appendChild(document.createElement("span")); document.body.appendChild(h.box); document.body.appendChild(h.line); };
+    const pos = (t) => { const R = dtRectOf(t.nodeId || t.firstId); if (!R) return null; return { x:R.l, y: t.nodeId ? R.b+2 : R.t-6, w:Math.max(160, R.r-R.l-48) }; };
+    const hitAt = () => { let b = null, bd = 1e9;
+      targets.forEach(t => { const q = pos(t); if (!q) return; const dy = Math.abs(ly-q.y), dx = lx < q.x ? q.x-lx : Math.max(0, lx-(q.x+q.w+60))*0.3; const d = dy + dx*0.6;
+        if (d < bd) { bd = d; b = { t, q }; } });
+      best = bd < 90 ? b : null;
+      if (!best) { h.line.classList.remove("on"); if (ghost) ghost.classList.remove("ok"); return; }
+      const sp = h.line.firstChild; sp.textContent = best.t.ok ? "Put it here" : "Can’t go here · " + best.t.why;
+      h.line.classList.remove("onbox"); h.line.classList.toggle("bad", !best.t.ok);
+      Object.assign(h.line.style, { left:(best.q.x+24)+"px", top:best.q.y+"px", width:best.q.w+"px" }); h.line.classList.add("on");
+      if (ghost) ghost.classList.toggle("ok", !!best.t.ok); };
+    // near the canvas's top / bottom edge the flow scrolls by itself, so every place can be reached
+    const edge = () => { if (!scroller) { const any = document.querySelector("[data-dtn] > *"); scroller = any && dtScrollerOf(any); } if (!scroller) return;
+      const sr = scroller.getBoundingClientRect(), d = ly < sr.top+70 ? -14 : ly > sr.bottom-90 ? 14 : 0; if (d) scroller.scrollTop += d; hitAt(); };
+    const end = (drop) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key, true); clearInterval(tick);
+      if (!ghost) return; ghost.remove(); h.line.classList.remove("on", "bad"); document.documentElement.classList.remove("dt-dragging");
+      const hit = drop && best && best.t.ok ? best.t : null; onState && onState(false);
+      setTimeout(()=>{ dtDragged.current = false; }, 0); if (hit) dtPick(pid, hit); };
+    const move = (ev) => { lx = ev.clientX; ly = ev.clientY;
+      if (!ghost) { if (Math.hypot(lx-sx, ly-sy) < 6) return; dtDragged.current = true; ensure(); h.box.classList.remove("on"); onState && onState(true);
+        document.documentElement.classList.add("dt-dragging");
+        ghost = document.createElement("div"); ghost.setAttribute("data-nf", "dt-ghost");
+        const b = document.createElement("b"); b.textContent = v.title; const sp = document.createElement("span"); sp.textContent = dtSteps(v.steps) + " · drop it in the workflow";
+        ghost.appendChild(b); ghost.appendChild(sp); document.body.appendChild(ghost); tick = setInterval(edge, 16); }
+      ghost.style.left = lx+"px"; ghost.style.top = ly+"px"; hitAt(); };
+    const up = () => end(true);
+    const key = (ev) => { if (ev.key==="Escape" && ghost) { ev.stopPropagation(); ev.preventDefault(); end(false); } };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("keydown", key, true); };
+  // after a reattach: the steps settle in with a short glow and the canvas scrolls to them
+  useEffect(()=>{ const id = dtArrive.current; if (!id) return; dtArrive.current = null;
+    requestAnimationFrame(()=>{ const w = document.querySelector(`[data-dtn="${id}"]`); if (!w) return; const el = w.children[0]; if (el) dtScrollTo(el);
+      [...w.children].forEach(c => { c.classList.add("dt-arrive-row"); setTimeout(()=>c.classList.remove("dt-arrive-row"), 1500); }); }); }, [detached.length]);
+  const dtStartPlacing = (pid) => { setCutHover(null); setPlacing(cur => cur===pid ? null : pid); };
+  // drag a card onto a blue spot: the same spots Attach… shows
+  const dtCardDown = (pid, e) => { if (e.button!==0) return; const sx = e.clientX, sy = e.clientY; let ghost = null, over = null, lx = sx, ly = sy, scroller = null, tick = null; dtDragged.current = false;
+    const p = detached.find(x=>x.id===pid); if (!p) return; const v = dtView(p);
+    const hitAt = () => { const hit = document.elementFromPoint(lx, ly), d = hit && hit.closest ? hit.closest("[data-dtdrop]") : null;
+      if (d!==over) { if (over) over.removeAttribute("data-over"); over = d; if (d) d.setAttribute("data-over", ""); } };
+    // near the canvas top / bottom edge the list scrolls by itself, so far-away spots can be reached
+    const edge = () => { if (!scroller) { const z = document.querySelector('[data-nf="dt-dropz"]'); scroller = z && dtScrollerOf(z); } if (!scroller) return;
+      const sr = scroller.getBoundingClientRect(), d = ly < sr.top+70 ? -14 : ly > sr.bottom-120 ? 14 : 0; if (d) { scroller.scrollTop += d; hitAt(); } };
+    const move = (ev) => { lx = ev.clientX; ly = ev.clientY;
+      if (!ghost) { if (Math.hypot(ev.clientX-sx, ev.clientY-sy) < 6) return; dtDragged.current = true; setCutHover(null); setPlacing(pid);
+        ghost = document.createElement("div"); ghost.setAttribute("data-nf", "dt-ghost");
+        const b = document.createElement("b"); b.textContent = v.title; const s = document.createElement("span"); s.textContent = dtSteps(v.steps) + " · drop it on a blue spot";
+        ghost.appendChild(b); ghost.appendChild(s); document.body.appendChild(ghost); tick = setInterval(edge, 16); }
+      ghost.style.left = ev.clientX+"px"; ghost.style.top = ev.clientY+"px"; hitAt(); };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); clearInterval(tick);
+      if (!ghost) return; ghost.remove();
+      if (over) { const t = JSON.parse(over.getAttribute("data-dtdrop")); attachAt(pid, t.b, t.i); } else setPlacing(null);
+      setTimeout(()=>{ dtDragged.current = false; }, 0); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); };
+  // fold: the stack shrinks into the toolbar's Detached button (unfold grows it back — see DetachTray)
+  const dtFold = (box) => { setPlacing(null);
+    if (!box || dtCalm()) { setTrayFolded(true); return; }
+    const r = box.getBoundingClientRect(), g = box.cloneNode(true);
+    g.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;right:auto;margin:0;z-index:70;pointer-events:none;transform-origin:0 0`;
+    document.body.appendChild(g); setTrayFolded(true);
+    requestAnimationFrame(()=>{ const btn = document.querySelector('[data-dt="traybtn"]'); if (!btn) { g.remove(); return; } const to = btn.getBoundingClientRect();
+      g.animate([{ transform:"none", opacity:1 }, { transform:`translate(${to.left-r.left}px,${to.top-r.top}px) scale(${to.width/r.width},${to.height/r.height})`, opacity:0.15 }],
+        { duration:480, easing:"cubic-bezier(.4,0,.2,1)" }).onfinish = ()=>{ g.remove(); btn.classList.add("dt-bump"); setTimeout(()=>btn.classList.remove("dt-bump"), 600); }; }); };
+  // the detached rows glide into their new card
+  useEffect(()=>{ const f = dtFly.current; if (!f) return; dtFly.current = null; if (dtCalm()) return;
+    const card = document.querySelector(`[data-dt-card="${f.id}"]`); if (!card) return;
+    const r = f.rect, to = card.getBoundingClientRect(), box = document.createElement("div"); box.setAttribute("data-nf", "dt-fly");
+    box.style.cssText = `left:${r.left-4}px;top:${r.top-4}px;width:${r.width+8}px;height:${r.height+8}px`;
+    f.el.style.cssText += `;position:absolute;left:4px;top:4px;width:${r.width/lzoom}px;zoom:${lzoom}`; box.appendChild(f.el); document.body.appendChild(box);
+    box.animate([{ transform:"translate(0,0) scale(1)", opacity:1 }, { transform:`translate(${to.left-r.left+4}px,${to.top-r.top+4}px) scale(${to.width/(r.width+8)},${to.height/(r.height+8)})`, opacity:0.15 }],
+      { duration:560, easing:"cubic-bezier(.4,0,.2,1)" }).onfinish = ()=>{ box.remove(); card.classList.add("dt-arrive"); setTimeout(()=>card.classList.remove("dt-arrive"), 1300); };
+  }, [detached.length]);
+  useEffect(()=>{ if (!placing) return;
+    requestAnimationFrame(()=>{ const el = document.querySelector("[data-dtdrop]"); if (el && !dtDragged.current) dtScrollTo(el); });
+    const k = (e)=>{ if (e.key==="Escape") { e.stopPropagation(); e.preventDefault(); setPlacing(null); } };
+    window.addEventListener("keydown", k, true); return ()=>window.removeEventListener("keydown", k, true); }, [placing]);
+  useEffect(()=>{ if (placing && !detached.some(x=>x.id===placing)) setPlacing(null); }, [detached, placing]);
+  // a drop spot — replaces every gap's InsertZone (and closes each path) while a piece is being placed
+  const dtDropBar = (key, bp, index, label, dbl, noRail, isEnd) => { const r = dtCanDrop(placing, bp, index);
+    return (<div key={key} className="relative" data-nf="dt-dropz" data-end={isEnd ? "" : undefined}>
+      {noRail ? null : (dbl ? vLines(7, { top:0, bottom: isEnd ? "50%" : 0 }) : vSingle(8.2, { top:0, bottom: isEnd ? "50%" : 0 }))}
+      <button type="button" data-nf="dt-drop" data-dtdrop={r.ok ? JSON.stringify({ b:bp, i:index }) : undefined} disabled={!r.ok}
+        onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>{ e.stopPropagation(); if (r.ok) attachAt(placing, bp, index); }}>
+        <DtIc n={r.ok ? "down" : "x"} s={12} w={2}/><span>{r.ok ? label : "Can’t go here · "+r.why}</span></button>
+    </div>); };
+
   // Auto "linguistic form" of the whole workflow — the default (editable) description.
   const autoDesc = (() => {
     if (!hasTrigger) return "";
@@ -10212,7 +10987,7 @@ function App() {
       {/* role-tinted background: on hover, and while this row's popover is open.
           headerBg → the tint covers ONLY the first (header) row, not the rows below (e.g. GET's where-conditions);
           `bottom:calc(100% - X)` puts its lower edge X from the TOP, where X = the header row + symmetric pt padding. */}
-      <div className={"absolute rounded-lg transition-opacity pointer-events-none " + ((active||dim) ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
+      <div data-nf="st-tint" className={"absolute rounded-lg transition-opacity pointer-events-none " + ((active||dim) ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
         style={{ top:0, bottom: headerBg ? `calc(100% - ${2*pt + HEAD}px)` : `${bgBottom}px`, left:bgLeft, right:bgRight, background: dim ? (dimBg||hoverBg||"var(--panel2)") : (hoverBg||"var(--panel2)") }}/>
       {/* persistent green border once the node's form is confirmed "Good to go" */}
       {okBorder && <div className="absolute rounded-lg pointer-events-none" style={{ top:0, bottom:`${bgBottom}px`, left:bgLeft, right:bgRight, border:"1px solid var(--rdy-bd)" }}/>}
@@ -10826,16 +11601,35 @@ function App() {
     // while a node is being dragged, FREEZE these zones: no hover-expand (the growing "Add step" ghost would shove
     // rows around and fight the drop target) and no pointer capture — so placement stays stable (user 2026-07-27).
     const dragging = draggingId!=null;
+    // DETACH (user 2026-11-05): the trash sits ON the line, above the +. Hovering it tints everything below it red
+    // (this path only) and the step above blue; clicking lifts those steps into the Detached stack.
+    const zk = pathKey(basePath)+":"+index, hot = EMBED && cutHover===zk;
+    const dtArr = EMBED ? childrenAt(flowRef.current, basePath) : [];
+    const dtBlocked = !!(dtArr[index] && dtArr[index].kind==="merge");
+    const dtN = EMBED ? dtCount(dtArr.slice(index)) : 0;
+    if (EMBED && placing) return dtDropBar(undefined, basePath, index, "Put it here", dbl, noRail, false);
     return (
     // FULL-WIDTH target: open on mousedown + stopPropagation so clicking THIS zone while another menu is open
     // SWITCHES (the press opens this one and prevents the global close listener from just closing the old one).
     <button onMouseDown={(e)=>{ e.stopPropagation(); openInsert(basePath, index, e.currentTarget.querySelector('[data-iz-card]')||e.currentTarget); }}
-      className={"relative block w-full text-left group/iz focus:outline-none " + (dragging ? "pointer-events-none " : "cursor-pointer")} style={{ background:"transparent" }}>
+      data-nf={hot ? "iz-hot" : undefined} className={"relative block w-full text-left group/iz focus:outline-none " + (dragging ? "pointer-events-none " : "cursor-pointer")} style={{ background:"transparent" }}>
       {/* continuous connector line — full height, grows with the zone. DOUBLE = main path / parallel lane; SINGLE = a condition branch (user 2026-07-21). noRail = the LOOP body, where the box border is the one edge line. */}
       {noRail ? null : (dbl ? vLines(7, { top:0, bottom:0 }) : vSingle(8.2, { top:0, bottom:0 }))}
+      {/* DETACH trash — outside the clipped height box below, so its tooltip is never cut off */}
+      {EMBED && dtN>0 && !dragging && (
+        <span role="button" tabIndex={-1} data-nf="dt-trash" data-blocked={dtBlocked ? "" : undefined} aria-label={dtBlocked ? "Can’t detach here" : "Detach "+dtSteps(dtN)}
+          onMouseDown={(e)=>{ e.stopPropagation(); e.preventDefault(); }}
+          onClick={(e)=>{ e.stopPropagation(); e.preventDefault(); if (!dtBlocked) detachAt(basePath, index); }}
+          onMouseEnter={()=>{ if (!dtBlocked) setCutHover(zk); }} onMouseLeave={()=>setCutHover(c=>c===zk ? null : c)}
+          className={"absolute flex items-center justify-center transition-opacity duration-200 " + (hot ? "opacity-100" : "opacity-0 group-hover/iz:opacity-100")}>
+          <DtIc n="trash" s={12} w={2}/>
+          <span data-nf="dt-tip">{dtBlocked
+            ? <><b>Can’t detach here</b><span>A Merge stays with the paths it joins. Detach from above them instead.</span></>
+            : <><b>Detach {dtSteps(dtN)}</b><span>Everything below this line{basePath.length ? " in "+dtPathLabel(basePath, flowRef.current) : ""} moves to the Detached stack. It won’t run until you attach it.</span></>}</span>
+        </span>)}
       {/* collapsed = the resting gap; opens on hover OR while its menu is open (izOpen → no collapse-jump). During a
           drag the hover-expand is disabled so the zone stays a stable 31px gap. */}
-      <div className={"relative overflow-hidden transition-[height] duration-200 ease-out " + (izOpen ? "h-[64px]" : (dragging ? "h-[31px]" : "h-[31px] group-hover/iz:h-[64px]"))}>
+      <div className={"relative overflow-hidden transition-[height] duration-200 ease-out " + ((izOpen||hot) ? (EMBED ? "h-[72px]" : "h-[64px]") : (dragging ? "h-[31px]" : (EMBED ? "h-[31px] group-hover/iz:h-[72px]" : "h-[31px] group-hover/iz:h-[64px]")))}>
         {/* + marker, vertically centred */}
         <span className={"absolute flex items-center justify-center rounded-full transition-all duration-200 " + (izOpen ? "opacity-100" : "opacity-0 group-hover/iz:opacity-100")}
           style={{ left:"9px", top:"50%", transform:"translate(-50%,-50%)", width:"18px", height:"18px", border:"1px solid var(--border2)", background:"var(--panel2)", color:"var(--muted)", boxShadow:"0 0 0 3px var(--bg)", zIndex:2 }}>
@@ -11851,8 +12645,26 @@ function App() {
     const showLead = nodes.length>0 && !opts.headless && (isTrunk ? hasTrigger : true);
     const out = [];
     const izNoRail = !!opts.noRail;
+    // DETACH hover (user 2026-11-05): everything from the hovered gap down sits in ONE cut-set wrapper (tinted red), and the
+    // step just above it is outlined blue — the same highlight as the Detached-steps concept.
+    const ckAt = cutHover ? cutHover.lastIndexOf(":") : -1;
+    const ci = (EMBED && ckAt>=0 && cutHover.slice(0, ckAt)===pathKey(basePath)) ? +cutHover.slice(ckAt+1) : -1;
+    const cutEls = [];
+    const put = (el, i) => (ci>=0 && i>=ci ? cutEls : out).push(el);
     if (showLead) out.push(<InsertZone key="iz-lead" basePath={basePath} index={0} dbl={izDbl} noRail={izNoRail} label={izLabel} />);
-    rendered.forEach((el, i) => { out.push(el); if (i < rendered.length-1) out.push(<InsertZone key={"iz-"+i} basePath={basePath} index={i+1} dbl={izDbl} noRail={izNoRail} label={izLabel} />); });
+    rendered.forEach((el, i) => {
+      const simple = el && nodes[i] && !(nodes[i].kind==="branch" || nodes[i].kind==="merge" || nodes[i].kind==="loop");
+      const tagged = (EMBED && el && nodes[i]) ? <div key={"dtn-"+nodes[i].id} data-dtn={nodes[i].id} style={{ display:"contents" }}>{el}</div> : el;
+      put((ci>0 && i===ci-1 && simple) ? <div key="dt-src" data-nf="cutsrc">{tagged}</div> : tagged, i);
+      if (i < rendered.length-1) put(<InsertZone key={"iz-"+i} basePath={basePath} index={i+1} dbl={izDbl} noRail={izNoRail} label={izLabel} />, i+1 === ci ? -1 : i+1);
+    });
+    if (cutEls.length) out.push(<div key="dt-cut" data-nf="cutset">{cutEls}</div>);
+    if (EMBED && placing) {
+      const seg = basePath[basePath.length-1], par = (seg && isBranchSeg(seg) && seg.path!==undefined) ? nodeAt(flowRef.current, basePath.slice(0,-1)) : null;
+      const feeds = !!(par && par.paths && par.paths[seg.path] && par.paths[seg.path].feeds); // a feeder lane already ends in its own spot (the zone above its merge row)
+      const last = nodes[nodes.length-1], closed = !!(last && isSplitBranch(last)); // a split ends its level; the main path carries on after a Merge
+      if (!feeds && !closed) out.push(dtDropBar("dt-end", basePath, nodes.length, nodes.length ? "Put it at the end of "+dtPathLabel(basePath, flowRef.current) : "Put it in "+dtPathLabel(basePath, flowRef.current), izDbl, izNoRail, true));
+    }
     return out;
   }
 
@@ -12286,7 +13098,8 @@ function App() {
               // poll for the new row's value control to commit to the DOM (a single rAF fires before React paints the
               // appended row), then open its picker. The field-picker's own onClose has already run by then.
               let tries=0; const openV=()=>{ const elx=document.querySelector(`[data-anchor="dval:${dnode.id}:${idx}"]`);
-                if(elx && fdx){ openFieldValue(dpath, fdx, null, (v)=>{ const nn=nodeAt(flowRef.current,dpath); update(dpath,{fields:(nn.fields||[]).map((x,ix)=>ix===idx?{...x,value:v}:x)}); }, `dval:${dnode.id}:${idx}`, elx); }
+                if(elx && fdx && EMBED && textVer==="D" && /^(text|textarea|toggle)$/.test(fdx.type)){ if(fdx.type!=="toggle") focusTextSlot(`dval:${dnode.id}:${idx}`); }   // D: no popup — the caret lands in the field
+                else if(elx && fdx){ openFieldValue(dpath, fdx, null, (v)=>{ const nn=nodeAt(flowRef.current,dpath); update(dpath,{fields:(nn.fields||[]).map((x,ix)=>ix===idx?{...x,value:v}:x)}); }, `dval:${dnode.id}:${idx}`, elx); }
                 else if(++tries<10){ setTimeout(openV, 30); } };
               setTimeout(openV, 30);
             };
@@ -12483,7 +13296,10 @@ function App() {
                         (field==="to" && !isSms) ? null : { header:"Technician groups", items:vlGroups }, { header:"People", items:vlPeople } ].filter(x=>x && x.items.length);
                       // one recipient row: label (with a count) · the value list (f(x) at its right edge) · Cc/Bcc links
                       // EMAIL (not SMS) uses the design version picked in the host's top bar (1.1 · 1.2 · 2 — user 2026-10-15)
-                      const rcField = (field, label) => <RcptField variant={emailVer} values={rList(dnode, field)} onChange={(next)=>rWrite(field, ()=>next||[])}
+                      const rcField = (field, label) => (EMBED && textVer==="D")   // text trial D: type in the field, f(x) adds dynamic values to the same list
+                        ? chipD({ dpath, slotKey:`vl:${dnode.id}:${field}`, values:rList(dnode, field), onChange:(next)=>rWrite(field, ()=>next||[]), kind: isSms ? "phone" : "email",
+                            suggest: vlSecs(field).flatMap(sc=>sc.items.map(it=>({ id:it.id, label:it.label, sub:it.sub }))), mix:true, ph: isSms ? "Type a mobile number…" : "Type an email…" })
+                        : <RcptField variant={emailVer} values={rList(dnode, field)} onChange={(next)=>rWrite(field, ()=>next||[])}
                         title={label+" recipients"} kind={isSms ? "phone" : "email"} sections={isSms ? [] : vlSecs(field)} refSources={recordsInScope(dpath)} placeholder={isSms ? "Add a mobile number…" : "Search people or add an email…"}
                         emptyUntilSearch searchPh={isSms ? "Type a mobile number and press Enter" : "Search people, or type an email and press Enter"}
                         onExpression={(setVal, prev)=> openExprBuilder(setVal, prev, label+" recipients", recordsInScope(dpath), `vl:${dnode.id}:${field}`, { drawer:dnode.id, label:"Email" })} />;
@@ -12574,8 +13390,12 @@ function App() {
                           {has("subject") && <div data-nf="crow" className="px-5 py-2.5 flex items-center gap-3 border-b" style={{borderColor:"var(--border2)"}}>
                             <span data-nf="clabel" className="shrink-0 text-[length:var(--fs-125)]" style={{color:"var(--muted)"}}>Subject<span className="ml-0.5" style={{color:"var(--red)"}}>*</span></span>
                             <div className="flex-1 min-w-0">
-                              <RichBody single value={mig(ddata.subject)} onChange={(v2)=>setD("subject",v2)} placeholder="add a subject…"
-                                canPlaceholder={canRef} onRequestPlaceholder={reqPh("subject")} />
+                              {(EMBED && textVer==="D")
+                                ? <TxtFxD single bare mix anchorKey={`dspec:${dnode.id}:subject`} value={mig(ddata.subject)} onChange={(v2)=>setD("subject",v2)} placeholder="add a subject…"
+                                    canDynamic={canRef} fxOn={fxOnFor(`dspec:${dnode.id}:subject`)} onPh={(el, applyRef)=>{ setFxSlot(null); reqPh("subject")(el, applyRef); }}
+                                    onFx={(el, applyRef)=>{ const k3 = `dspec:${dnode.id}:subject`; setFxSlot(k3); openSmartRef(dpath, k3, el, k3, (ref)=>applyRef(refPathLabels(ref).join(" › ")), { refOnly:true }, { matchWidth:true }); }} />
+                                : <RichBody single value={mig(ddata.subject)} onChange={(v2)=>setD("subject",v2)} placeholder="add a subject…"
+                                canPlaceholder={canRef} onRequestPlaceholder={reqPh("subject")} />}
                             </div>
                           </div>}
                           {/* v8: error sits BELOW the subject hairline, not inside the row */}
@@ -12682,6 +13502,8 @@ function App() {
                       else if (fd.type==="user")
                         ctrl = refOK ? fieldCtrl(dpath, fd, v, set, fk, "choose a person…")
                           : <EntitySelect kind="user" value={v} onChange={set} options={SAMPLE_USERS.map(u2=>({id:u2.name, name:u2.name, sub:u2.email}))} placeholder="choose a person…" />;
+                      else if (EMBED && textVer==="D" && (fd.type==="textarea" || fd.type==="phtext" || (fd.type==="text" && !fd.plain)))   // text trial D: every action form's text fields (user 2026-10-22)
+                        ctrl = txtD(dpath, fd, v || null, set, fk, fd.ph, true, !!fd.rte);
                       else if (fd.type==="textarea" || fd.type==="richtext") {
                         // typeable multi-line body/message with inline REFERENCE placeholders (the "Insert
                         // placeholder" affordance runs the same record→field drill conditions use). Replaces the
@@ -12786,6 +13608,8 @@ function App() {
                               style={ v===o ? {background:"var(--accent)", color:"#fff"} : {color:"var(--muted)"} }>{o}</button>
                           ))}
                         </div>);
+                      else if (fd.type==="duration" && EMBED && textVer==="D")   // text trial D: number + unit in one field, f(x)
+                        ctrl = inD(dpath, { ...fd, type:"number" }, D[fd.k] || null, set, fk, "0", { unit:D[fd.k+"_unit"], setUnit:(x)=>SET(fd.k+"_unit", x) });
                       else if (fd.type==="duration")
                         ctrl = (<div className="flex gap-2">
                           <input type="number" className={inCls+" flex-1 min-w-0"} style={inSty} value={v} placeholder="0" onChange={e=>set(e.target.value)}/>
@@ -12854,12 +13678,15 @@ function App() {
                         ctrl = <input className={inCls} style={inSty} type="password" autoComplete="new-password" value={v} placeholder={fd.ph||""} onChange={e=>set(e.target.value)}/>;
                       else if (fd.type==="keyval")
                         ctrl = <KeyValRows value={Array.isArray(v)?v:[]} onChange={set} keyPh={fd.keyPh} valPh={fd.valPh} addLabel={fd.addLabel}
-                          renderVal={(EMBED && refOK) ? (val, commitV, i)=> textBCtrl(dpath, { k:fd.k+"_v"+i, label:(fd.valPh||"Value"), type:"phtext", phDyn:true }, val || null, (x)=>commitV(x==null?"":x), fk+":v"+i, fd.valPh||"Value") : undefined}/>;
+                          renderVal={(EMBED && textVer==="D") ? (val, commitV, i)=> txtD(dpath, { k:fd.k+"_v"+i, label:(fd.valPh||"Value"), type:"phtext" }, val || null, (x)=>commitV(x==null?"":x), fk+":v"+i, fd.valPh||"Value")
+                            : (EMBED && refOK) ? (val, commitV, i)=> textBCtrl(dpath, { k:fd.k+"_v"+i, label:(fd.valPh||"Value"), type:"phtext", phDyn:true }, val || null, (x)=>commitV(x==null?"":x), fk+":v"+i, fd.valPh||"Value") : undefined}/>;
                       else if (fd.type==="attach")
                         ctrl = (<button type="button" className="inline-flex items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2 text-[length:var(--fs-125)] font-medium transition-colors hover:bg-[var(--pop-hover)]" style={{borderColor:"var(--border2)", color:"var(--muted)"}}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M8 8l4-4 4 4M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                           Attach files
                         </button>);
+                      else if (EMBED && textVer==="D" && !fd.plain && /^(number|date|datetime)$/.test(fd.type))   // text trial D
+                        ctrl = inD(dpath, fd, v || null, set, fk, fd.ph);
                       else
                         ctrl = (refOK && !fd.plain) ? fieldCtrl(dpath, fd, v, set, fk, fd.ph||"value")
                           : <input className={inCls} style={inSty} type={fd.type==="date"?"date":fd.type==="datetime"?"datetime-local":fd.type==="number"?"number":"text"} value={v} placeholder={fd.ph||""} onChange={e=>set(e.target.value)}/>;
@@ -12984,13 +13811,18 @@ function App() {
                             // Dynamic = one reference. Several specific tags OR one dynamic value, never both.
                             ? vpCtrl({ ...vpCfgFor(dpath, fd), dpath, slotKey:`dval:${dnode.id}:${i}`, values: fv.value, onChange: (n)=>setF(i,{value:n}) })
                             : (EMBED && (fd.type==="tokens" && /mail/i.test(fd.id+" "+(fd.label||"")) || fd.id==="user_email"))   // EMAIL values (user 2026-10-21): the Send email › To popup
-                            ? <div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{background:"#fff", border:"1px solid var(--border2)", padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
+                            ? (textVer==="D" ? chipD({ dpath, slotKey:`dval:${dnode.id}:${i}`, kind:"email", suggest:PEOPLE_SUGGEST, mix:false, maxOne: fd.id==="user_email", ph:"Type an email…",
+                                  values: (fv.value && !Array.isArray(fv.value) && !smartKindOf(fv.value)) ? [fv.value] : fv.value,
+                                  onChange:(n)=>setF(i,{value: n==null ? null : smartKindOf(n) ? n : (n.length ? (fd.id==="user_email" ? n[0] : n) : null)}) })
+                            : <div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{background:"#fff", border:"1px solid var(--border2)", padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
                                 <RcptField variant="1.2" kind="email" title={fd.label} values={Array.isArray(fv.value) ? fv.value : (fv.value ? [fv.value] : [])} onChange={(n)=>setF(i,{value: n && n.length ? (fd.id==="user_email" ? n[0] : n) : null})}
                                   maxOne={fd.id==="user_email"} sections={[{header:"People", items:SAMPLE_USERS.map(u=>({ id:u.email, label:u.name, sub:u.email }))}]} refSources={recordsInScope(dpath)}
-                                  emptyUntilSearch searchPh="Search people, or type an email and press Enter" placeholder={fd.id==="user_email" ? "Search people or add the email…" : "Search people or add an email…"} /></div>
+                                  emptyUntilSearch searchPh="Search people, or type an email and press Enter" placeholder={fd.id==="user_email" ? "Search people or add the email…" : "Search people or add an email…"} /></div>)
                             : fd.type==="tokens"  // free type-and-add chips
                             ? (EMBED ? <TokensField value={fv.value} onChange={v=>setF(i,{value:v})} email={/mail/i.test(fd.id+" "+(fd.label||""))} noun={/mail/i.test(fd.id+" "+(fd.label||"")) ? "email" : (fd.label||"value").replace(/s$/,"").toLowerCase()} />
                                : <TokenInput value={fv.value} onChange={v=>setF(i,{value:v})} placeholder={fd.placeholder} />)
+                            : (fd.type==="toggle" && EMBED && textVer==="D")  // text trial D: the switch sits in the field
+                            ? tglD(dpath, fd, fv.value, (val)=>setF(i,{value:val}), `dval:${dnode.id}:${i}`)
                             : fd.type==="toggle"  // Yes / No (user 2026-10-19): the field opens Specific | Dynamic; Specific = a segmented Yes | No
                             ? (smartKindOf(fv.value) ? fieldCtrl(dpath, fd, fv.value, (val)=>setF(i,{value:val}), `dval:${dnode.id}:${i}`, "Select Yes or No")
                               : <button type="button" data-nf="yn-field" data-anchor={`dval:${dnode.id}:${i}`} onClick={(e)=>openToggleValue(dpath, fd, fv.value, (val)=>setF(i,{value:val}), `dval:${dnode.id}:${i}`, e.currentTarget)}
@@ -13018,6 +13850,8 @@ function App() {
                             ? fieldCtrl(dpath, fd, fv.value, (val)=>setF(i,{value:val}), `dval:${dnode.id}:${i}`, "enter the task subject…")
                             : fd.type==="taskdate"  // Add task start date (v8): Current Date / Current Date Time / Custom, + Dynamic / Expression
                             ? fieldCtrl(dpath, fd, fv.value, (val)=>setF(i,{value:val}), `dval:${dnode.id}:${i}`, "choose a start date…")
+                            : (EMBED && textVer==="D" && /^(number|date|datetime)$/.test(fd.type))   // text trial D: type / pick in the field
+                            ? inD(dpath, fd, fv.value, (val)=>setF(i,{value:val}), `dval:${dnode.id}:${i}`)
                             : fieldCtrl(dpath, fd, fv.value, (val)=>setF(i,{value:val}), `dval:${dnode.id}:${i}`, "value"))}
                           </>)}
                           {/* required-field error (v8): a row needs both a field and its value */}
@@ -13201,7 +14035,8 @@ function App() {
               <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" style={{color:"var(--faint)"}}><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
             {ctrl}
           </div></div></div>);
-        const rcRow = (key, title, extra)=> (<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{background:"#fff", border:"1px solid var(--border2)", padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
+        const rcRow = (key, title, extra)=> textVer==="D" ? chipD({ dpath:gp, slotKey:"g:"+key, values:G(key), onChange:(n)=>S(key)(n), kind:"email", suggest:PEOPLE_SUGGEST, mix:false, maxOne:!!(extra && extra.maxOne), ph:"Type an email…" })
+          : (<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{background:"#fff", border:"1px solid var(--border2)", padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
           <RcptField variant="1.2" kind="email" title={title} values={G(key)||[]} onChange={(n)=>S(key)(n||[])} refSources={recordsInScope(gp)} {...extra}
             emptyUntilSearch searchPh="Search people, or type an email and press Enter" sections={[{header:"People", items:people}]} /></div>);
         const popBox = (key, value, ph, onOpen)=> (<button type="button" data-anchor={key} onClick={(e)=>{ setOpenSlot(key); onOpen(e.currentTarget); }}
@@ -13267,11 +14102,11 @@ function App() {
             card("subject", "Single-line text", "Create / Update record › Subject",
               frow("Subject", textFieldCtrl(gp, {id:"subject", label:"Subject", type:"text"}, G("subject"), S("subject"), "g:subject", "enter text…"))),
             card("url", "Text with placeholders", "HTTP request › URL",
-              <>{lbl("URL", true)}{textBCtrl(gp, {k:"url", label:"URL", type:"phtext", phDyn:true}, G("url")||null, S("url"), "g:url", "https://api.example.com/…")}</>),
+              <>{lbl("URL", true)}{(textVer==="D" ? txtD : textBCtrl)(gp, {k:"url", label:"URL", type:"phtext", phDyn:true}, G("url")||null, S("url"), "g:url", "https://api.example.com/…")}</>),
             card("desc", "Long text", "Create / Update record › Description",
               frow("Description", textareaFieldCtrl(gp, {id:"description", label:"Description", type:"textarea"}, G("desc"), S("desc"), "g:desc"))),
             card("phtext", "Inline placeholder text", "Create deployment › Name · Email subject",
-              <>{lbl("Deployment name", true)}<div className="rounded-lg px-3 py-2" style={boxSty}><RichBody single value={G("dname")||""} onChange={S("dname")} placeholder="e.g. Chrome rollout for the Finance team" canPlaceholder={true} onRequestPlaceholder={(el, apply)=>openPhPicker("g:dname", el, apply)} /></div></>),
+              <>{lbl("Deployment name", true)}{textVer==="D" ? txtD(gp, {k:"dname", label:"Deployment name", type:"phtext"}, G("dname")||null, S("dname"), "g:dname", "e.g. Chrome rollout for the Finance team") : <div className="rounded-lg px-3 py-2" style={boxSty}><RichBody single value={G("dname")||""} onChange={S("dname")} placeholder="e.g. Chrome rollout for the Finance team" canPlaceholder={true} onRequestPlaceholder={(el, apply)=>openPhPicker("g:dname", el, apply)} /></div>}</>),
             card("rich", "Rich text", "Send email › Content · Announcement · Notes",
               <>{lbl("Content", true)}<RichBody value={G("rich")||""} onChange={S("rich")} placeholder="Write the email…" minRows={5} tools expandable expandTitle="Content" canPlaceholder={true} onRequestPlaceholder={(el, apply)=>openPhPicker("g:rich", el, apply)} /></>, true),
             card("pwd", "Password", "HTTP request › Basic Auth",
@@ -13283,7 +14118,7 @@ function App() {
             card("proxy", "Plain dropdown", "HTTP request › Proxy server · Credential",
               <>{lbl("Proxy server")}<Dropdown options={["Corporate proxy","DMZ proxy","Cloud egress proxy"].map(o=>({id:o, label:o}))} value={G("proxy")} onChange={S("proxy")} placeholder="Proxy server" /></>),
             card("spam", "Yes / No", "Record fields: Spam, Known error…",
-              frow("Spam", <button type="button" data-nf="yn-field" data-anchor="g:spam" onClick={(e)=>openToggleValue(gp, {id:"spam", label:"Spam", type:"toggle"}, G("spam"), S("spam"), "g:spam", e.currentTarget)}
+              frow("Spam", textVer==="D" ? tglD(gp, {id:"spam", label:"Spam", type:"toggle"}, G("spam"), S("spam"), "g:spam") : <button type="button" data-nf="yn-field" data-anchor="g:spam" onClick={(e)=>openToggleValue(gp, {id:"spam", label:"Spam", type:"toggle"}, G("spam"), S("spam"), "g:spam", e.currentTarget)}
                 className="w-full rounded-lg pl-3 pr-2.5 py-2.5 flex items-center gap-2 text-left text-[length:var(--fs-135)] transition-colors hover:bg-[var(--pop-hover)]" style={{background:"var(--panel2)", border:"1px solid "+(openSlot==="g:spam" ? "var(--accent2)" : "var(--border2)"), color: G("spam") ? "var(--text)" : "var(--faint)"}}>
                 <span className="flex-1 min-w-0 flex items-center">{G("spam")==="Yes" || G("spam")==="No" ? G("spam") : (smartKindOf(G("spam")) ? valueDisplay(G("spam")) : "Select Yes or No")}</span>
                 <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" style={{color:"var(--faint)"}}><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button>)),
@@ -13327,15 +14162,15 @@ function App() {
             card("uemail", "Single email", "Create user › Email",
               frow("Email", rcRow("uemail", "Email", { maxOne:true, placeholder:"Search people or add the email…" }))),
             card("to", "Recipients — email", "Send email › To",
-              <>{lbl("To", true)}<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{...boxSty, padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
+              <>{lbl("To", true)}{textVer==="D" ? chipD({ dpath:gp, slotKey:"g:to", values:G("to"), onChange:(n)=>S("to")(n||[]), kind:"email", suggest:PEOPLE_SUGGEST, mix:true, ph:"Type an email…" }) : <div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{...boxSty, padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
                 <RcptField variant="1.2" kind="email" title="To recipients" values={G("to")||[]} onChange={(n)=>S("to")(n||[])} refSources={recordsInScope(gp)} placeholder="Search people or add an email…"
-                  emptyUntilSearch searchPh="Search people, or type an email and press Enter" sections={[{header:"People", items:people}]} /></div></>),
+                  emptyUntilSearch searchPh="Search people, or type an email and press Enter" sections={[{header:"People", items:people}]} /></div>}</>),
             card("tgroups", "Technician group", "Send email › Technician group",
               <>{lbl("Technician group")}{vpCtrl({ title:"Technician group", choices:SAMPLE_GROUPS, dynamic:true, searchPh:"Search technician groups", ph:"Pick technician groups…", dpath:gp, slotKey:"g:tgroups", values:G("tgroups"), onChange:S("tgroups") })}</>),
             card("sms", "Recipients — phone", "Send SMS › To",
-              <>{lbl("To", true)}<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{...boxSty, padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
+              <>{lbl("To", true)}{textVer==="D" ? chipD({ dpath:gp, slotKey:"g:sms", values:G("sms"), onChange:(n)=>S("sms")(n||[]), kind:"phone", suggest:[], mix:true, ph:"Type a mobile number…" }) : <div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{...boxSty, padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
                 <RcptField variant="1.2" kind="phone" title="To recipients" values={G("sms")||[]} onChange={(n)=>S("sms")(n||[])} refSources={recordsInScope(gp)} placeholder="Add a mobile number…"
-                  emptyUntilSearch searchPh="Type a mobile number and press Enter" sections={[]} /></div></>),
+                  emptyUntilSearch searchPh="Type a mobile number and press Enter" sections={[]} /></div>}</>),
             card("appr", "Pick list", "Ask for approval › Stage › Technician group",
               <>{lbl("Technician group")}<div data-nf="rc-box" className="w-full min-w-0 flex items-center rounded-md" style={{...boxSty, padding:"5px 5px 5px 12px", minHeight:36, cursor:"text"}}>
                 <RcptField variant="1.2" kind="pick" title="Technician group" values={G("appr")||[]} onChange={(n)=>S("appr")(n||[])} refSources={recordsInScope(gp)} placeholder="Pick technician groups…" searchPh="Search technician groups"
@@ -13343,15 +14178,15 @@ function App() {
           ]],
           ["Numbers & dates", [
             card("num", "Number", "Asset › Cost · Task › Estimated time",
-              frow("Cost", fieldCtrl(gp, {id:"cost", label:"Cost", type:"number"}, G("num"), S("num"), "g:num", "a number…"))),
+              frow("Cost", (textVer==="D" ? inD(gp, {id:"cost", label:"Cost", type:"number"}, G("num"), S("num"), "g:num") : fieldCtrl(gp, {id:"cost", label:"Cost", type:"number"}, G("num"), S("num"), "g:num", "a number…")))),
             card("date", "Date", "Change › Start / End date",
-              frow("Due by", fieldCtrl(gp, {id:"due_by", label:"Due by", type:"date"}, G("date"), S("date"), "g:date", "pick a date…"))),
+              frow("Due by", (textVer==="D" ? inD(gp, {id:"due_by", label:"Due by", type:"date"}, G("date"), S("date"), "g:date") : fieldCtrl(gp, {id:"due_by", label:"Due by", type:"date"}, G("date"), S("date"), "g:date", "pick a date…")))),
             card("dt", "Date & time", "Task › End date",
-              frow("Task end date", fieldCtrl(gp, {id:"task_end", label:"Task end date", type:"datetime"}, G("dt"), S("dt"), "g:dt", "pick a date and time…"))),
+              frow("Task end date", (textVer==="D" ? inD(gp, {id:"task_end", label:"Task end date", type:"datetime"}, G("dt"), S("dt"), "g:dt") : fieldCtrl(gp, {id:"task_end", label:"Task end date", type:"datetime"}, G("dt"), S("dt"), "g:dt", "pick a date and time…")))),
             card("dur", "Number + unit", "Create announcement › Duration",
-              <>{lbl("Duration")}<div className="flex gap-2">
+              <>{lbl("Duration")}{textVer==="D" ? inD(gp, {id:"duration", label:"Duration", type:"number"}, G("durn")||null, S("durn"), "g:durn", "0", { unit:G("duru"), setUnit:S("duru") }) : <div className="flex gap-2">
                 <input type="number" value={G("durn")||""} onChange={e=>S("durn")(e.target.value)} placeholder="0" className="flex-1 min-w-0 h-[38px] rounded-lg px-3 text-[length:var(--fs-13)] outline-none focus:border-[var(--accent)]" style={boxSty} />
-                <div className="w-28 shrink-0"><Dropdown value={G("duru")||"Hours"} options={["Minutes","Hours","Days"].map(u=>({id:u,label:u}))} onChange={S("duru")} /></div></div></>),
+                <div className="w-28 shrink-0"><Dropdown value={G("duru")||"Hours"} options={["Minutes","Hours","Days"].map(u=>({id:u,label:u}))} onChange={S("duru")} /></div></div>}</>),
             card("tstart", "Date presets", "Add task › Task start date",
               frow("Task start date", fieldCtrl(gp, {id:"task_start", label:"Task start date", type:"taskdate"}, G("ts"), S("ts"), "g:ts", "choose a start date…"))),
           ]],
@@ -13424,14 +14259,17 @@ function App() {
             <header className="flex flex-col gap-1 relative">
               {/* how popups save — the SIDEBAR way (Press Enter hint, no button) or the CANVAS way (Apply button) */}
               {galView!=="canvas" && <div data-nf="g-mode" role="tablist" className="absolute right-0 top-0 flex p-0.5 rounded-lg gap-0.5" style={{background:"#fff", border:"1px solid #dfe5ed"}}>
-                {[["1","V1 · Below"],["2","V2 · On the field"]].map(([id,l])=>{ const on = popVer===id; return <button key={id} type="button" role="tab" aria-selected={on} onClick={()=>{ close(); setPopVer(id); }} className="px-3 py-1.5 rounded-md text-[length:var(--fs-12)] font-medium transition-colors" style={on ? {background:"var(--accent)", color:"#fff"} : {color:"#7b8fa5"}}>{l}</button>; })}
+                {[["1","V1 · Below"],["2","V2 · On the field"],["3","V3 · Type + f(x)"]].map(([id,l])=>{ const on = id==="3" ? textVer==="D" : (popVer===id && textVer!=="D");   // V3 = text trial D on every field (user 2026-10-22)
+                  return <button key={id} type="button" role="tab" aria-selected={on} onClick={()=>{ close(); if (id==="3") setTextVer("D"); else { setPopVer(id); if (textVer==="D") setTextVer("B"); } }} className="px-3 py-1.5 rounded-md text-[length:var(--fs-12)] font-medium transition-colors" style={on ? {background:"var(--accent)", color:"#fff"} : {color:"#7b8fa5"}}>{l}</button>; })}
               </div>}
               <h1 className="text-[22px] font-semibold" style={{color:"#1d2a3e"}}>Field gallery</h1>
               {/* which half of the builder: the right SIDEBAR's fields, or the CANVAS sentence blanks */}
               <div data-nf="g-view" role="tablist" className="self-start mt-2 flex p-0.5 rounded-lg gap-0.5" style={{background:"#fff", border:"1px solid #dfe5ed"}}>
                 {[["sidebar","Sidebar fields"],["canvas","Canvas blanks"]].map(([id,l])=>{ const on = galView===id; return <button key={id} type="button" role="tab" aria-selected={on} onClick={()=>{ close(); setGalView(id); }} className="px-3 py-1.5 rounded-md text-[length:var(--fs-12)] font-medium transition-colors" style={on ? {background:"var(--accent)", color:"#fff"} : {color:"var(--muted)"}}>{l}</button>; })}
               </div>
-              <p className="text-[length:var(--fs-13)]" style={{color:"#7b8fa5", maxWidth:760}}>Every unique field of the Linear workflow builder in one place, with the same look and behaviour as the workflow — click any field: the Specific | Dynamic popups, pickers, placeholders and chips are the real ones.</p>
+              <p className="text-[length:var(--fs-13)]" style={{color:"#7b8fa5", maxWidth:760}}>{textVer==="D" && galView!=="canvas"
+                ? "V3 · Type + f(x): every text, number, date, Yes / No, email and tag field is typed or picked right in the field — no Specific | Dynamic popup. f(x) at the top-right adds a value from the record; { } inserts a placeholder."
+                : "Every unique field of the Linear workflow builder in one place, with the same look and behaviour as the workflow — click any field: the Specific | Dynamic popups, pickers, placeholders and chips are the real ones."}</p>
             </header>
             {(galView==="canvas" ? canvasSections : sections).map(([title, cards])=>(<div key={title} className="flex flex-col gap-3">
               <h2 className="text-[length:var(--fs-11)] font-semibold uppercase tracking-[0.08em]" style={{color:"#8E9FBC"}}>{title}</h2>
@@ -13560,6 +14398,18 @@ function App() {
                 ))}
               </div>
             </div>); })()}
+          {EMBED && (()=>{ const off = exprEdit ? 640 : (drawer||refOpen||savePanel||helpOpen) ? (sideW+10) : 0;
+            const pl = placing && detached.find(x=>x.id===placing);
+            return (<>
+              <DetachTray pieces={detached.map(dtView)} ver={dtVer} folded={trayFolded} right={off+12} unfoldFrom={dtUnfold}
+                onDelete={dtDelete} onFold={dtFold} targetsFor={dtTargets} onHoverTarget={dtHighlight} onPick={dtPick} onDrag={dtDrag} dragged={dtDragged} />
+              {pl && <div data-nf="dt-banner" role="status" style={{ transform:`translateX(calc(-50% - ${off/2}px))` }}>
+                <div className="dt-bt"><b>Where should “{dtShort(dtCap(dtLine(pl.items[0])))}” go?</b>
+                  <small>Click a blue spot in the list.{dtEndOnly(pl.items) ? " It holds a split path, so only the ends of paths are open." : ""} Esc cancels.</small></div>
+                <button type="button" className="dt-btno" onClick={()=>setPlacing(null)}>Cancel</button></div>}
+              {dtToast && <div data-nf="dt-toast" role="status" style={{ transform:`translateX(calc(-50% - ${off/2}px))` }}>
+                <span>{dtToast.msg}</span>{dtToast.undoable && <button type="button" onClick={()=>{ undo(); setDtToast(null); }}>Undo</button>}</div>}
+            </>); })()}
           {EMBED ? (()=>{
             const NI = (d) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{__html:d}} />;
             const zset = (z) => setLzoom(Math.max(0.5, Math.min(1.5, Math.round(z*10)/10)));
@@ -13579,6 +14429,8 @@ function App() {
               <Tool onClick={undo} title="Undo" kbd={["Ctrl","Z"]}>{NI('<path d="M4 8h10a5.5 5.5 0 0 1 0 11H8"/><path d="M7.5 4.5 4 8l3.5 3.5"/>')}</Tool>
               <Tool onClick={redo} title="Redo" kbd={["Ctrl","⇧","Z"]}>{NI('<path d="M20 8H10a5.5 5.5 0 0 0 0 11h6"/><path d="M16.5 4.5 20 8l-3.5 3.5"/>')}</Tool>
               <Tooltip label="Reset" kbd={["⇧","R"]} side="top"><button data-nf="bartext" onClick={reset}>{NI('<path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M21 4v5h-5"/>')}Reset</button></Tooltip>
+              {/* no "Detached N" toolbar button (user 2026-11-05): detached steps are never folded or stored away — the stack
+                  stays on screen until each piece is reattached or deleted */}
             </div>); })() : (
           <div ref={floatBarRef} data-nf="bar" className="absolute left-1/2 bottom-6 z-40 flex items-center gap-1 px-3.5 py-2.5 rounded-2xl"
             style={{ background:"var(--panel)", boxShadow:"var(--shadow-float)",

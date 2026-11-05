@@ -10,6 +10,9 @@
 <link rel="stylesheet" href="workflow-nodes.css">
 <link rel="stylesheet" href="workflow-popover.css">
 <link rel="stylesheet" href="workflow-chrome.css">
+<link rel="stylesheet" href="workflow-skeleton.css">
+<script>/* ?skeleton=hold keeps the loading skeletons on screen for design review */
+if(/[?&]skeleton=hold\b/.test(location.search)) document.documentElement.classList.add('skel-hold');</script>
 <style>
   :root{
     --page-text:#364658;
@@ -316,7 +319,59 @@
   <!-- Linear view: the textual builder (linear/index.html), loaded into this
        frame the first time the Linear tab is picked — see workflow-chrome.js -->
   <div class="linear-view" id="linearView" hidden>
-    <div class="linear-loading">Loading Linear view…</div>
+    <!-- loading skeleton (Linear view): vertical, read top to bottom -->
+    <div class="lskel" role="status" aria-live="polite">
+      <span class="sk-sr">Loading workflow</span>
+      <div class="ls-col" aria-hidden="true">
+        <div class="ls-seg">
+          <div class="ls-row" style="--d:0s"><div class="ls-mk"><i class="ring"></i></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg when"></span><span class="sk ls-w soft" style="width:16px"></span><span class="sk ls-w deep u" style="width:80px"></span><span class="sk ls-w soft" style="width:20px"></span><span class="sk ls-w deep u" style="width:66px"></span></div><span class="sk soft ls-sub" style="width:250px"></span></div></div>
+          <div class="ls-gap"></div>
+          <div class="ls-row" style="--d:0.06s"><div class="ls-mk"><i class="dia"></i></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg if"></span><span class="sk ls-w deep u" style="width:72px"></span><span class="sk ls-w soft" style="width:18px"></span><span class="sk ls-w deep u" style="width:84px"></span></div></div></div>
+          <div class="ls-gap s"></div>
+          <div class="ls-row" style="--d:0.1s;margin-left:42px"><div class="ls-mk"></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg join"></span><span class="sk ls-w deep u" style="width:66px"></span><span class="sk ls-w soft" style="width:52px"></span><span class="sk ls-w deep u" style="width:62px"></span></div></div></div>
+          <div class="ls-gap"></div>
+          <div class="ls-row" style="--d:0.16s"><div class="ls-mk"><i class="dot"></i></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg then"></span><span class="sk ls-w soft" style="width:48px"></span><span class="sk ls-w deep u" style="width:32px"></span><span class="sk ls-w deep u" style="width:120px"></span></div></div></div>
+          <div class="ls-card" style="--d:0.2s"><span class="sk ico"></span><div class="tx"><span class="sk deep" style="width:120px;height:11px"></span><span class="sk soft" style="width:186px;height:8px"></span></div><span class="ls-cta"><span class="sk" style="width:34px"></span><i class="chv"></i></span></div>
+          <div class="ls-gap"></div>
+        </div>
+        <div class="ls-br">
+          <div class="ls-lane"><span class="ls-rail"></span>
+            <div class="ls-row" style="--d:0.28s"><div class="ls-mk"><i class="chev"></i></div><div class="ls-body" style="flex-direction:row;align-items:center;padding-top:0;height:34px;gap:10px"><span class="sk ls-lname"></span><span class="sk soft ls-count"></span></div></div>
+            <div class="ls-row" style="--d:0.32s"><div class="ls-mk"><i class="dia"></i></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg if"></span><span class="sk ls-w deep u" style="width:60px"></span><span class="sk ls-w soft" style="width:16px"></span><span class="sk ls-w deep u" style="width:46px"></span></div></div></div>
+            <div class="ls-gap s"></div>
+            <div class="ls-row" style="--d:0.36s"><div class="ls-mk"><i class="dot"></i></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg then"></span><span class="sk ls-w soft" style="width:44px"></span><span class="sk ls-w deep u" style="width:30px"></span><span class="sk ls-w deep u" style="width:104px"></span></div></div></div>
+            <div class="ls-add" style="--d:0.4s"><span class="pl"></span><span class="sk soft"></span></div>
+          </div>
+          <div class="ls-lane"><span class="ls-rail"></span>
+            <div class="ls-row" style="--d:0.46s"><div class="ls-mk"><i class="chev"></i></div><div class="ls-body" style="flex-direction:row;align-items:center;padding-top:0;height:34px;gap:10px"><span class="sk ls-lname"></span><span class="sk soft ls-count"></span></div></div>
+            <div class="ls-row" style="--d:0.5s"><div class="ls-mk"><i class="dia"></i></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg other"></span><span class="sk ls-w soft" style="width:116px"></span></div></div></div>
+            <div class="ls-gap s"></div>
+            <div class="ls-row" style="--d:0.54s"><div class="ls-mk"><i class="dot"></i></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg then"></span><span class="sk ls-w soft" style="width:32px"></span><span class="sk ls-w deep u" style="width:56px"></span><span class="sk ls-w soft" style="width:20px"></span><span class="sk ls-w deep u" style="width:84px"></span></div></div></div>
+            <div class="ls-add" style="--d:0.58s"><span class="pl"></span><span class="sk soft"></span></div>
+          </div>
+        </div>
+      </div>
+      <!-- Skeleton 3 · New workflow (user 2026-11-05): only the trigger sentence, and Add step under it -->
+      <div class="ls-col ls-one" aria-hidden="true">
+        <div class="ls-seg">
+          <div class="ls-row" style="--d:0s"><div class="ls-mk"><i class="ring"></i></div><div class="ls-body"><div class="ls-line"><span class="sk ls-bdg when"></span><span class="sk ls-w soft" style="width:16px"></span><span class="sk ls-w deep u" style="width:80px"></span><span class="sk ls-w soft" style="width:20px"></span><span class="sk ls-w deep u" style="width:66px"></span></div><span class="sk soft ls-sub" style="width:250px"></span></div></div>
+          <div class="ls-gap"></div>
+        </div>
+        <div class="ls-add" style="--d:0.08s;margin-left:-8px"><span class="pl"></span><span class="sk soft"></span></div>
+      </div>
+      <!-- Skeleton 4 · Loader (user 2026-11-05): the rail runs top to bottom and each step lights up as the blue line reaches it -->
+      <div class="ls-load" aria-hidden="true">
+        <svg viewBox="0 0 96 78" width="104" height="84">
+          <path class="ld-ln" d="M9 15 V31"/><path class="ld-ln" d="M9 46 V63"/>
+          <path class="ld-run r1" pathLength="100" d="M9 15 V31"/>
+          <path class="ld-run r2" pathLength="100" d="M9 46 V63"/>
+          <g class="ld-nd n1"><circle class="bx" cx="9" cy="9" r="6"/><rect class="b" x="24" y="5.5" width="58" height="7" rx="3.5"/></g>
+          <g class="ld-nd n2"><path class="bx" d="M9 31.5 L15.5 38.5 L9 45.5 L2.5 38.5 Z" stroke-linejoin="round"/><rect class="b" x="24" y="35" width="44" height="7" rx="3.5"/></g>
+          <g class="ld-nd n3"><circle class="bx" cx="9" cy="69" r="5.5"/><rect class="b" x="24" y="65.5" width="66" height="7" rx="3.5"/></g>
+        </svg>
+      </div>
+      <div class="ls-bar" aria-hidden="true"><span class="sk" style="width:56px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:46px"></span></div>
+    </div>
   </div>
   <div class="app">
   <div class="stage">
@@ -325,6 +380,82 @@
     <div class="canvas" id="canvas">
       <div class="world" id="world">
         <svg id="edges" width="100" height="100"></svg>
+      </div>
+      <!-- loading skeleton (Node view): horizontal, read left to right -->
+      <div class="nskel" id="nodeSkel" role="status" aria-live="polite">
+        <span class="sk-sr">Loading workflow</span>
+        <div class="ns-flow" aria-hidden="true">
+          <svg class="ns-lines" width="1400" height="420">
+            <path class="base" d="M250 204 H350"/>
+            <path class="base" d="M600 202 H700"/>
+            <path class="base" d="M600 249 H660 Q672 249 672 261 V348 Q672 360 684 360 H700"/>
+            <path class="base" d="M950 202 H1050"/>
+            <path class="base" d="M1300 202 H1322"/>
+            <path class="base" d="M950 360 H972"/>
+            <path class="pulse" d="M250 204 H350"/>
+            <path class="pulse d2" d="M600 202 H700"/>
+            <path class="pulse d2" d="M600 249 H660 Q672 249 672 261 V348 Q672 360 684 360 H700"/>
+            <path class="pulse d3" d="M950 202 H1050"/>
+            <circle class="dot" cx="250" cy="204" r="4"/><circle class="dot" cx="350" cy="204" r="4"/>
+            <circle class="dot" cx="600" cy="202" r="4"/><circle class="dot" cx="600" cy="249" r="4"/>
+            <circle class="dot" cx="700" cy="202" r="4"/><circle class="dot" cx="700" cy="360" r="4"/>
+            <circle class="dot" cx="950" cy="202" r="4"/><circle class="dot" cx="950" cy="360" r="4"/>
+            <circle class="dot" cx="1050" cy="202" r="4"/><circle class="dot" cx="1300" cy="202" r="4"/>
+          </svg>
+          <div class="ns-node" style="left:0px;top:137px;--d:0s"><span class="sk ns-pill" style="--w:56px"></span><div class="ns-card" style="height:76px">
+            <div class="ns-top"><span class="sk ns-ico"></span><span class="sk deep" style="width:118px;height:10px"></span></div>
+            <span class="sk soft" style="width:150px;height:8px;margin-left:32px"></span>
+          </div></div>
+          <span class="ns-plus" style="left:290px;top:194px"></span>
+          <div class="ns-node" style="left:350px;top:107px;--d:0.08s"><span class="sk ns-pill" style="--w:62px"></span><div class="ns-card" style="height:136px;justify-content:space-between;padding:8px 8px 14px">
+            <div class="ns-top"><span class="sk ns-ico"></span><span class="sk deep" style="width:96px;height:10px"></span></div>
+            <div class="ns-row"><span class="sk ns-chip" style="width:24px"></span><span class="sk soft ns-bar"></span></div>
+            <div class="ns-row"><span class="sk ns-chip" style="width:36px"></span></div>
+          </div></div>
+          <span class="sk ns-tag" style="left:612px;top:193px"></span>
+          <span class="sk ns-tag" style="left:612px;top:240px"></span>
+          <div class="ns-node" style="left:700px;top:139px;--d:0.16s"><span class="sk ns-pill" style="--w:52px"></span><div class="ns-card" style="height:68px">
+            <div class="ns-top"><span class="sk ns-ico"></span><span class="sk deep" style="width:132px;height:10px"></span></div>
+            <span class="sk soft" style="width:110px;height:8px;margin-left:32px"></span>
+          </div></div>
+          <div class="ns-node" style="left:700px;top:297px;--d:0.22s"><span class="sk ns-pill" style="--w:52px"></span><div class="ns-card" style="height:68px">
+            <div class="ns-top"><span class="sk ns-ico"></span><span class="sk deep" style="width:104px;height:10px"></span></div>
+            <span class="sk soft" style="width:140px;height:8px;margin-left:32px"></span>
+          </div></div>
+          <span class="ns-plus" style="left:990px;top:192px"></span>
+          <span class="ns-plus" style="left:972px;top:350px"></span>
+          <div class="ns-node" style="left:1050px;top:139px;--d:0.3s"><span class="sk ns-pill" style="--w:52px"></span><div class="ns-card" style="height:68px">
+            <div class="ns-top"><span class="sk ns-ico"></span><span class="sk deep" style="width:120px;height:10px"></span></div>
+            <span class="sk soft" style="width:96px;height:8px;margin-left:32px"></span>
+          </div></div>
+          <span class="ns-plus" style="left:1322px;top:192px"></span>
+        </div>
+        <!-- Skeleton 3 · New workflow (user 2026-11-05): only the trigger, and the empty spot for the first step -->
+        <div class="ns-one" aria-hidden="true">
+          <svg class="ns-lines" width="400" height="140">
+            <path class="base" d="M250 67 H322"/><path class="pulse" d="M250 67 H322"/>
+            <circle class="dot" cx="250" cy="67" r="4"/>
+          </svg>
+          <div class="ns-node" style="left:0;top:0;--d:0s"><span class="sk ns-pill" style="--w:56px"></span><div class="ns-card" style="height:76px">
+            <div class="ns-top"><span class="sk ns-ico"></span><span class="sk deep" style="width:118px;height:10px"></span></div>
+            <span class="sk soft" style="width:150px;height:8px;margin-left:32px"></span>
+          </div></div>
+          <span class="ns-next"><i></i></span>
+        </div>
+        <!-- Skeleton 4 · Loader (user 2026-11-05): a small workflow that runs — the nodes light up as a blue line flows through -->
+        <div class="ns-load" aria-hidden="true">
+          <svg viewBox="0 0 108 56" width="124" height="64">
+            <path class="ld-ln" d="M22 28 H44"/>
+            <path class="ld-ln" d="M62 28 H67 Q74 28 74 21 V16 Q74 9 81 9 H88"/>
+            <path class="ld-ln" d="M62 28 H67 Q74 28 74 35 V40 Q74 47 81 47 H88"/>
+            <path class="ld-run r1" pathLength="100" d="M22 28 H44"/>
+            <path class="ld-run r2" pathLength="100" d="M62 28 H67 Q74 28 74 21 V16 Q74 9 81 9 H88"/>
+            <path class="ld-run r2" pathLength="100" d="M62 28 H67 Q74 28 74 35 V40 Q74 47 81 47 H88"/>
+            <g class="ld-nd n1"><rect class="bx" x="4" y="19" width="18" height="18" rx="5"/></g>
+            <g class="ld-nd n2"><path class="bx" d="M53 18.5 L62 28 L53 37.5 L44 28 Z" stroke-linejoin="round"/></g>
+            <g class="ld-nd n3"><rect class="bx" x="88" y="1.5" width="15" height="15" rx="4.5"/><rect class="bx" x="88" y="39.5" width="15" height="15" rx="4.5"/></g>
+          </svg>
+        </div>
       </div>
     </div>
 
@@ -819,8 +950,25 @@
   </div>
   </div>
 
+  <script src="workflow-skeleton.js"></script>
   <script src="workflow-popover.js"></script>
   <script src="workflow-chrome.js"></script>
   <script src="workflow-app.js"></script>
+  <script>
+  /* Node view loading skeleton: shown from first paint, cross-faded away once the
+     page has loaded (held at least ~0.9s so it never just flickers). The real
+     product would end it when the workflow's data arrives. */
+  (function(){
+    var sk = document.getElementById('nodeSkel');
+    if(!sk) return;
+    function done(){
+      setTimeout(function(){
+        sk.style.opacity = '0';
+        setTimeout(function(){ sk.hidden = true; }, 380);   // kept (hidden) so the Skeleton button can show it again
+      }, Math.max(0, 900 - performance.now()));
+    }
+    if(document.readyState === 'complete') done(); else window.addEventListener('load', done);
+  })();
+  </script>
 </body>
 </html>

@@ -95,6 +95,10 @@
       keywords:'if else condition true false split check branch inline add condition',
       sub:'Check a value, then choose what happens',
       help:{ eyebrow:'Condition', title:'Add condition', body:'Add a check on the flow — one check with an Is True / Is False path (Inline), or several paths at once (Branching).', eg:'Like — priority is High goes to the escalation path.', more:DOC } },
+    { id:'split', label:'Split path', tag:'parallel', tone:'split', icon:'branch',
+      keywords:'split path parallel at the same time fork run together',
+      sub:'Run another path at the same time',
+      help:{ eyebrow:'Split path', title:'Split path', body:'Forks the flow right after the Trigger. Every split path runs at the same time — there is no check.', eg:'Like — notify the on-call team and open a problem record at once.', more:DOC } },
     { id:'merge', label:'Merge paths', tag:'merge', tone:'util', icon:'split2', chevron:true, soon:true,
       keywords:'merge join combine converge',
       sub:'Bring split paths back into one flow',
@@ -163,6 +167,21 @@
     return out.concat([i]);
   }, []);
   const IMPLEMENTED = { cond:1, branch:1, email:1 };
+  /* Split path is only ever offered from the Trigger's "+":
+     'first' = nothing after the Trigger yet (no Split path),
+     'offer' = steps already there (Split path offered),
+     'only'  = a split already exists (only Split path — steps go inside a path) */
+  const SPLIT_ITEM = NODE_CATALOG.find(i => i.id === 'split');
+  function catalogFor(mode){
+    if(mode === 'offer') return NODE_CATALOG;
+    if(mode === 'only') return [{ header:'Flow control' }, SPLIT_ITEM];
+    return NODE_CATALOG.filter(i => i.id !== 'split');
+  }
+  function flatFor(mode){
+    if(mode === 'offer') return FLAT_CATALOG;
+    if(mode === 'only') return [SPLIT_ITEM];
+    return FLAT_CATALOG.filter(i => i.id !== 'split');
+  }
 
   /* ---------------------------------------------------------- state */
   const nodes = {};           // id -> node
@@ -256,10 +275,18 @@
 
   /* Every node hanging off a Trigger / branch path's single output: the first one
      (slots.next), then any parallel siblings. They all run at the same time. */
-  const kidsOf = n => (n.slots.next ? [n.slots.next] : []).concat(n.parallel || []);
+  const kidsOf = n => (n.slots.next ? [n.slots.next] : []).concat((n.parallel || []).filter(Boolean));
+  /* Split path: the Trigger's line forks into "Split path 1, 2, …". Path 1 is
+     slots.next, the rest live in `parallel` (null = empty path, shows a "+"). */
+  const trigPaths = n => [n.slots.next || null].concat(n.parallel || []);
+  const isSplitT = n => !!n && n.type === 'trigger' && (n.parallel || []).length > 0;
+  function setPaths(t, P){
+    if(P[0]) t.slots.next = P[0]; else delete t.slots.next;
+    t.parallel = P.slice(1);                 // one path left → a plain flow again, no labels
+  }
   /* single-output steps: Trigger, a branch path, and Send an Email */
   const isChain = n => n.type === 'trigger' || n.type === 'lane' || n.type === 'email';
-  const canParallel = isChain;
+  const canParallel = n => n.type === 'trigger';   // splits only fork from the Trigger
 
   /* ports = output connection points of a node, in top→bottom order */
   function portsOf(n){
@@ -526,7 +553,7 @@
       list.push({ key:id, n });
       portsOf(n).forEach(p => { const cid = n.slots[p.key]; if(cid) walk(cid); });
       if(n.type === 'branch') n.lanes.forEach(walk);
-      (n.parallel || []).forEach(walk);
+      (n.parallel || []).filter(Boolean).forEach(walk);
     })(rootId);
 
     // 1. inner HTML + class
@@ -566,6 +593,7 @@
        horizontal maps main→x, cross→y. Cards themselves never rotate: only
        where they land on the canvas changes. */
     const LANE_GAP = 56, LANE_DY = 118, BUS_DY = 52, CARD_W = 250;
+    const SPLIT_DY = 240, SPLIT_BUS = 60;              // Trigger → split paths: room for the "+" and the tags
     const horiz = axis === 'h';
     const mSize = k => horiz ? CARD_W : els[k].offsetHeight;
     const cHalf = k => horiz ? els[k].offsetHeight / 2 : CARD_W / 2;
@@ -614,10 +642,10 @@
        Is True / Is False (each holding whatever node was added there, or nothing yet) */
     /* a trigger / branch path fans out only once there is more than one thing to
        draw: parallel kids, or one kid plus the dashed slot offered while selected */
-    const showPar = n => canParallel(n) && n.slots.next && selId === n.id;
-    function chainFans(n){ return kidsOf(n).length > 1 || !!showPar(n); }
+    const showPar = () => false;                       // the old "Add parallel node" box is gone
+    function chainFans(n){ return isSplitT(n); }
     function laneItems(n){
-      if(canParallel(n)) return kidsOf(n).map(id => ({ id })).concat(showPar(n) ? [{ par:true }] : []);
+      if(canParallel(n)) return trigPaths(n).map((id, i) => id ? { id, i } : { empty:true, i });
       return n.lanes.map(id => ({ id })).concat([{ pending:true }]);
     }
     function laneWidths(n){
@@ -656,21 +684,20 @@
         /* parallel nodes: one line splits, the nodes sit side by side under it.
            myCross is this card's own top-left edge, not its centre — the row
            must centre on the card's MIDDLE, so its own half-width goes in first. */
-        const w = laneWidths(n), rowMain = myMain + main + LANE_DY, mid = myCross + cHalf(key);
+        /* split paths: the trunk carries the Trigger's "+", then forks; every
+           path's "Split path N" tag sits on its own straight run, one column */
+        const w = laneWidths(n), rowMain = myMain + main + SPLIT_DY, mid = myCross + cHalf(key);
         w.items.forEach((it, i) => {
           const cross = mid - w.total / 2 + w.centres[i], pt = P(rowMain, cross);
           if(it.id){
-            /* pt is this item's CENTRE-line; a real card's own top-left corner
-               is that centre minus half ITS OWN cross-size — 125 always in
-               vertical mode, but the child's real height in horizontal mode */
             const cardPt = P(rowMain, cross - cHalf(it.id));
             bottom = Math.max(bottom, layout(it.id, cardPt.x, cardPt.y));
-            edges.push({ kind:'pfan', from:key, to:it.id, cx:cardPt.x, y:cardPt.y });
+            edges.push({ kind:'pfan', from:key, to:it.id, i:it.i });
           } else {
-            edges.push({ kind:'ppar', from:key, cx:pt.x, y:pt.y });
-            minX = Math.min(minX, pt.x - 125); maxX = Math.max(maxX, pt.x + 125);
-            minY = Math.min(minY, pt.y - 30); maxY = Math.max(maxY, pt.y + 44);
-            bottom = Math.max(bottom, rowMain + 44);
+            edges.push({ kind:'ppar', from:key, cx:pt.x, y:pt.y, i:it.i });
+            minY = Math.min(minY, pt.y - 30); maxY = Math.max(maxY, pt.y + 30);
+            maxX = Math.max(maxX, pt.x + 60 - 250 + 200);
+            bottom = Math.max(bottom, rowMain + 60);
           }
         });
         return bottom;
@@ -678,7 +705,7 @@
       if(isChain(n)){
         const c = n.slots.next;
         if(c){
-          const pt = P(myMain + main + 64, myCross);
+          const pt = P(myMain + main + (n.type === 'trigger' ? 96 : 64), myCross);
           bottom = layout(c, pt.x, pt.y);
           edges.push({ kind:'trig', from:key, to:c });
         }
@@ -808,7 +835,12 @@
       b.dataset.pid = pid; b.dataset.slot = slot;
       b.innerHTML = img('n-plus');
       b.style.left = x + 'px'; b.style.top = y + 'px';
-      b.addEventListener('click', ev => { ev.stopPropagation(); if(readOnly) return; slot === 'pending' ? openBranchType(pid) : openNodePicker(pid, slot); });
+      b.addEventListener('click', ev => {
+        ev.stopPropagation(); if(readOnly) return;
+        if(slot === 'pending') return openBranchType(pid);
+        if(nodes[pid].type === 'trigger' && slot === 'next') return triggerPlus();
+        openNodePicker(pid, slot);
+      });
       world.appendChild(b);
       return b;
     }
@@ -932,27 +964,34 @@
       dot.style.left = (from.x - 5) + 'px'; dot.style.top = (from.y - 4) + 'px'; world.appendChild(dot);
       const fan = edges.filter(e => (e.kind === 'pfan' || e.kind === 'ppar') && e.from === id);
       if(fan.length){
-        /* the split: one trunk, a "Parallel" tag on it, an elbow to each node */
-        const busPos = mOf(from) + BUS_DY;
+        /* split paths: the Trigger's "+" on the shared trunk, then one elbow per
+           path, each tagged "Split path N" at the same distance from the fork */
+        const busPos = mOf(from) + SPLIT_BUS;
+        const tp = P(mOf(from) + SPLIT_BUS / 2 + 3, cOf(from));
+        plusBtn(id, 'next', tp.x - 10, tp.y - 10, 'a split path');
         fan.forEach(e => {
-          if(e.kind === 'pfan'){ const to = entry(e.to); svg += elbow(start.x, start.y, to.x, to.y, busPos, false, true); return; }
-          svg += elbow(start.x, start.y, e.cx, e.y, busPos, false, false);
-          const slot = document.createElement('button');
-          slot.type = 'button'; slot.className = 'par-slot' + (picking && picking.parentId === id && picking.slot === 'par' ? ' on' : '');
-          slot.dataset.pid = id; slot.dataset.slot = 'par';
-          slot.innerHTML = img('plus-square') + '<span>Add parallel node</span>';
-          /* a fixed 250×~40 box that never rotates: centre it on the CROSS
-             coordinate (its own width in vertical mode, its own height in
-             horizontal), flush against the MAIN coordinate on the other axis */
-          { const lt = horiz ? { x:e.cx, y:e.y - 20 } : { x:e.cx - 125, y:e.y };
-            slot.style.left = lt.x + 'px'; slot.style.top = lt.y + 'px'; }
-          slot.addEventListener('click', ev => { ev.stopPropagation(); if(readOnly) return; openNodePicker(id, 'par'); });
-          world.appendChild(slot);
+          const tgt = e.kind === 'pfan' ? entry(e.to) : { x:e.cx, y:e.y };
+          svg += elbow(start.x, start.y, tgt.x, tgt.y, busPos, false, e.kind === 'pfan');
+          const lab = document.createElement('div');
+          lab.className = 'elabel'; lab.style.transform = 'translateY(-50%)';
+          lab.textContent = 'Split path ' + (e.i + 1);
+          const labPt = P(busPos + 22, cOf(tgt));
+          lab.style.left = labPt.x + 'px'; lab.style.top = labPt.y + 'px'; world.appendChild(lab);
+          /* hovering a path's tag reveals its delete — removes the path and its steps */
+          if(!readOnly){
+            const hot = document.createElement('div');
+            hot.className = 'edge-hot sp'; hot.dataset.pid = id; hot.dataset.slot = 'p' + e.i;
+            hot.style.left = (labPt.x - 6) + 'px'; hot.style.top = labPt.y + 'px';
+            hot.style.width = (lab.offsetWidth + 42) + 'px';
+            hot.innerHTML = `<div class="edge-ctl"><button class="ec del" data-a="del" aria-label="Delete Split path ${e.i + 1}" data-tip="Delete this split path">${img('n-act-delete')}</button></div>`;
+            hot.addEventListener('click', ev => { ev.stopPropagation(); if(ev.target.closest('[data-a]')) removePath(id, e.i); });
+            world.appendChild(hot);
+          }
+          if(e.kind === 'pfan') return;
+          /* an empty path: its "+" adds the first node */
+          plusBtn(id, 'p' + e.i, tgt.x, tgt.y - 10, 'Split path ' + (e.i + 1));
+          maxX = Math.max(maxX, tgt.x + 30);
         });
-        const tagPt = P(mOf(from) + 26, cOf(from));
-        const tag = document.createElement('div');
-        tag.className = 'elabel par'; tag.textContent = 'Parallel';
-        tag.style.left = tagPt.x + 'px'; tag.style.top = tagPt.y + 'px'; world.appendChild(tag);
         return;
       }
       if(n.slots.next){
@@ -965,7 +1004,8 @@
           svg += `<path class="edge" data-ekey="${ekey}" d="M${start.x} ${start.y} C${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${to.x} ${to.y}" marker-end="url(#wf-arrow)"/>`;
         }
         const midPt = P((mOf(start) + mOf(to)) / 2, (cOf(start) + cOf(to)) / 2);
-        edgeControls(id, 'next', kid, midPt.x, midPt.y, horiz ? 'h' : 'v', ekey);
+        if(n.type === 'trigger') plusBtn(id, 'next', midPt.x - 10, midPt.y - 10, 'after the trigger');   // always there
+        else edgeControls(id, 'next', kid, midPt.x, midPt.y, horiz ? 'h' : 'v', ekey);
       } else {
         const stubEnd = P(mOf(start) + 32, cOf(start));
         svg += `<path class="edge" d="M${start.x} ${start.y} L${stubEnd.x} ${stubEnd.y}"/>`;
@@ -1194,9 +1234,14 @@
     if(btn) panIntoView(btn, toSide ? { left:170, right:650, top:150, bottom:210 }
                                     : { left:170, right:170, top:140, bottom:200 });
     const restore = selId;
+    const par = nodes[parentId];
+    const mode = par.type === 'trigger' && slot === 'next'
+      ? (isSplitT(par) ? 'only' : par.slots.next ? 'offer' : 'first') : 'first';
+    const CAT = catalogFor(mode), FLAT = flatFor(mode);
     const port = allPortsOf(nodes[parentId]).find(p => p.key === slot);
     closeDrawer();                                   // the drawer always steps aside for the picker
-    const rootTitle = slot === 'par' ? 'Add a parallel node' : insert ? 'Insert a step here'
+    const rootTitle = mode === 'only' ? 'Add a split path' : /^p\d+$/.test(slot) ? 'Split path ' + (+slot.slice(1) + 1) + ' starts with'
+      : slot === 'par' ? 'Add a parallel node' : insert ? 'Insert a step here'
       : port && port.label ? 'What happens on “' + port.label + '”' : 'What happens next';
     /* Levels replace each other in place. WFPop.open closes whatever is open
        first, which would otherwise read as "cancelled" and put the drawer back —
@@ -1206,7 +1251,7 @@
     function openLevel(items, title, back){
       navigating = true;
       WFPop.open({
-      anchor: insert ? insertAnchor(parentId, slot) : plusAnchor(parentId, slot),
+      anchor: insert && par.type !== 'trigger' ? insertAnchor(parentId, slot) : plusAnchor(parentId, slot),
       /* follow the connector: the trigger's line runs down, so the menu drops
          below it; a port's line runs right, so the menu opens off its end */
       side: 'bottom',
@@ -1214,14 +1259,22 @@
       back,
       wide: true,
       searchPlaceholder: 'Search actions, conditions, or modules…',
-      items: (tab, q) => (q && !back) ? FLAT_CATALOG : items,
+      items: (tab, q) => (q && !back) ? FLAT : items,
       helpEyebrow: 'Node',
       help: { title:'Node Selection', body:'Pick the step that runs next in your workflow.', more:DOC },
       onPick(item){
         const kids = SUBMENUS[item.id];
         if(kids){                                    // drill in rather than commit
-          openLevel(kids, item.label, () => openLevel(NODE_CATALOG, rootTitle, null));
+          openLevel(kids, item.label, () => openLevel(CAT, rootTitle, null));
           return true;
+        }
+        if(item.id === 'split'){
+          /* no card: the existing flow becomes Split path 1 and an empty path is added */
+          picking = null;
+          par.parallel = (par.parallel || []).concat(null);
+          render();
+          if(restore && nodes[restore]) selectNode(restore);
+          return;
         }
         const make = item.make;
         if(!make || !IMPLEMENTED[make]){ toast(item.label + ' is not designed yet'); return true; }
@@ -1239,7 +1292,8 @@
           nodes[old].parent = host.id;
           nodes[old].source = TYPE_LABEL[node.type];
         }
-        if(slot === 'par'){ const p = nodes[parentId]; p.parallel = (p.parallel || []).concat(node.id); }   // runs alongside the others
+        if(/^p\d+$/.test(slot)){ const P = trigPaths(par); P[+slot.slice(1)] = node.id; setPaths(par, P); }   // an empty split path gets its first node
+        else if(slot === 'par'){ const p = nodes[parentId]; p.parallel = (p.parallel || []).concat(node.id); }   // runs alongside the others
         else nodes[parentId].slots[slot] = node.id;
         selId = node.id;
         render();
@@ -1253,7 +1307,34 @@
       });
       navigating = false;
     }
-    openLevel(NODE_CATALOG, rootTitle, null);
+    openLevel(CAT, rootTitle, null);
+  }
+
+  /* The Trigger's "+" is always on its line: first time → the plain menu; once
+     steps exist → the menu with Split path (anything else is inserted in
+     between); once split → only Split path, which adds another path. */
+  function triggerPlus(){
+    const t = nodes[rootId];
+    openNodePicker(rootId, 'next', { insert:!!t.slots.next && !isSplitT(t) });
+  }
+  /* delete one split path (and every step in it); asks first if it has steps.
+     One path left → it's a plain flow again. */
+  function removePath(tid, i, confirmed){
+    const t = nodes[tid], P = trigPaths(t), cid = P[i];
+    if(cid && !confirmed){
+      const k = 1 + stepsBelow(cid);
+      confirmDialog({
+        title: 'Delete Split path ' + (i + 1) + '?',
+        body: 'This split path and the ' + k + ' step' + (k > 1 ? 's' : '') + ' in it will be deleted. You can undo this right after.',
+        confirmLabel: 'Delete split path',
+        onConfirm: () => removePath(tid, i, true)
+      });
+      return;
+    }
+    P.splice(i, 1); setPaths(t, P);
+    if(cid) dropSubtree(cid);
+    if(selId && !nodes[selId]) selId = null;
+    render();
   }
 
 
@@ -1371,6 +1452,12 @@
   /* One "Next Node Selection" row per output port: a dashed add-row when the slot
      is free, the child's name when it is taken. */
   function nextRowsHTML(n){
+    if(isSplitT(n)){
+      const row = (label, body) => `<div class="nns-branch" style="position:relative;width:100%;max-width:none"><div class="nns-branch-label">${label}</div>${body}</div>`;
+      return trigPaths(n).map((cid, i) => row('Split path ' + (i + 1), cid
+        ? `<a class="nns-add filled" data-goto="${cid}"><img src="assets/n-trig-blue.svg" alt=""><span>${esc(nodes[cid].title || TYPE_LABEL[nodes[cid].type])}</span></a>`
+        : `<a class="nns-add" data-slot="p${i}"><img src="assets/plus-square.svg" alt=""><span>Select next block</span></a>`)).join('');
+    }
     if(canParallel(n) && kidsOf(n).length){
       /* the chain's rows: every node that follows (the first, then its parallel
          siblings), then the dashed slot to add one more alongside them */
@@ -2344,7 +2431,7 @@
   function dropSubtree(id){
     const n = nodes[id]; if(!n) return;
     Object.values(n.slots).forEach(dropSubtree);
-    (n.parallel || []).forEach(dropSubtree);
+    (n.parallel || []).filter(Boolean).forEach(dropSubtree);
     delete nodes[id];
   }
   function removeNode(id, confirmed){
@@ -2369,10 +2456,10 @@
       }
       parent.lanes.splice(parent.lanes.indexOf(id), 1);
     }
+    const P0 = isSplitT(parent) ? trigPaths(parent) : null;
     Object.keys(parent.slots).forEach(k => { if(parent.slots[k] === id) delete parent.slots[k]; });
-    if(parent.parallel) parent.parallel = parent.parallel.filter(k => k !== id);
-    /* if the first node went and parallel siblings remain, the next one steps up */
-    if(!parent.slots.next && parent.parallel && parent.parallel.length) parent.slots.next = parent.parallel.shift();
+    /* a split path's first node going removes that path; one path left → plain flow */
+    if(P0 && P0.includes(id)){ P0.splice(P0.indexOf(id), 1); setPaths(parent, P0); }
     dropSubtree(id);
     selId = null; selectNode(parent.id);
   }
@@ -2381,8 +2468,11 @@
     const n = nodes[id]; if(!n || !n.parent) return;
     const parent = nodes[n.parent];
     let slot = Object.keys(parent.slots).find(k => parent.slots[k] === id);
+    /* replacing a split path's first node keeps the path, empty, and refills it */
+    if(isSplitT(parent) && trigPaths(parent).includes(id)){
+      const P = trigPaths(parent), i = P.indexOf(id); P[i] = null; setPaths(parent, P); slot = 'p' + i;
+    }
     Object.keys(parent.slots).forEach(k => { if(parent.slots[k] === id) delete parent.slots[k]; });
-    if(parent.parallel && parent.parallel.includes(id)){ parent.parallel = parent.parallel.filter(k => k !== id); slot = 'par'; }
     dropSubtree(id);
     selId = parent.id; render();
     openNodePicker(parent.id, slot);

@@ -1,0 +1,263 @@
+/* ============================================================================
+   Loading skeletons — one per view, because the two views read differently.
+
+   Node view  = horizontal: node cards left → right with connectors, the shine
+                sweeps sideways and a soft pulse travels along the lines.
+   Linear view = vertical: the sentence rail top → bottom, the shine sweeps
+                downward and a pulse runs down the rail.
+
+   No loading text anywhere (a screen-reader-only label only). Each skeleton
+   sits exactly where the real content lands, so the hand-over is a cross-fade,
+   not a jump. Add ?skeleton=hold to the URL to keep both on screen for review.
+   ========================================================================== */
+:root{
+  --sk-base:#e9eef4;            /* neutral bone */
+  --sk-deep:#dfe6ee;            /* "filled blank" bone — a word the admin picked */
+  --sk-soft:#f0f3f7;            /* filler-word bone */
+  --sk-line:#e1e7ee;            /* connectors / rail */
+  --sk-card:#ffffff;
+  --sk-border:#e7ebf1;
+  --sk-shine:rgba(255,255,255,.85);
+  --sk-pulse:rgba(61,139,208,.28);
+}
+.sk-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+/* every bone shares ONE shine: the highlight layer is fixed to the viewport, so
+   a single wave crosses all bones together instead of each blinking alone */
+.sk{
+  display:block;border-radius:6px;background-color:var(--sk-base);
+  background-repeat:no-repeat;background-attachment:fixed;
+}
+.sk.deep{background-color:var(--sk-deep);}
+.sk.soft{background-color:var(--sk-soft);}
+
+/* ------------------------------------------------------------ Node view */
+.nskel{
+  position:absolute;inset:0;z-index:30;overflow:hidden;
+  background-color:#f7f9fb;
+  background-image:radial-gradient(#d8e0ea 1.3px, transparent 1.3px);
+  background-size:22px 22px;
+  transition:opacity .35s cubic-bezier(.4,0,.2,1);
+}
+.nskel .sk{
+  background-image:linear-gradient(100deg,transparent 0,var(--sk-shine) 50%,transparent 100%);
+  background-size:38vw 100%;background-position:-40vw 0;
+  animation:skSweepX 1.7s cubic-bezier(.45,.05,.55,.95) infinite;
+}
+@keyframes skSweepX{to{background-position:140vw 0;}}
+/* the flow is centred in the canvas (its drawing spans 1342 x 290, from y 107) */
+.ns-flow{position:absolute;left:max(24px,calc(50% - 671px));top:calc(50% - 252px);width:1342px;height:420px;}
+.ns-lines{position:absolute;left:0;top:0;overflow:visible;}
+.ns-lines .base{fill:none;stroke:var(--sk-line);stroke-width:1.5;}
+.ns-lines .pulse{fill:none;stroke:var(--sk-pulse);stroke-width:2;stroke-linecap:round;
+  stroke-dasharray:26 900;stroke-dashoffset:26;animation:skFlow 2.4s cubic-bezier(.4,0,.2,1) infinite;}
+.ns-lines .pulse.d2{animation-delay:.45s;}
+.ns-lines .pulse.d3{animation-delay:.9s;}
+@keyframes skFlow{to{stroke-dashoffset:-420;}}
+.ns-lines .dot{fill:#fff;stroke:var(--sk-line);stroke-width:1.5;}
+.ns-node{position:absolute;width:250px;animation:skInX .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:var(--d,0s);}
+@keyframes skInX{from{opacity:0;transform:translateX(-10px);}}
+.ns-pill{width:var(--w,58px);height:23px;border-radius:12px;margin-bottom:6px;}
+.ns-card{background:var(--sk-card);border:1px solid var(--sk-border);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:10px;}
+.ns-top{display:flex;align-items:center;gap:8px;}
+.ns-ico{width:24px;height:24px;border-radius:6px;flex-shrink:0;}
+.ns-row{display:flex;align-items:center;gap:8px;}
+.ns-chip{height:18px;border-radius:9px;flex-shrink:0;}
+.ns-bar{height:28px;border-radius:6px;flex:1;}
+.ns-plus{position:absolute;width:20px;height:20px;border-radius:4px;background:#fff;border:1.25px solid var(--sk-line);}
+.ns-tag{position:absolute;width:44px;height:18px;border-radius:8px;}
+
+/* ------------------------------------------------------------ Linear view
+   Darker bones, a 2px rail and real shapes (text lines, L-shaped branch lines,
+   step cards with their Set up button, Add step pills) so it reads clearly on
+   the light canvas instead of blending into it. */
+.lskel{
+  --sk-base:#e9eef4; --sk-deep:#dfe6ee; --sk-soft:#f0f3f7; --sk-line:#dbe2ea;
+  /* the wave DARKENS bones a touch instead of washing them white, so they never vanish into the canvas */
+  --sk-shine:rgba(110,140,175,.2); --sk-pulse:rgba(61,139,208,.4);
+  position:absolute;inset:0;overflow:hidden;
+  display:flex;align-items:safe center;justify-content:center;padding:20px 24px 66px;
+  background-color:#f7f9fb;
+  background-image:radial-gradient(#dde3ea 1px, transparent 1.2px);
+  background-size:18px 18px;
+  transition:opacity .35s cubic-bezier(.4,0,.2,1);
+}
+.lskel .sk{
+  background-image:linear-gradient(180deg,transparent 0,var(--sk-shine) 50%,transparent 100%);
+  background-size:100% 22vh;background-position:0 -24vh;
+  animation:skSweepY 1.8s cubic-bezier(.45,.05,.55,.95) infinite;
+}
+@keyframes skSweepY{to{background-position:0 132vh;}}
+/* centred in the view, both ways */
+.ls-col{position:relative;width:min(480px,100%);flex-shrink:0;}
+/* the main rail, with a soft pulse running down it */
+.ls-seg{position:relative;}
+.ls-seg::before{content:'';position:absolute;left:9px;top:18px;bottom:0;width:2px;border-radius:1px;background:var(--sk-line);}
+.ls-col::after{content:'';position:absolute;left:8px;top:18px;width:4px;height:80px;border-radius:2px;
+  background:linear-gradient(180deg,transparent,var(--sk-pulse),transparent);animation:skRail 2.6s cubic-bezier(.4,0,.2,1) infinite;}
+@keyframes skRail{from{transform:translateY(0);opacity:0;}15%{opacity:1;}85%{opacity:1;}to{transform:translateY(400px);opacity:0;}}
+
+.ls-row{position:relative;display:flex;align-items:flex-start;animation:skInY .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:var(--d,0s);}
+@keyframes skInY{from{opacity:0;transform:translateY(-8px);}}
+.ls-mk{position:relative;z-index:1;width:20px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.ls-mk i{display:block;box-shadow:0 0 0 4px #f7f9fb;}
+.ls-mk .ring{width:13px;height:13px;border-radius:50%;border:2.5px solid #d3dbe4;background:#fff;}
+.ls-mk .dia{width:10px;height:10px;border-radius:2px;transform:rotate(45deg);background:#d5dde6;}
+.ls-mk .dot{width:10px;height:10px;border-radius:50%;background:#d5dde6;}
+.ls-mk .chev{width:12px;height:12px;border-radius:3px;background:var(--sk-deep);}
+.ls-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;margin-left:16px;padding-top:6px;}
+.ls-line{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+/* badges are plain grey pills (user 2026-11-05: no green / yellow) — their widths still hint at the step type */
+.ls-bdg{height:22px;border-radius:5px;flex-shrink:0;}
+.ls-bdg.when{width:48px;}
+.ls-bdg.if{width:68px;}
+.ls-bdg.then{width:48px;}
+.ls-bdg.and{width:42px;}
+.ls-bdg.join{width:38px;}
+.ls-bdg.other{width:86px;}
+.ls-w{height:14px;border-radius:7px;}
+.ls-sub{height:9px;border-radius:5px;}
+.ls-gap{height:30px;}
+.ls-gap.s{height:14px;}
+/* a step card: icon, two text lines and its "Set up ›" button */
+.ls-card{margin:12px 0 0 36px;width:min(430px,calc(100% - 36px));height:58px;background:#fff;border:1px solid #e7ebf1;border-radius:10px;
+  display:flex;align-items:center;gap:12px;padding:0 12px 0 14px;
+  animation:skInY .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:var(--d,0s);}
+.ls-card .ico{width:30px;height:30px;border-radius:8px;flex-shrink:0;}
+.ls-card .tx{flex:1;display:flex;flex-direction:column;gap:7px;}
+.ls-cta{display:flex;align-items:center;gap:5px;height:28px;padding:0 9px;border-radius:7px;background:#eef2f6;flex-shrink:0;}
+.ls-cta .sk{height:10px;border-radius:5px;background-color:#dfe6ee;}
+.ls-cta .chv{width:6px;height:6px;border-right:2px solid #cfd8e2;border-top:2px solid #cfd8e2;transform:rotate(45deg);margin-left:1px;}
+/* "Add step" pill at the end of a path */
+.ls-add{display:flex;align-items:center;gap:8px;height:30px;margin:14px 0 0 30px;padding:0 12px 0 8px;width:max-content;
+  border:1.5px dashed #dbe2ea;border-radius:8px;background:rgba(255,255,255,.7);animation:skInY .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:var(--d,0s);}
+.ls-add .pl{width:16px;height:16px;border-radius:50%;border:1.5px solid #cfd8e2;position:relative;}
+.ls-add .pl::before,.ls-add .pl::after{content:'';position:absolute;left:50%;top:50%;width:8px;height:1.5px;background:#cfd8e2;transform:translate(-50%,-50%);}
+.ls-add .pl::after{transform:translate(-50%,-50%) rotate(90deg);}
+.ls-add .sk{height:10px;width:62px;}
+.ls-lname{width:66px;height:10px;border-radius:5px;}
+.ls-count{width:44px;height:16px;border-radius:8px;}
+/* IF / Else: each branch hangs off the rail on an L-shaped line */
+.ls-br{position:relative;padding-left:52px;}
+.ls-lane{position:relative;}
+.ls-lane::before{content:'';position:absolute;left:-43px;top:-14px;width:47px;height:31px;border-left:2px solid var(--sk-line);border-bottom:2px solid var(--sk-line);border-bottom-left-radius:10px;}
+.ls-lane:not(:last-child)::after{content:'';position:absolute;left:-43px;top:-14px;bottom:-22px;border-left:2px solid var(--sk-line);}
+.ls-lane .ls-rail{position:absolute;left:9px;top:17px;bottom:15px;width:2px;border-radius:1px;background:var(--sk-line);}
+.ls-lane+.ls-lane{margin-top:22px;}
+.ls-bar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);height:42px;width:min(410px,calc(100% - 32px));
+  background:#fff;border:1px solid #e7ebf1;border-radius:12px;
+  display:flex;align-items:center;gap:12px;padding:0 14px;}
+.ls-bar .sk{height:14px;border-radius:4px;}
+
+/* hand-over: the Linear frame fades in over its skeleton */
+.linear-view.ready .lskel{opacity:0;pointer-events:none;}
+/* review mode — the top bar's Skeleton button, or ?skeleton=hold — keeps the skeleton on screen */
+.skel-hold .nskel,.skel-hold .nskel[hidden]{display:block !important;opacity:1 !important;}
+.skel-btn[aria-pressed="true"]{border-color:rgba(61,139,208,.45);background:#eef5fc;color:#3d8bd0;}
+.skel-hold .linear-view iframe{opacity:0 !important;pointer-events:none;}
+.skel-hold .linear-view .lskel{opacity:1 !important;}
+
+@media (prefers-reduced-motion:reduce){
+  .nskel .sk,.lskel .sk,.ns-lines .pulse,.ls-col::after,.ns-node,.ls-row,.ls-card,.ls-add{animation:none !important;}
+  .ns-lines .pulse,.ls-col::after{display:none;}
+}
+
+/* ============================================================================
+   Version 2 — step by step (user 2026-11-05; top bar Skeleton switch, html.skel-v2).
+   Version 1 above is untouched. Here the workflow builds itself one node at a
+   time: the connector draws in blue up to the next node, that node fades in, the
+   line settles to grey, then the next one follows. When it's complete it holds,
+   fades and starts again. Driven by workflow-skeleton.js (adds .is-on / .is-live).
+   ========================================================================== */
+.sk-reset,.sk-reset *,.sk-reset::after{transition:none !important;}
+.skel-v2 .ns-flow,.skel-v2 .ls-col{transition:opacity .3s ease;}
+.skel-v2 .ns-flow.skel-fade,.skel-v2 .ls-col.skel-fade{opacity:0;}
+/* Node view: nodes / + / tags wait their turn; lines draw from start to end */
+.skel-v2 .ns-node{animation:none;opacity:0;transform:translateX(-8px);transition:opacity .22s ease-out,transform .3s cubic-bezier(.2,.7,.2,1);}
+.skel-v2 .ns-plus,.skel-v2 .ns-tag{opacity:0;transform:scale(.85);transition:opacity .22s ease-out,transform .26s cubic-bezier(.2,.7,.2,1);}
+.skel-v2 .ns-lines .pulse{display:none;}
+.skel-v2 .ns-lines .base{stroke-dasharray:var(--len,600px) var(--len,600px);stroke-dashoffset:var(--len,600px);
+  transition:stroke-dashoffset var(--dur,300ms) cubic-bezier(.45,.05,.4,1),stroke .7s ease,stroke-width .7s ease;}   /* --dur: set per line, so every line draws at the same speed */
+.skel-v2 .ns-lines .base.is-on{stroke-dashoffset:0;}
+.skel-v2 .ns-lines .base.is-live{stroke:#3d8bd0;stroke-width:2;}
+.skel-v2 .ns-lines .dot{opacity:0;transition:opacity .18s ease;}
+/* Linear view: the column is revealed top → bottom, so rails and branch lines grow with it */
+.skel-v2 .ls-col{clip-path:inset(-20px -60px calc(100% - var(--rv,0px)) -60px);transition:clip-path .2s cubic-bezier(.4,0,.2,1),opacity .3s ease;}
+.skel-v2 .ls-row,.skel-v2 .ls-card,.skel-v2 .ls-add{animation:none;opacity:0;transform:translateY(-6px);transition:opacity .2s ease-out,transform .24s cubic-bezier(.2,.7,.2,1);}
+/* the blue line: the rail's growing tip, ending at the step being added */
+.skel-v2 .ls-col::after{animation:none;opacity:0;width:2px;height:58px;border-radius:1px;transform:none;
+  left:calc(var(--tx,10px) - 1px);top:calc(var(--ty,0px) - 58px);background:linear-gradient(180deg,rgba(61,139,208,0),#3d8bd0);
+  transition:top .2s cubic-bezier(.4,0,.2,1),left .2s cubic-bezier(.4,0,.2,1),opacity .2s ease;}
+.skel-v2 .ls-col.is-drawing::after{opacity:1;}
+/* shown */
+.skel-v2 .is-on{opacity:1 !important;transform:none !important;}
+@media (prefers-reduced-motion:reduce){
+  .skel-v2 .ls-col{clip-path:none;}
+  .skel-v2 .ns-node,.skel-v2 .ns-plus,.skel-v2 .ns-tag,.skel-v2 .ns-lines .dot,.skel-v2 .ls-row,.skel-v2 .ls-card,.skel-v2 .ls-add{opacity:1;transform:none;}
+  .skel-v2 .ns-lines .base{stroke-dashoffset:0;}
+}
+
+/* ============================================================================
+   Skeleton 3 · New workflow and 4 · Loader (user 2026-11-05; html.skel-v3 / .skel-v4).
+   3: a brand-new workflow has only its trigger, so the skeleton is just that
+      one step plus the empty spot for the first step.
+   4: not a skeleton — a small workflow that "runs": each node's outline turns
+      blue as the blue line reaches it, then it all settles and starts again.
+   Grey everywhere; blue only for the line and what it has reached.
+   ========================================================================== */
+.ns-one,.ns-load,.ls-one,.ls-load{display:none;}
+.skel-v3 .nskel .ns-flow,.skel-v4 .nskel .ns-flow{display:none;}
+.skel-v3 .nskel .ns-one{display:block;}
+.skel-v4 .nskel .ns-load{display:flex;}
+.skel-v3 .lskel .ls-col:not(.ls-one),.skel-v4 .lskel .ls-col,.skel-v4 .lskel .ls-bar{display:none;}
+.skel-v3 .lskel .ls-one{display:block;}
+.skel-v4 .lskel .ls-load{display:block;}
+
+/* 3 · New workflow */
+.ns-one{position:absolute;left:calc(50% - 200px);top:calc(50% - 70px);width:400px;height:140px;}
+.ns-one .ns-lines .pulse{stroke-dasharray:26 300;animation-duration:1.8s;}
+.ns-next{position:absolute;left:322px;top:56px;width:22px;height:22px;border-radius:6px;border:1.5px dashed #cfd8e2;background:#fff;
+  animation:skInX .5s cubic-bezier(.2,.7,.2,1) .12s both;}
+.ns-next i::before,.ns-next i::after{content:'';position:absolute;left:50%;top:50%;width:9px;height:1.5px;border-radius:1px;background:#c3cdd8;transform:translate(-50%,-50%);}
+.ns-next i::after{transform:translate(-50%,-50%) rotate(90deg);}
+.ls-one::after{display:none;}
+.ls-one .ls-seg::before{bottom:-14px;}
+
+/* 4 · Loader */
+.ns-load{position:absolute;inset:0;align-items:center;justify-content:center;}
+.ld-ln{fill:none;stroke:#dfe6ee;stroke-width:1.5;}
+.ld-run{fill:none;stroke:#3d8bd0;stroke-width:2;stroke-linecap:round;stroke-dasharray:100 100;stroke-dashoffset:100;}
+.ld-nd{color:#dfe6ee;}
+.ld-nd .bx{fill:#fff;stroke:currentColor;stroke-width:1.5;}
+.ld-nd .b{fill:#e9eef4;}
+/* Node view: trigger → IF / Else → its two paths (2.6s a round) */
+.ns-load .n1{animation:ldNa 2.6s ease-in-out infinite;}
+.ns-load .n2{animation:ldNb 2.6s ease-in-out infinite;}
+.ns-load .n3{animation:ldNc 2.6s ease-in-out infinite;}
+.ns-load .r1{animation:ldRa 2.6s cubic-bezier(.45,.05,.4,1) infinite;}
+.ns-load .r2{animation:ldRb 2.6s cubic-bezier(.45,.05,.4,1) infinite;}
+@keyframes ldNa{0%{color:#dfe6ee}6%,78%{color:#3d8bd0}90%,100%{color:#dfe6ee}}
+@keyframes ldNb{0%,24%{color:#dfe6ee}30%,78%{color:#3d8bd0}90%,100%{color:#dfe6ee}}
+@keyframes ldNc{0%,50%{color:#dfe6ee}56%,78%{color:#3d8bd0}90%,100%{color:#dfe6ee}}
+@keyframes ldRa{0%,8%{stroke-dashoffset:100;opacity:1}26%,78%{stroke-dashoffset:0;opacity:1}90%{stroke-dashoffset:0;opacity:0}100%{stroke-dashoffset:100;opacity:0}}
+@keyframes ldRb{0%,32%{stroke-dashoffset:100;opacity:1}52%,78%{stroke-dashoffset:0;opacity:1}90%{stroke-dashoffset:0;opacity:0}100%{stroke-dashoffset:100;opacity:0}}
+/* Linear view: down the rail — trigger → condition → action (2.4s a round) */
+.ls-load{position:relative;flex-shrink:0;}
+.ls-load .n1{animation:ldLa 2.4s ease-in-out infinite;}
+.ls-load .n2{animation:ldLb 2.4s ease-in-out infinite;}
+.ls-load .n3{animation:ldLc 2.4s ease-in-out infinite;}
+.ls-load .r1{animation:ldLr1 2.4s cubic-bezier(.45,.05,.4,1) infinite;}
+.ls-load .r2{animation:ldLr2 2.4s cubic-bezier(.45,.05,.4,1) infinite;}
+@keyframes ldLa{0%{color:#dfe6ee}6%,80%{color:#3d8bd0}92%,100%{color:#dfe6ee}}
+@keyframes ldLb{0%,28%{color:#dfe6ee}34%,80%{color:#3d8bd0}92%,100%{color:#dfe6ee}}
+@keyframes ldLc{0%,54%{color:#dfe6ee}60%,80%{color:#3d8bd0}92%,100%{color:#dfe6ee}}
+@keyframes ldLr1{0%,8%{stroke-dashoffset:100;opacity:1}30%,80%{stroke-dashoffset:0;opacity:1}92%{stroke-dashoffset:0;opacity:0}100%{stroke-dashoffset:100;opacity:0}}
+@keyframes ldLr2{0%,34%{stroke-dashoffset:100;opacity:1}56%,80%{stroke-dashoffset:0;opacity:1}92%{stroke-dashoffset:0;opacity:0}100%{stroke-dashoffset:100;opacity:0}}
+/* compact loaders: a lit step gets a soft blue fill as well as its outline */
+.ld-nd .bx{fill:color-mix(in srgb,currentColor 12%,#fff);stroke-width:1.75;}
+.ld-run{stroke-width:1.75;}
+.ld-ln{stroke-width:1.75;}
+@media (prefers-reduced-motion:reduce){
+  .ld-nd,.ld-run,.ns-next{animation:none !important;}
+  .ld-run{stroke-dashoffset:0;}
+}

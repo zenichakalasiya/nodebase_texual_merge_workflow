@@ -1013,3 +1013,388 @@ html.embed [data-nf="side"] [data-nf="fcell"]:has(+ [style*="1px solid var(--acc
 html.embed [data-nf="cbar"][data-rt]{padding:4px 8px 6px !important;}
 html.embed [data-nf="cbar"][data-rt] [data-nf="rte-row"], html.embed [data-nf="cbar"][data-rt] [data-nf="rte-bar"],
 html.embed [data-nf="cbar"][data-rt] [data-nf="rte-fmt"]{border-top:none !important;background:transparent !important;}
+
+/* 44 · Text field trial D (user 2026-10-22): type straight in the field; { } and f(x) sit top-right as two #eef2f6
+   squares, 4px from the edges (f(x) rightmost). f(x) opens the Dynamic drill only — while it's open the field's
+   border and f(x) turn blue and the { } hides. Yes / No shows its switch inside the field. */
+html.embed [data-nf="fxd-btns"] [data-nf="ph-btn"]{position:static !important;}
+html.embed [data-nf="fxd-fx"]{width:24px;height:24px;border-radius:4px;background:#eef2f6;border:none;color:#364658;cursor:pointer;}
+html.embed [data-nf="fxd-fx"]:not(:disabled):hover{background:#e2e8f0;}
+html.embed [data-nf="fxd-fx"][data-on]{background:#e3eefa;color:var(--accent);}
+html.embed [data-nf="fxd-fx"]:disabled{color:#b4c0cd;cursor:not-allowed;}
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + div[data-nf="txt-d"]{height:auto !important;min-height:32px !important;}
+html.embed [data-nf="txt-d"][data-multi] [data-nf="fxd-btns"]{top:4px !important;right:4px !important;}
+
+/* 45 · D's email / tag chip field (user 2026-10-22): the sidebar's generic value-cell button sizing (30px, 12.8px,
+   4px 11px padding) caught the "+N" button — that made it tall and pushed the first chip off-centre. Reset it to a
+   20px count pill, and let the field grow while editing (the value-cell rule pins div fields to 32px). */
+html.embed [data-nf="chip-d-more"]{height:20px !important;min-height:20px !important;padding:0 6px !important;font-size:11.5px !important;line-height:20px !important;}
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + div[data-nf="chip-d"]{height:auto !important;min-height:32px !important;}
+/* …the joined value cell has no border of its own, so the chip row fills the 31px above its bottom line and its values sit centred */
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + div[data-nf="chip-d"] > div:first-child{min-height:31px !important;}
+
+/* 46 · D's number / date / duration field (user 2026-10-22): the sidebar's value-cell input padding (4px 11px) and
+   11–12.8px sizes don't apply inside it — the field sets its own; no number spinner; the unit is a quiet chip */
+html.embed [data-nf="in-d"] input[data-nf="in-d-input"]{padding:0 !important;font-size:12.8px !important;height:100%;}
+html.embed [data-nf="in-d"] input[type=number]::-webkit-outer-spin-button,
+html.embed [data-nf="in-d"] input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+html.embed [data-nf="in-d"] input[type=number]{-moz-appearance:textfield;}
+html.embed [data-nf="in-d"] [data-nf="in-d-text"]{font-size:12.8px !important;}
+html.embed [data-nf="in-d"] [data-nf="in-d-unit"]{height:24px !important;min-height:24px !important;padding:0 6px 0 8px !important;font-size:12px !important;}
+html.embed [data-nf="side"] [data-nf="frow"] > [data-nf="fcell"] + div[data-nf="in-d"]{height:auto !important;min-height:32px !important;}
+
+/* 47 · Detached steps (user 2026-11-05) — the "Detached steps" concept, built into the Linear view.
+   The trash sits ON the line of a gap, above its +. Hovering it tints everything below red (that path only) and the
+   step above blue; clicking lifts those steps into a see-through stack on the right (no container background, glass
+   cards). Hover spreads the stack; a card opens its full summary + drawn flow with Attach… / Delete. Markup: DetachTray,
+   InsertZone and renderFlow in linear/index.html. */
+html.embed{ --dt-cut:#f6a59c; --dt-cut-bg:#fff4f3; --dt-src-bg:#eef5fc; --dt-ink:#1d2a3e; --dt-text:#364658; --dt-muted:#7b8fa5; --dt-faint:#8a99ab;
+  --dt-if:#b7791f; --dt-if-bg:#fdf3dc; --dt-then:#1f9d55; --dt-then-bg:#e4f5ea; --dt-split:#3d8bd0; --dt-split-bg:#e8f1fb;
+  --dt-merge:#7c5cd6; --dt-merge-bg:#f0ebfc; --dt-loop:#0e8aa6; --dt-loop-bg:#e2f6fa; --dt-wait:#64748b; --dt-wait-bg:#eef1f5;
+  --dt-ease:cubic-bezier(.4,0,.2,1); }
+
+/* the cut set (red) and the step above it (blue) */
+html.embed [data-nf="cutset"]{ --border2:var(--dt-cut); }
+html.embed [data-nf="cutset"] [data-nf="st-tint"]{ opacity:1 !important; background:var(--dt-cut-bg) !important; }
+html.embed [data-nf="cutsrc"] [data-nf="st-tint"]{ opacity:1 !important; background:var(--dt-src-bg) !important; box-shadow:inset 0 0 0 1px rgba(61,139,208,.3); }
+html.embed [data-nf="iz-hot"]{ --border2:#3d8bd0; }
+
+/* the trash on the line */
+html.embed [data-nf="dt-trash"]{ left:9px; top:2px; transform:translateX(-50%); width:18px; height:18px; border-radius:5px; z-index:4;   /* 18px like the +; the hovered gap is 72px in Linear so a clear gap opens above the + and its ring (user 2026-11-05) */
+  background:#fff; border:1px solid #e3e8ef; color:#f25c4e; box-shadow:0 1px 4px rgba(54,70,88,.14); cursor:pointer; }
+html.embed [data-nf="dt-trash"]:hover{ background:#fff4f3; border-color:rgba(242,92,78,.45); }
+html.embed [data-nf="dt-trash"][data-blocked]{ color:var(--dt-faint); cursor:not-allowed; }
+html.embed [data-nf="dt-trash"][data-blocked]:hover{ background:#fff; border-color:#e3e8ef; }
+html.embed [data-nf="dt-tip"]{ position:absolute; left:calc(100% + 8px); top:50%; transform:translateY(-50%); width:max-content; max-width:280px;
+  display:flex; flex-direction:column; gap:2px; padding:7px 10px; border-radius:8px; background:#14212d; color:#fff; font-size:11.5px; line-height:1.45;
+  font-weight:400; text-align:left; pointer-events:none; opacity:0; transition:opacity .12s; z-index:6; }
+html.embed [data-nf="dt-tip"] b{ font-weight:500; }
+html.embed [data-nf="dt-tip"] span{ color:#c9d6e3; }
+html.embed [data-nf="dt-trash"]:hover [data-nf="dt-tip"]{ opacity:1; transition-delay:.15s; }
+
+/* drop spots (Attach… or dragging a card) */
+html.embed [data-nf="dt-dropz"]{ height:44px; }
+html.embed [data-nf="dt-dropz"][data-end]{ height:48px; }
+html.embed [data-nf="dt-drop"]{ position:absolute; left:30px; right:16px; top:50%; transform:translateY(-50%); height:30px; display:flex; align-items:center; gap:7px;
+  padding:0 11px; border:1.5px dashed #3d8bd0; border-radius:8px; background:rgba(238,245,252,.94); color:#3d8bd0; font-size:12px; font-weight:500; cursor:pointer; text-align:left; }
+html.embed [data-nf="dt-drop"] span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.embed [data-nf="dt-drop"] svg{ flex-shrink:0; }
+html.embed [data-nf="dt-drop"]:not(:disabled):hover, html.embed [data-nf="dt-drop"][data-over], html.embed [data-nf="dt-drop"]:focus-visible{ background:#3d8bd0; color:#fff; border-style:solid; outline:none; }
+html.embed [data-nf="dt-drop"]:disabled{ border-color:#cfd8e3; color:var(--dt-faint); background:#fff; cursor:not-allowed; }
+
+/* the stack: no container background — only the cards are glass */
+html.embed [data-nf="dt-nc"]{ position:absolute; top:12px; width:340px; max-height:calc(100vh - 120px); display:flex; flex-direction:column; z-index:41;
+  font-family:'Inter',system-ui,sans-serif; transition:right .3s ease; }
+html.embed [data-nf="dt-nc"] .dt-h{ display:flex; align-items:center; gap:8px; padding:4px 2px 8px 6px; flex-shrink:0; }
+html.embed [data-nf="dt-nc"] .dt-ti{ flex:1; min-width:0; display:flex; align-items:baseline; gap:7px; }
+html.embed [data-nf="dt-nc"] .dt-ti b{ font-size:14px; font-weight:600; color:var(--dt-ink); }
+html.embed [data-nf="dt-nc"] .dt-ti small{ font-size:11.5px; color:var(--dt-muted); }
+html.embed [data-nf="dt-nc"] .dt-gbtn{ width:28px; height:28px; border-radius:50%; border:none; background:rgba(255,255,255,.7); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; padding:0; color:var(--dt-text); box-shadow:0 1px 3px rgba(29,42,62,.1); }
+html.embed [data-nf="dt-nc"] .dt-gbtn:hover{ background:#fff; }
+html.embed [data-nf="dt-nc"] .dt-backb{ height:28px; padding:0 10px 0 6px; border-radius:14px; border:none; background:rgba(255,255,255,.75); display:inline-flex; align-items:center; gap:4px;
+  cursor:pointer; font-size:12px; font-weight:500; color:var(--dt-ink); box-shadow:0 1px 3px rgba(29,42,62,.1); }
+html.embed [data-nf="dt-nc"] .dt-backb:hover{ background:#fff; }
+html.embed [data-nf="dt-nc"] .dt-body{ overflow:auto; padding:2px 2px 12px; flex:0 1 auto; min-height:0; scrollbar-width:none; }
+html.embed [data-nf="dt-nc"] .dt-body::-webkit-scrollbar{ display:none; }
+html.embed [data-nf="dt-nc"] .dt-stack{ position:relative; transition:height .35s var(--dt-ease); }
+html.embed [data-nf="dt-nc"] .dt-card{ position:absolute; left:0; right:0; top:0; border-radius:16px; padding:11px 12px; cursor:pointer; overflow:hidden; user-select:none; touch-action:none;
+  background:rgba(255,255,255,.16); -webkit-backdrop-filter:blur(1.5px); backdrop-filter:blur(1.5px);
+  border:1px solid rgba(255,255,255,.75); box-shadow:0 8px 24px -10px rgba(29,42,62,.22),inset 0 1px 0 rgba(255,255,255,.6);
+  transform-origin:50% 100%; transition:transform .38s var(--dt-ease),opacity .3s,height .38s var(--dt-ease),background .15s; }
+html.embed [data-nf="dt-nc"] .dt-card:hover{ background:rgba(255,255,255,.45); }
+html.embed [data-nf="dt-nc"] .dt-card:focus-visible{ outline:2px solid #3d8bd0; outline-offset:2px; }
+html.embed [data-nf="dt-nc"] .dt-card.behind{ background:rgba(255,255,255,.1); }
+html.embed [data-nf="dt-nc"] .dt-card.behind .dt-in{ opacity:0; }
+html.embed [data-nf="dt-nc"] .dt-stack.instant, html.embed [data-nf="dt-nc"] .dt-stack.instant .dt-card{ transition:none; }
+html.embed [data-nf="dt-nc"] .dt-card.dt-arrive{ animation:dtArrive 1.3s var(--dt-ease); }
+@keyframes dtArrive{ 0%{ box-shadow:0 0 0 5px rgba(61,139,208,.32); } 100%{ box-shadow:0 8px 24px -10px rgba(29,42,62,.22),inset 0 1px 0 rgba(255,255,255,.6); } }
+html.embed [data-nf="dt-nc"] .dt-in{ display:grid; grid-template-columns:34px 1fr; gap:3px 10px; transition:opacity .25s; }
+html.embed [data-nf="dt-nc"] .dt-vi{ width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; grid-row:span 3; }
+html.embed [data-nf="dt-nc"] .t-act{ background:var(--dt-then-bg); color:var(--dt-then); }
+html.embed [data-nf="dt-nc"] .t-get{ background:var(--dt-split-bg); color:var(--dt-split); }
+html.embed [data-nf="dt-nc"] .t-if{ background:var(--dt-if-bg); color:var(--dt-if); }
+html.embed [data-nf="dt-nc"] .t-split{ background:var(--dt-split-bg); color:var(--dt-split); }
+html.embed [data-nf="dt-nc"] .t-merge{ background:var(--dt-merge-bg); color:var(--dt-merge); }
+html.embed [data-nf="dt-nc"] .t-loop{ background:var(--dt-loop-bg); color:var(--dt-loop); }
+html.embed [data-nf="dt-nc"] .t-wait{ background:var(--dt-wait-bg); color:var(--dt-wait); }
+html.embed [data-nf="dt-nc"] .dt-nk{ display:flex; align-items:center; gap:6px; min-width:0; }
+html.embed [data-nf="dt-nc"] .dt-nkt{ font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--dt-muted); }
+html.embed [data-nf="dt-nc"] .dt-ago{ margin-left:auto; font-size:11px; color:var(--dt-faint); white-space:nowrap; }
+html.embed [data-nf="dt-nc"] .dt-ntl{ font-size:13px; font-weight:600; color:var(--dt-ink); line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.embed [data-nf="dt-nc"] .dt-nbd{ font-size:12px; color:var(--dt-text); line-height:1.4; display:flex; gap:6px; align-items:center; min-width:0; }
+html.embed [data-nf="dt-nc"] .dt-cnt{ font-weight:500; flex-shrink:0; }
+html.embed [data-nf="dt-nc"] .dt-dot{ width:3px; height:3px; border-radius:50%; background:var(--dt-faint); flex-shrink:0; }
+html.embed [data-nf="dt-nc"] .dt-frm{ color:var(--dt-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.embed [data-nf="dt-nc"] .dt-more{ text-align:center; font-size:11px; color:var(--dt-muted); padding-top:8px; }
+
+/* the detail that replaces the stack */
+html.embed [data-nf="dt-nc"] .dt-nd{ display:flex; flex-direction:column; gap:10px; }
+html.embed [data-nf="dt-nc"] .dt-ndcard{ border-radius:16px; background:rgba(255,255,255,.92); border:1px solid rgba(255,255,255,.95); box-shadow:0 8px 24px -10px rgba(29,42,62,.22);
+  padding:14px 14px 12px; animation:dtIn .3s var(--dt-ease); }
+@keyframes dtIn{ from{ opacity:0; transform:translateY(6px) scale(.98); } }
+html.embed [data-nf="dt-nc"] .dt-ndhd{ display:grid; grid-template-columns:34px 1fr; gap:2px 10px; align-items:center; }
+html.embed [data-nf="dt-nc"] .dt-ndhd .dt-vi{ grid-row:span 2; }
+html.embed [data-nf="dt-nc"] .dt-ndhd h3{ margin:0; font-size:15px; font-weight:600; color:var(--dt-ink); line-height:1.35; text-wrap:balance; }
+html.embed [data-nf="dt-nc"] .dt-sum{ margin:12px 0 0; font-size:13px; line-height:1.6; color:var(--dt-text); }
+html.embed [data-nf="dt-nc"] .dt-sec{ margin-top:14px; }
+html.embed [data-nf="dt-nc"] .dt-lbl{ display:block; font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--dt-muted); margin-bottom:6px; }
+html.embed [data-nf="dt-nc"] .dt-sec p{ margin:0; font-size:12.5px; line-height:1.55; color:var(--dt-text); }
+html.embed [data-nf="dt-nc"] .dt-sec p em{ font-style:normal; font-weight:500; color:var(--dt-ink); }
+html.embed [data-nf="dt-nc"] .dt-note{ display:flex; gap:8px; align-items:flex-start; margin-top:8px; padding:8px 10px; border-radius:10px; background:rgba(245,188,24,.12); font-size:12px; line-height:1.5; color:#7a5600; }
+html.embed [data-nf="dt-nc"] .dt-note svg{ flex-shrink:0; margin-top:2px; color:#b7791f; }
+html.embed [data-nf="dt-nc"] .dt-ndf{ display:flex; gap:8px; }
+html.embed .dt-btnp{ flex:1; height:36px; border:none; border-radius:10px; background:#3d8bd0; color:#fff; font-size:12.5px; font-weight:500; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+html.embed .dt-btnp:hover{ background:#3479b8; }
+html.embed .dt-btnd{ height:36px; padding:0 12px; border:1px solid rgba(242,92,78,.35); border-radius:10px; background:rgba(255,255,255,.88); color:#f25c4e; font-size:12px; font-weight:500; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+html.embed .dt-btnd:hover{ background:#fff4f3; }
+html.embed .dt-btno{ height:30px; padding:0 12px; border:1px solid #e3e8ef; border-radius:6px; background:#fff; color:var(--dt-text); font-size:12px; font-weight:500; cursor:pointer; flex-shrink:0; }
+html.embed .dt-btno:hover{ background:#f1f5f9; }
+html.embed .dt-btnred{ height:30px; padding:0 14px; border:none; border-radius:6px; background:#f25c4e; color:#fff; font-size:12px; font-weight:500; cursor:pointer; }
+
+/* the drawn flow, up to 3 levels */
+html.embed [data-nf="dt-nc"] .dt-vstep{ position:relative; padding-bottom:8px; }
+html.embed [data-nf="dt-nc"] .dt-vstep:not(:last-child)::before{ content:''; position:absolute; left:11px; top:22px; bottom:0; width:1.5px; background:#cfd8e3; }
+html.embed [data-nf="dt-nc"] .dt-vn{ position:relative; display:flex; align-items:flex-start; gap:8px; min-height:24px; }
+html.embed [data-nf="dt-nc"] .dt-vn .dt-vi{ width:24px; height:24px; border-radius:7px; grid-row:auto; flex-shrink:0; }
+html.embed [data-nf="dt-nc"] .dt-vt{ font-size:12.5px; line-height:1.45; color:var(--dt-text); padding-top:3px; min-width:0; }
+html.embed [data-nf="dt-nc"] .dt-vfork{ position:relative; margin:6px 0 0 11px; padding-left:16px; background:none; }
+html.embed [data-nf="dt-nc"] .dt-vfork::before{ content:''; position:absolute; left:0; top:-6px; bottom:14px; width:1.5px; background:var(--fk,#cfd8e3); }
+html.embed [data-nf="dt-nc"] .dt-vlane{ position:relative; padding-top:2px; }
+html.embed [data-nf="dt-nc"] .dt-vlane + .dt-vlane{ margin-top:4px; }
+html.embed [data-nf="dt-nc"] .dt-vlane::before{ content:''; position:absolute; left:-16px; top:-6px; width:12px; height:17px; border-left:1.5px solid var(--fk,#cfd8e3); border-bottom:1.5px solid var(--fk,#cfd8e3); border-bottom-left-radius:8px; }
+html.embed [data-nf="dt-nc"] .dt-vfork.t-if{ --fk:#e9c983; }
+html.embed [data-nf="dt-nc"] .dt-vfork.t-split{ --fk:#a9cbeb; }
+html.embed [data-nf="dt-nc"] .dt-vfork.t-loop{ --fk:#93d3e1; }
+html.embed [data-nf="dt-nc"] .dt-vfork.t-merge{ --fk:#c5b5ee; }
+html.embed [data-nf="dt-nc"] .dt-vtag{ display:inline-flex; align-items:center; height:20px; padding:0 7px; border-radius:6px; font-size:10.5px; font-weight:500; margin-bottom:5px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.embed [data-nf="dt-nc"] .t-if > .dt-vlane > .dt-vtag{ background:var(--dt-if-bg); color:var(--dt-if); }
+html.embed [data-nf="dt-nc"] .t-split > .dt-vlane > .dt-vtag{ background:var(--dt-split-bg); color:var(--dt-split); }
+html.embed [data-nf="dt-nc"] .t-loop > .dt-vlane > .dt-vtag{ background:var(--dt-loop-bg); color:var(--dt-loop); }
+html.embed [data-nf="dt-nc"] .t-merge > .dt-vlane > .dt-vtag{ background:var(--dt-merge-bg); color:var(--dt-merge); }
+html.embed [data-nf="dt-nc"] .dt-vtag.par{ background:none !important; color:var(--dt-muted) !important; padding:0; margin:0 0 5px 6px; display:flex; }
+html.embed [data-nf="dt-nc"] .dt-vmore, html.embed [data-nf="dt-nc"] .dt-vempty{ font-size:11.5px; color:var(--dt-muted); margin:4px 0 0 32px; }
+html.embed [data-nf="dt-nc"] .dt-vempty{ margin:0 0 4px 2px; font-style:italic; }
+
+/* placement banner, toast, drag ghost, fly-in box, delete dialog, toolbar badge */
+html.embed [data-nf="dt-banner"]{ position:absolute; top:12px; left:50%; width:min(540px,calc(100% - 420px)); min-width:300px; display:flex; align-items:center; gap:12px; padding:10px 12px;
+  background:#fff; border:1px solid rgba(61,139,208,.35); border-radius:12px; box-shadow:0 10px 30px -8px rgba(54,70,88,.28),0 2px 6px rgba(54,70,88,.08); z-index:42; font-family:'Inter',system-ui,sans-serif; }
+html.embed [data-nf="dt-banner"] .dt-bt{ flex:1; min-width:0; font-size:12.5px; line-height:1.5; color:var(--dt-text); }
+html.embed [data-nf="dt-banner"] .dt-bt b{ font-weight:500; color:var(--dt-ink); display:block; }
+html.embed [data-nf="dt-banner"] .dt-bt small{ display:block; color:var(--dt-muted); font-size:11.5px; }
+html.embed [data-nf="dt-toast"]{ position:absolute; left:50%; bottom:84px; display:flex; align-items:center; gap:12px; padding:8px 10px 8px 14px; background:#14212d; color:#fff; border-radius:9px;
+  font-size:12px; z-index:45; box-shadow:0 10px 30px -8px rgba(54,70,88,.28); max-width:calc(100% - 24px); font-family:'Inter',system-ui,sans-serif; }
+html.embed [data-nf="dt-toast"] button{ border:none; background:rgba(255,255,255,.14); color:#fff; height:24px; padding:0 9px; border-radius:5px; font-size:11.5px; font-weight:500; cursor:pointer; }
+html.embed [data-nf="dt-toast"] button:hover{ background:rgba(255,255,255,.24); }
+html.embed [data-nf="dt-ghost"]{ position:fixed; z-index:100; pointer-events:none; width:240px; padding:9px 11px; background:rgba(255,255,255,.96); border:1px solid #3d8bd0; border-radius:12px;
+  box-shadow:0 10px 30px -8px rgba(54,70,88,.28); font:12px 'Inter',system-ui,sans-serif; transform:translate(-24px,-20px) rotate(-1.5deg); }
+html.embed [data-nf="dt-ghost"] b{ font-weight:600; color:var(--dt-ink); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.embed [data-nf="dt-ghost"] span{ font-size:11px; color:var(--dt-muted); }
+html.embed [data-nf="dt-fly"]{ position:fixed; z-index:60; pointer-events:none; border:1.5px dashed #3d8bd0; border-radius:12px; background:rgba(238,245,252,.85); transform-origin:0 0; overflow:hidden; }
+html.embed [data-nf="dt-modal-bg"]{ position:fixed; inset:0; z-index:90; background:rgba(20,33,45,.32); display:flex; align-items:center; justify-content:center; padding:16px; font-family:'Inter',system-ui,sans-serif; }
+html.embed [data-nf="dt-modal-bg"] .dt-modal{ width:min(430px,100%); background:#fff; border-radius:14px; box-shadow:0 10px 30px -8px rgba(54,70,88,.28); padding:18px 18px 14px; }
+html.embed [data-nf="dt-modal-bg"] h4{ margin:0 0 6px; font-size:15px; font-weight:600; color:var(--dt-ink); }
+html.embed [data-nf="dt-modal-bg"] p{ margin:0; font-size:12.5px; line-height:1.6; color:var(--dt-text); }
+html.embed [data-nf="dt-modal-bg"] .dt-mb{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+html.embed [data-nf="dt-badge"]{ min-width:18px; height:18px; padding:0 5px; margin-left:2px; border-radius:9px; background:#3d8bd0; color:#fff; font-size:10px; font-weight:600;
+  display:inline-flex; align-items:center; justify-content:center; }
+html.embed [data-dt="traybtn"].dt-bump{ animation:dtBump .5s var(--dt-ease); }
+@keyframes dtBump{ 40%{ transform:scale(1.12); } }
+@media (prefers-reduced-motion:reduce){ html.embed [data-nf="dt-nc"] *, html.embed [data-nf="dt-nc"]{ transition:none !important; animation:none !important; } }
+
+/* 48 · Detached steps v2 (user 2026-11-05) — two designs (top bar "Detach": 1 Panel · 2 Popover), reattach by picking a
+   step from a list (hover lights it up on the canvas), the steps drawn like the canvas, a 2-line highlighted summary.
+   Overrides § 47 where they meet. */
+/* the cards no longer blend into the dotted canvas: frosted white, a firm edge and a lifted shadow */
+html.embed [data-nf="dt-nc"] .dt-card{ background:rgba(255,255,255,.86); -webkit-backdrop-filter:blur(12px) saturate(1.3); backdrop-filter:blur(12px) saturate(1.3);
+  border:1px solid rgba(207,216,227,.9); box-shadow:0 12px 28px -14px rgba(29,42,62,.38),0 2px 6px rgba(29,42,62,.06); }
+html.embed [data-nf="dt-nc"] .dt-card:hover, html.embed [data-nf="dt-nc"] .dt-card.on{ background:#fff; border-color:#b9cbe0; }
+html.embed [data-nf="dt-nc"] .dt-card.on{ box-shadow:0 0 0 2px rgba(61,139,208,.28),0 12px 28px -14px rgba(29,42,62,.38); }
+html.embed [data-nf="dt-nc"] .dt-card.behind{ background:rgba(255,255,255,.62); }
+html.embed [data-nf="dt-nc"] .dt-pill{ display:inline-flex; align-items:baseline; gap:7px; padding:5px 11px; border-radius:16px; background:rgba(255,255,255,.9);
+  border:1px solid rgba(207,216,227,.9); box-shadow:0 2px 8px -2px rgba(29,42,62,.14); }
+html.embed [data-nf="dt-nc"] .dt-pill b{ font-size:13px; font-weight:600; color:var(--dt-ink); }
+html.embed [data-nf="dt-nc"] .dt-pill small{ font-size:11.5px; color:var(--dt-muted); }
+/* ver 2: Reattach / Delete appear on the hovered card, in place of its time */
+html.embed [data-nf="dt-nc"] .dt-cacts{ display:none; margin-left:auto; gap:4px; }
+html.embed [data-nf="dt-nc"][data-ver="2"] .dt-card:hover .dt-cacts, html.embed [data-nf="dt-nc"][data-ver="2"] .dt-card.on .dt-cacts,
+html.embed [data-nf="dt-nc"][data-ver="2"] .dt-card:focus-within .dt-cacts{ display:inline-flex; }
+html.embed [data-nf="dt-nc"][data-ver="2"] .dt-card:hover .dt-ago, html.embed [data-nf="dt-nc"][data-ver="2"] .dt-card.on .dt-ago,
+html.embed [data-nf="dt-nc"][data-ver="2"] .dt-card:focus-within .dt-ago{ display:none; }
+html.embed .dt-ib{ width:26px; height:26px; border-radius:7px; border:1px solid #e3e8ef; background:#fff; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+html.embed .dt-ib.pri{ color:#3d8bd0; } html.embed .dt-ib.pri:hover{ background:#eef5fc; border-color:rgba(61,139,208,.45); }
+html.embed .dt-ib.red{ color:#f25c4e; } html.embed .dt-ib.red:hover{ background:#fff4f3; border-color:rgba(242,92,78,.45); }
+html.embed [data-nf="dt-nc"] .dt-nk{ min-height:26px; }
+
+/* shared look for the detail (ver 1 panel, ver 2 popover) and the step list */
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"],[data-nf="dt-pick"]) .dt-vi{ width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"],[data-nf="dt-pick"]) .dt-vi.sm{ width:24px; height:24px; border-radius:7px; }
+html.embed :is([data-nf="dt-pop"],[data-nf="dt-pick"]) .t-act{ background:var(--dt-then-bg); color:var(--dt-then); }
+html.embed :is([data-nf="dt-pop"],[data-nf="dt-pick"]) .t-get{ background:var(--dt-split-bg); color:var(--dt-split); }
+html.embed :is([data-nf="dt-pop"],[data-nf="dt-pick"]) .t-if{ background:var(--dt-if-bg); color:var(--dt-if); }
+html.embed :is([data-nf="dt-pop"],[data-nf="dt-pick"]) .t-split{ background:#fdebe4; color:#c2410c; }
+html.embed :is([data-nf="dt-pop"],[data-nf="dt-pick"]) .t-merge{ background:var(--dt-split-bg); color:var(--dt-split); }
+html.embed :is([data-nf="dt-pop"],[data-nf="dt-pick"]) .t-loop{ background:var(--dt-loop-bg); color:var(--dt-loop); }
+html.embed :is([data-nf="dt-pop"],[data-nf="dt-pick"]) .t-wait{ background:var(--dt-wait-bg); color:var(--dt-wait); }
+html.embed [data-nf="dt-nc"] .t-split{ background:#fdebe4; color:#c2410c; }
+html.embed [data-nf="dt-nc"] .t-merge{ background:var(--dt-split-bg); color:var(--dt-split); }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-ndcard{ display:flex; flex-direction:column; min-height:0; max-height:calc(100vh - 150px); padding:14px 14px 10px;
+  background:#fff; border:1px solid rgba(207,216,227,.9); border-radius:16px; box-shadow:0 14px 36px -16px rgba(29,42,62,.4); animation:dtIn .25s var(--dt-ease); }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-fix{ flex-shrink:0; width:0; min-width:100%; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-ndhd{ display:grid; grid-template-columns:34px 1fr; gap:1px 10px; align-items:center; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-ndhd .dt-vi{ grid-row:span 2; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-ndhd .dt-nkt{ font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--dt-muted); }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-ndhd h3{ margin:0; font-size:15px; font-weight:600; color:var(--dt-ink); line-height:1.35; }
+html.embed [data-nf="dt-nc"] .dt-ndf{ display:flex; gap:8px; margin-top:12px; }
+html.embed [data-nf="dt-nc"] .dt-ndf .dt-btnp{ height:34px; }
+html.embed [data-nf="dt-nc"] .dt-ndf .dt-btnd{ width:34px; height:34px; padding:0; justify-content:center; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-sumw{ width:0; min-width:100%; flex-shrink:0; margin-top:12px; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-sum{ margin:0; font-size:13px; line-height:1.65; color:var(--dt-text); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-sum.open{ display:block; -webkit-line-clamp:unset; overflow:visible; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-sum mark{ background:none; padding:0; color:inherit; font-weight:inherit; box-shadow:none; }   /* plain text, no underline (user 2026-11-05) */
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-readmore{ border:none; background:none; padding:0; margin-top:2px; font-size:12px; font-weight:500; color:#3d8bd0; cursor:pointer; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-readmore:hover{ text-decoration:underline; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-lbl{ display:block; flex-shrink:0; margin:24px 0 4px; font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--dt-muted); }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-flowbox{ flex:1 1 auto; min-height:90px; overflow:auto; margin:0 -14px; padding:4px 14px 6px; scrollbar-width:thin; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-note{ flex-shrink:0; width:0; min-width:100%; display:flex; gap:8px; align-items:flex-start; margin-top:8px; padding:8px 10px; border-radius:10px; background:rgba(245,188,24,.12); font-size:12px; line-height:1.5; color:#7a5600; }
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-note svg{ flex-shrink:0; margin-top:2px; color:#b7791f; }
+/* ver 1: the panel grows as wide as the piece needs, up to a cap, while its detail is open */
+html.embed [data-nf="dt-nc"][data-detail]{ width:max-content; min-width:340px; max-width:min(760px, calc(100vw - 80px)); }
+html.embed [data-nf="dt-nc"][data-detail] .dt-body{ display:flex; flex-direction:column; overflow:hidden; padding-bottom:4px; }
+html.embed [data-nf="dt-nc"][data-detail] .dt-nd{ display:flex; flex-direction:column; min-height:0; }
+/* ver 2: the popover, to the left of the stack */
+html.embed [data-nf="dt-pop"]{ position:absolute; z-index:44; width:max-content; min-width:340px; max-width:min(760px, calc(100vw - 420px)); font-family:'Inter',system-ui,sans-serif; }
+html.embed [data-nf="dt-pop"]{ display:flex; flex-direction:column; }
+html.embed [data-nf="dt-pop"] .dt-ndcard{ max-height:100%; }
+
+/* the steps drawn like the canvas — rail, markers, badges, lane elbows (read-only, rows never wrap) */
+html.embed .dc-root{ width:max-content; min-width:100%; }
+html.embed .dc-path{ position:relative; }
+html.embed .dc-path::before{ content:''; position:absolute; left:8.4px; top:14px; bottom:6px; width:1.5px; background:#d5dde7; }
+html.embed .dc-row{ position:relative; display:flex; align-items:center; gap:9px; min-height:30px; padding-left:28px; white-space:nowrap; }
+html.embed .dc-mk{ position:absolute; left:9px; top:50%; transform:translate(-50%,-50%); box-shadow:0 0 0 3px #fff; }
+html.embed .dc-mk.m-act{ width:9px; height:9px; border-radius:50%; background:var(--c-then,#1f9d55); }
+html.embed .dc-mk.m-if{ width:9px; height:9px; background:var(--c-if,#c9930b); transform:translate(-50%,-50%) rotate(45deg); border-radius:1.5px; }
+html.embed .dc-mk.m-split{ width:11px; height:11px; border-radius:50%; background:#c2410c; }
+html.embed .dc-mk.m-merge{ width:10px; height:10px; border-radius:50%; background:#3d8bd0; }
+html.embed .dc-mk.m-loop{ width:10px; height:10px; border-radius:50%; background:#22b3cf; }
+html.embed .dc-mk.m-wait{ width:10px; height:10px; border-radius:3px; border:1.5px solid #7b8fa5; background:#fff; }
+html.embed .dc-b{ font-size:9.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; padding:5px 7px; line-height:1; border-radius:5px; flex-shrink:0; }
+html.embed .dc-b.t-then{ color:var(--c-then,#1f9d55); background:var(--c-then-bg,#e4f5ea); }
+html.embed .dc-b.t-if{ color:var(--c-if,#b7791f); background:var(--c-if-bg,#fdf3dc); }
+html.embed .dc-b.t-split{ color:#c2410c; background:#fdebe4; }
+html.embed .dc-b.t-merge{ color:#3d8bd0; background:#e3eefa; }
+html.embed .dc-b.t-loop{ color:#0e8aa6; background:#e2f6fa; }
+html.embed .dc-b.t-wait{ color:#364658; background:#eef1f5; }
+html.embed .dc-t{ font-size:13px; color:var(--dt-ink); }
+html.embed .dc-t.dim{ color:var(--dt-muted); font-size:12px; }
+html.embed .dc-lanes{ position:relative; margin-left:34px; padding:2px 0 4px; }
+html.embed .dc-lane{ position:relative; margin-top:4px; }
+html.embed .dc-lane::before{ content:''; position:absolute; left:-25.6px; top:-8px; width:26px; height:23px; border-left:1.5px solid #d5dde7; border-bottom:1.5px solid #d5dde7; border-bottom-left-radius:10px; }
+html.embed .dc-lane.has-l::before{ height:18px; }
+html.embed .dc-lane.no-h::before{ height:23px; }
+html.embed .dc-ll{ height:20px; display:flex; align-items:center; padding-left:28px; font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--dt-faint); white-space:nowrap; }
+html.embed .dc-lanes.boxed > .dc-lane{ border:1.5px dashed #9fd8e6; border-radius:10px; background:rgba(14,138,166,.035); padding:4px 10px 2px 0; }
+html.embed .dc-lanes.boxed > .dc-lane::before{ height:18px; }
+html.embed .dc-empty{ padding:4px 0 6px 28px; font-size:12px; font-style:italic; color:var(--dt-faint); white-space:nowrap; }
+
+/* Reattach: the step list, opened to the left */
+html.embed [data-nf="dt-pick"]{ position:fixed; z-index:80; width:360px; max-height:min(560px, calc(100vh - 24px)); display:flex; flex-direction:column; background:#fff;
+  border:1px solid #dfe5ed; border-radius:14px; box-shadow:0 18px 44px -16px rgba(29,42,62,.42),0 2px 6px rgba(29,42,62,.08); font-family:'Inter',system-ui,sans-serif; animation:dtIn .2s var(--dt-ease); }
+html.embed [data-nf="dt-pick"] .dp-h{ display:flex; align-items:flex-start; gap:8px; padding:12px 12px 8px 14px; }
+html.embed [data-nf="dt-pick"] .dp-ht{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+html.embed [data-nf="dt-pick"] .dp-ht b{ font-size:13px; font-weight:600; color:var(--dt-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.embed [data-nf="dt-pick"] .dp-ht small{ font-size:11.5px; color:var(--dt-muted); }
+html.embed [data-nf="dt-pick"] .dp-x{ width:26px; height:26px; border:none; background:none; border-radius:7px; color:var(--dt-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+html.embed [data-nf="dt-pick"] .dp-x:hover{ background:#f1f5f9; color:var(--dt-ink); }
+html.embed [data-nf="dt-pick"] .dp-s{ padding:0 12px 8px; }
+html.embed [data-nf="dt-pick"] .dp-s input{ width:100%; height:32px; border:1px solid #dfe5ed; border-radius:8px; padding:0 10px; font-size:12.5px; outline:none; color:var(--dt-ink); background:#fff; }
+html.embed [data-nf="dt-pick"] .dp-s input:focus{ border-color:#3d8bd0; }
+html.embed [data-nf="dt-pick"] .dp-l{ overflow:auto; padding:0 6px 8px; scrollbar-width:thin; }
+html.embed [data-nf="dt-pick"] .dp-r{ width:100%; display:flex; align-items:center; gap:9px; padding:6px 8px; border:none; background:none; border-radius:8px; cursor:pointer; text-align:left; }
+html.embed [data-nf="dt-pick"] .dp-r:hover:not(:disabled), html.embed [data-nf="dt-pick"] .dp-r:focus-visible{ background:#eef5fc; outline:none; }
+html.embed [data-nf="dt-pick"] .dp-r.off{ cursor:not-allowed; opacity:.5; }
+html.embed [data-nf="dt-pick"] .dp-t{ display:flex; flex-direction:column; min-width:0; line-height:1.35; }
+html.embed [data-nf="dt-pick"] .dp-t b{ font-size:12.5px; font-weight:500; color:var(--dt-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.embed [data-nf="dt-pick"] .dp-t small{ font-size:11px; color:var(--dt-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.embed [data-nf="dt-pick"] .dp-r.start .dp-t b{ font-weight:400; color:var(--dt-text); }
+html.embed [data-nf="dt-pick"] .dp-start{ width:24px; height:24px; border-radius:7px; border:1px dashed #cfd8e3; color:var(--dt-muted); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+html.embed [data-nf="dt-pick"] .dp-empty{ padding:14px 10px; font-size:12px; color:var(--dt-muted); }
+
+/* the canvas highlight while a step is hovered in the list, and the glow when the piece lands */
+html.embed [data-nf="dt-hl"]{ position:fixed; z-index:38; pointer-events:none; border-radius:10px; background:rgba(61,139,208,.07); box-shadow:inset 0 0 0 1.5px rgba(61,139,208,.45);
+  opacity:0; transition:opacity .18s ease, left .22s var(--dt-ease), top .22s var(--dt-ease), width .22s var(--dt-ease), height .22s var(--dt-ease); }
+html.embed [data-nf="dt-hl-line"]{ position:fixed; z-index:39; pointer-events:none; height:0; border-top:2px dashed #3d8bd0; opacity:0;
+  transition:opacity .18s ease, left .22s var(--dt-ease), top .22s var(--dt-ease), width .22s var(--dt-ease); }
+html.embed [data-nf="dt-hl-line"] span{ position:absolute; left:0; top:-1px; transform:translateY(-50%); padding:3px 8px; border-radius:6px; background:#3d8bd0; color:#fff; font:500 11px 'Inter',system-ui,sans-serif; white-space:nowrap; }
+html.embed [data-nf="dt-hl"].on, html.embed [data-nf="dt-hl-line"].on{ opacity:1; }
+html.embed .dt-arrive-row{ animation:dtLand 1.4s var(--dt-ease); }
+@keyframes dtLand{ 0%{ opacity:.2; transform:translateY(-8px); background:rgba(61,139,208,.14); } 35%{ opacity:1; transform:none; background:rgba(61,139,208,.12); } 100%{ background:transparent; } }
+@media (prefers-reduced-motion:reduce){ html.embed .dt-arrive-row{ animation:none; } html.embed [data-nf="dt-hl"], html.embed [data-nf="dt-hl-line"]{ transition:none; } }
+
+/* 49. Detached detail — short flows don't get padded out (user 2026-11-05): the steps area's 90px floor only matters for
+   longer flows (it stops them collapsing while the panel scrolls); 1–2 plain steps sit at their own height. A path
+   holding just one step has no rail stub peeking out under its dot. */
+html.embed :is([data-nf="dt-nc"],[data-nf="dt-pop"]) .dt-flowbox:not(:has(.dc-lanes)):not(:has(> .dc-root > .dc-path > .dc-node:nth-child(3))){ min-height:0; }
+
+/* 50. Detached detail — connectors drawn the way the canvas draws them (user 2026-11-05):
+   · lines run dot-to-dot and stop at the last dot (no stub hanging below it);
+   · a path's header (Split path / Else / Check if / Success) sits in its steps' column, with a line down into them;
+   · lanes branch off further right of the parent line, like the canvas's indent, on a longer elbow;
+   · a labelled branch ("BRANCH 1") gets the canvas's small circle, with a line down to its condition. */
+html.embed .dc-path::before{ display:none; }
+html.embed .dc-node{ position:relative; }
+html.embed .dc-node:not(:last-child)::before,
+html.embed .dc-lane:has(> .dc-path) > .dc-row::before{ content:''; position:absolute; left:8.4px; top:15px; bottom:-15px; width:1.5px; background:#d5dde7; z-index:0; }
+html.embed .dc-mk{ z-index:1; }
+html.embed .dc-lanes{ margin-left:58px; padding:4px 0 4px; }
+html.embed .dc-lane{ margin-top:8px; }
+html.embed .dc-lane::before{ left:-49.6px; width:50px; }
+/* the parent line keeps going between lanes, down to the next lane's elbow */
+html.embed .dc-lane:not(:last-child)::after{ content:''; position:absolute; left:-49.6px; top:-8px; bottom:-2px; width:1.5px; background:#d5dde7; }
+/* a node with its own row (Merge, Loop): its line drops from the row into the first lane's elbow */
+html.embed .dc-node > .dc-row + .dc-lanes::before{ content:''; position:absolute; left:-49.6px; top:-15px; height:16px; width:1.5px; background:#d5dde7; }
+html.embed .dc-ll{ position:relative; }
+html.embed .dc-ll::before{ content:''; position:absolute; left:9px; top:50%; width:9px; height:9px; transform:translate(-50%,-50%); border-radius:50%; border:1.5px solid #b9c5d2; background:#fff; box-sizing:border-box; z-index:1; }
+html.embed .dc-lane.has-l:has(> .dc-row) > .dc-ll::after{ content:''; position:absolute; left:8.4px; top:14px; bottom:-15px; width:1.5px; background:#d5dde7; }
+html.embed .dc-lane.has-l::before{ width:54px; }   /* runs into the small circle */
+
+/* 51. Reattach highlight (user 2026-11-05): the step's box is outlined with ONE dashed blue edge — no solid outline under a
+   separate dashed line. Over a step the "Goes here" label sits on the box's bottom edge; a "Start of …" row keeps its line. */
+html.embed [data-nf="dt-hl"]{ box-shadow:none; border:1.5px dashed #3d8bd0; box-sizing:border-box; }
+html.embed [data-nf="dt-hl-line"].onbox{ border-top-color:transparent; }
+
+/* 52. Detached detail — roomier branching (user 2026-11-05): lanes branch off further right (80px, was 58), sibling paths
+   sit 16px apart (was 8) and a branch group leaves room before the next step, so the inner steps read as their own group. */
+html.embed .dc-lanes{ margin-left:80px; padding:6px 0 12px; }
+html.embed .dc-lane{ margin-top:16px; }
+html.embed .dc-lane::before{ left:-71.6px; width:72px; }
+html.embed .dc-lane.has-l::before{ width:76px; }
+html.embed .dc-lane:not(:last-child)::after{ left:-71.6px; bottom:-8px; }
+html.embed .dc-node > .dc-row + .dc-lanes::before{ left:-71.6px; top:-15px; height:30px; }
+
+
+/* 53. Drag a detached piece into the workflow (user 2026-11-05): only ONE "Put it here" line, where the pointer is.
+   Cards and the panel / popover title are drag handles. */
+html.embed [data-nf="dt-nc"] .dt-card, html.embed .dt-grab{ cursor:grab; touch-action:none; }
+html.embed.dt-dragging, html.embed.dt-dragging *{ cursor:grabbing !important; user-select:none !important; }
+html.embed [data-nf="dt-hl-line"]{ transition:opacity .15s ease, top .12s ease-out, left .12s ease-out, width .12s ease-out; }
+html.embed [data-nf="dt-hl-line"].bad{ border-top-color:#b8c3cf; }
+html.embed [data-nf="dt-hl-line"].bad span{ background:#eef1f5; color:#5f7287; }
+html.embed [data-nf="dt-ghost"]{ transform:translate(14px,12px); }
+html.embed [data-nf="dt-ghost"].ok{ border-color:#3d8bd0; box-shadow:0 10px 28px rgba(61,139,208,.22); }
+/* while dragging, the canvas's own hover effects (Add step bars, trash on the line) stay quiet — only the one line shows */
+html.embed.dt-dragging body *{ pointer-events:none !important; }
+html.embed [data-nf="dt-ghost"]{ background:#fff; }
+
+/* 54. Detached detail — more vertical room (user 2026-11-05): sibling paths 28px apart (was 16) and 10px more between a path's
+   header and its first step; the connecting lines stretch to match. */
+html.embed .dc-lane{ margin-top:28px; }
+html.embed .dc-lane:not(:last-child)::after{ bottom:-20px; }
+html.embed .dc-lane > .dc-row + .dc-path,
+html.embed .dc-lane > .dc-ll + .dc-row + .dc-path{ margin-top:10px; }
+html.embed .dc-lane:has(> .dc-path) > .dc-row::before{ bottom:-25px; }
+html.embed .dc-node > .dc-row + .dc-lanes::before{ height:42px; }
+/* when the next thing is a group of paths (IF / Else, Branch, Split), the line runs on to that group's first elbow */
+html.embed .dc-lane:has(> .dc-path > .dc-node:first-child > .dc-lanes:first-child) > .dc-row::before{ bottom:-38px; }
+html.embed .dc-node:not(:last-child):has(+ .dc-node > .dc-lanes:first-child)::before{ bottom:-28px; }
