@@ -6834,20 +6834,31 @@ function DtPicker({ piece, targets, anchor, onHover, onPick, onClose }) {
     window.addEventListener("keydown", k, true); document.addEventListener("mousedown", d, true);
     return ()=>{ window.removeEventListener("keydown", k, true); document.removeEventListener("mousedown", d, true); onHover(null); }; }, []);
   const ql = q.trim().toLowerCase();
-  const list = ql ? targets.filter(t => !t.start && (t.label+" "+t.where).toLowerCase().includes(ql)) : targets;
-  return (<div ref={ref} data-nf="dt-pick" role="dialog" aria-label="Reattach after a step" style={pos ? { left:pos.left+"px", top:pos.top+"px" } : { visibility:"hidden" }} onMouseLeave={()=>onHover(null)}>
-    <div className="dp-h"><div className="dp-ht"><b>Reattach “{dtShort(piece.title, 30)}”</b><small>Pick a step. The {dtSteps(piece.steps)} go right below it.</small></div>
+  const fit = targets.filter(t => t.ok);   // only the places this piece can go (user 2026-11-05) — the list stays clean
+  // + the parents of those places (muted, not clickable), so a deep place never loses its context (user 2026-11-12)
+  const byKey = new Map(targets.map(t => [t.key, t])), need = new Set();
+  fit.forEach(t => { let c = t; while (c && !need.has(c.key)) { need.add(c.key); c = c.pk ? byKey.get(c.pk) : null; } });
+  const list = ql ? fit.filter(t => (t.label+" "+t.where+" "+(t.tag||"")).toLowerCase().includes(ql)) : targets.filter(t => need.has(t.key));
+  const G = 22, X0 = 8, gx = (k) => X0 + k*G + 12;   // tree geometry: one level = 22px; a guide runs down each level's icon centre
+  return (<div ref={ref} data-nf="dt-pick" role="dialog" aria-label="Reattach" style={pos ? { left:pos.left+"px", top:pos.top+"px" } : { visibility:"hidden" }} onMouseLeave={()=>onHover(null)}>
+    <div className="dp-h"><div className="dp-ht"><b>Reattach “{dtShort(piece.title, 30)}”</b><small>Hover a place to preview it in the workflow.</small></div>
       <button type="button" className="dp-x" aria-label="Close" onClick={onClose}><DtIc n="x" s={13} w={2}/></button></div>
-    <div className="dp-s"><input autoFocus value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Search steps" aria-label="Search steps"/></div>
+    <div className="dp-s"><input autoFocus value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Search steps or paths" aria-label="Search steps or paths"/></div>
     <div className="dp-l" role="listbox">
-      {list.map(t => { const ty = DT_TYPE[t.kind] || DT_TYPE.action; return (
-        <button key={t.key} type="button" role="option" className={"dp-r"+(t.ok ? "" : " off")+(t.start ? " start" : "")} disabled={!t.ok}
-          title={t.ok ? undefined : "Can’t go here: "+t.why} style={{ paddingLeft:(8 + (ql ? 0 : t.depth*16))+"px" }}
-          onMouseEnter={()=>onHover(t)} onFocus={()=>onHover(t)} onClick={()=>onPick(t)}>
-          {t.start ? <span className="dp-start"><DtIc n="down" s={11} w={2.2}/></span> : <span className={"dt-vi sm "+ty.c}><DtIc n={ty.ic} s={12}/></span>}
-          <span className="dp-t"><b>{t.label}</b><small>{t.ok ? t.where : "Can’t go here · "+t.why}</small></span>
+      {list.map(t => { const ty = DT_TYPE[t.kind] || DT_TYPE.action, ctx = !t.ok, d = ql ? 0 : t.depth, lane = !!(t.start && t.bp.length && !ql);
+        const desc = ql ? t.where : t.start ? (t.bp.length ? "First step of this path" : "First step, right after the trigger") : t.block ? "After the whole "+ty.k : "After this step";
+        return (
+        <button key={t.key} type="button" role="option" className={"dp-r"+(lane ? " hd" : "")+(ctx ? " ctx" : "")} disabled={ctx} aria-disabled={ctx}
+          style={{ paddingLeft:(X0 + d*G)+"px" }} onMouseEnter={()=>!ctx && onHover(t)} onFocus={()=>!ctx && onHover(t)} onClick={()=>!ctx && onPick(t)}>
+          {Array.from({ length:d }, (_, k) => (k===d-1 && lane) ? null : <i key={k} className="dp-g" style={{ left:gx(k)+"px" }}/>)}
+          {lane && <i className="dp-el" style={{ left:gx(d-1)+"px", width:(X0 + d*G - gx(d-1) - 3)+"px" }}/>}
+          {lane ? null : t.start ? <span className="dt-vi sm t-trg"><DtIc n="bolt" s={12}/></span> : <span className={"dt-vi sm "+ty.c}><DtIc n={ty.ic} s={12}/></span>}
+          <span className="dp-t">
+            {lane ? <span className="dp-hd"><span className={"dc-b t-"+t.tone}>{t.tag}</span>{t.lname && <b>{t.lname}</b>}</span> : <b>{t.label}</b>}
+            {!ctx && <small>{desc}</small>}
+          </span>
         </button>); })}
-      {!list.length && <div className="dp-empty">No step matches “{q}”.</div>}
+      {!list.length && <div className="dp-empty">{fit.length ? <>No step matches “{q}”.</> : "There’s no place this piece can go right now."}</div>}
     </div>
   </div>);
 }
@@ -6925,12 +6936,12 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
         {detail ? (
           <div key="dt-detail" className="dt-nd"><div className="dt-ndcard">
             <div className="dt-fix">
-              <div className="dt-grab" onPointerDown={grab(detail.id)} title="Drag into the workflow"><DtHead p={detail}/></div>
-              {/* the actions sit right under the title, never below the fold */}
-              <div className="dt-ndf">
-                <button type="button" className="dt-btnp" aria-expanded={!!pick} onClick={(e)=>openPick(detail.id, e.currentTarget.closest("[data-nf='dt-nc']"))}><DtIc n="link" s={13}/>Reattach after a step</button>
-                <Tooltip label="Delete these steps" side="bottom"><button type="button" className="dt-btnd" aria-label="Delete these steps" onClick={()=>setConfirmId(detail.id)}><DtIc n="trash" s={14}/></button></Tooltip>
+              {/* top right (user 2026-11-05): Reattach (primary, text) with the delete icon to its right */}
+              <div className="dt-tra">
+                <button type="button" className="dt-rb" aria-expanded={!!pick} onClick={(e)=>openPick(detail.id, e.currentTarget.closest("[data-nf='dt-nc']"))}><DtIc n="link" s={12}/>Reattach</button>
+                <Tooltip label="Delete these steps" side="bottom"><button type="button" className="dt-btnd dt-tr" aria-label="Delete these steps" onClick={()=>setConfirmId(detail.id)}><DtIc n="trash" s={14}/></button></Tooltip>
               </div>
+              <div className="dt-grab" onPointerDown={grab(detail.id)} title="Drag into the workflow"><DtHead p={detail}/></div>
             </div>
             <DtBody p={detail}/>
           </div></div>)
@@ -6943,9 +6954,9 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
                 onClick={(e)=>{ if (e.target.closest("button") || (dragged && dragged.current)) return; if (v2) { setPopId(id=>id===p.id ? null : p.id); } else setDetailId(p.id); }}
                 onKeyDown={(e)=>{ if ((e.key==="Enter" || e.key===" ") && e.target===e.currentTarget) { e.preventDefault(); if (v2) setPopId(p.id); else setDetailId(p.id); } }}>
                 <div className="dt-in"><span className={"dt-vi "+t.c}><DtIc n={t.ic} s={17}/></span>
-                  <div className="dt-nk"><span className="dt-nkt">{t.k}</span><span className="dt-ago">{dtAgo(p.at)}</span>
+                  <div className="dt-nk"><span className="dt-nkt">{t.k}</span>
                     {v2 && <span className="dt-cacts">
-                      <Tooltip label="Reattach after a step" side="top"><button type="button" className="dt-ib pri" aria-label="Reattach after a step" onClick={(e)=>openPick(p.id, e.currentTarget.closest("[data-dt-card]"))}><DtIc n="link" s={13}/></button></Tooltip>
+                      <button type="button" className="dt-rb" onClick={(e)=>openPick(p.id, e.currentTarget.closest("[data-dt-card]"))}><DtIc n="link" s={12}/>Reattach</button>
                       <Tooltip label="Delete" side="top"><button type="button" className="dt-ib red" aria-label="Delete these steps" onClick={()=>setConfirmId(p.id)}><DtIc n="trash" s={13}/></button></Tooltip>
                     </span>}</div>
                   <div className="dt-ntl">{p.title}</div>
@@ -7009,7 +7020,17 @@ function App() {
   const [doc, setDoc] = useState(()=> EMBED ? JSON.parse(JSON.stringify(GALLERY ? (LAB ? { ...GALLERY_DEMO_DOC, triggers:[...GALLERY_DEMO_DOC.triggers,
     { id:"t_daily", typeId:"daily", vals:{ time:"09:00" } }, { id:"t_weekly", typeId:"weekly", vals:{ weekday:"Monday", time:"09:00" } }] } : GALLERY_DEMO_DOC) : EMBED_DEMO_DOC)) : { triggers:[], flow:[] });
   const [qaDone, setQaDone] = useState([]); // dismissed QA-checklist item ids (sidebar dev aid)
-  const triggers = doc.triggers, flow = doc.flow;
+  // detached-step preview (user 2026-11-05): while a place is previewed (Reattach hover / drag), the canvas renders the flow
+  // WITH the piece placed there — every canvas helper reads that same `flow`, so paths always agree. The detach / reattach
+  // logic reads the REAL flow through dtFlowRef. Render-only: the doc (and undo) never sees the preview.
+  const [dtPrev, setDtPrev] = useState(null);   // { pid, bp, index, scroll, slot } — slot: while dragging, an empty "Put it here" gap
+  const dtPrevP = (EMBED && dtPrev) ? (doc.detached||[]).find(x=>x.id===dtPrev.pid) : null;
+  const dtIns = dtPrevP ? (dtPrev.slot ? [{ id:"__dtslot", kind:"action", action:null, arg:null }] : dtPrevP.items) : null;
+  const dtShown = dtPrevP ? (()=>{ try { const arr = childrenAt(doc.flow, dtPrev.bp), at = Math.min(dtPrev.index, arr.length);
+    return treeSetLevel(doc.flow, dtPrev.bp, [...arr.slice(0, at), ...dtIns, ...arr.slice(at)]); } catch (e) { return doc.flow; } })() : doc.flow;
+  const dtPrevIds = dtIns ? new Set(dtIns.map(n=>n.id)) : null;
+  const dtFlowRef = useRef(doc.flow); dtFlowRef.current = doc.flow;
+  const triggers = doc.triggers, flow = dtShown;
   const flowRef = useRef(flow); flowRef.current = flow; // always-current flow → deferred callbacks (rAF/popovers) never read a stale closure
   // the workflow's module (from the first trigger) gates the action menu, recipients and channels (§5.3)
   const workflowModuleId = () => moduleIdFromName(triggers[0] && triggers[0].vals && triggers[0].vals.module);
@@ -10631,7 +10652,7 @@ function App() {
       notes: dtEndOnly(p.items) ? ["It contains a split path, so it can only go at the end of a path."] : [] }; };
   // can piece `pid` go into the gap `index` of the path at `bp`? → { ok, why }
   const dtCanDrop = (pid, bp, index) => { const p = detached.find(x=>x.id===pid); if (!p) return { ok:false, why:"" };
-    const arr = childrenAt(flowRef.current, bp), prev = arr[index-1], next = arr[index];
+    const arr = childrenAt(dtFlowRef.current, bp), prev = arr[index-1], next = arr[index];
     if (prev && isSplitBranch(prev)) return { ok:false, why:"only a Merge can follow a split" };
     if (next && next.kind==="merge") return { ok:false, why:"a Merge has to follow its paths" };
     if (index < arr.length && dtEndOnly(p.items)) return { ok:false, why:"it holds a split, so only the end of a path" };
@@ -10643,7 +10664,7 @@ function App() {
     if (!s) return; const r = el.getBoundingClientRect(), sr = s.getBoundingClientRect();
     if (r.top < sr.top+70 || r.bottom > sr.bottom-90) s.scrollBy({ top:r.top - sr.top - sr.height/3, behavior:"smooth" }); };
   const detachAt = (bp, index) => {
-    const f0 = flowRef.current, arr = childrenAt(f0, bp), tail = arr.slice(index); if (!tail.length) return;
+    const f0 = dtFlowRef.current, arr = childrenAt(f0, bp), tail = arr.slice(index); if (!tail.length) return;
     const id = "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
     const cut = document.querySelector('[data-nf="cutset"]');
     dtFly.current = cut ? { id, rect:cut.getBoundingClientRect(), el:cut.cloneNode(true) } : null;
@@ -10655,7 +10676,7 @@ function App() {
     dtFlash(`Detached ${dtSteps(dtCount(tail))} · it won’t run until you attach it`, true);
   };
   const attachAt = (pid, bp, index) => { const p = detached.find(x=>x.id===pid); if (!p) return;
-    const where = dtPathLabel(bp, flowRef.current);
+    const where = dtPathLabel(bp, dtFlowRef.current);
     commit(prev => { const arr = childrenAt(prev.flow, bp), at = Math.min(index, arr.length);
       return { ...prev, flow: treeSetLevel(prev.flow, bp, [...arr.slice(0, at), ...p.items, ...arr.slice(at)]), detached:(prev.detached||[]).filter(x=>x.id!==pid) }; });
     setPlacing(null); dtFlash(`Attached ${dtSteps(dtCount(p.items))} to ${where}`, true); };
@@ -10690,70 +10711,121 @@ function App() {
     if (k==="loop") return { mk:"loop", tone:"loop", badge:"Loop", text:dtLine(n), boxed:true, lanes:[{ items:dtCanvasOf(n.children) }] };
     return { mk:"act", tone:"then", badge:"Then", text:"a step" }; }); };
   // every place a piece can go: the start of each path, and right after each step (a flow node = after its whole block)
-  const dtTargets = (pid) => { const out = [], f = flowRef.current;
-    const walk = (arr, bp, depth) => {
-      const where = dtPathLabel(bp, f), r0 = dtCanDrop(pid, bp, 0);
-      out.push({ key:pathKey(bp)+":0", bp, index:0, depth, start:true, label: bp.length ? "Start of "+where : "Right after the trigger", where: bp.length ? "before its first step" : "first step of the main path", ok:r0.ok, why:r0.why, firstId:arr[0] && arr[0].id });
-      arr.forEach((n, i) => { const r = dtCanDrop(pid, bp, i+1), k = dtKindOf(n), block = !!dtLanes(n), p = [...bp, i];
-        out.push({ key:pathKey(bp)+":"+(i+1), bp, index:i+1, depth, kind:k, label:dtCap(dtLine(n)), where:(block ? "after the whole "+DT_TYPE[k].k+" · " : "")+"in "+where, ok:r.ok, why:r.why, nodeId:n.id });
-        if (n.kind==="branch" || n.kind==="merge") { (n.paths||[]).forEach((pp, k2)=>walk(pp.children||[], [...p, { path:k2 }], depth+1));
-          if (n.success) walk(n.success.children||[], [...p, { success:true }], depth+1); if (n.otherwise) walk(n.otherwise.children||[], [...p, { otherwise:true }], depth+1); }
-        else if (n.kind==="loop") walk(n.children||[], p, depth+1);
+  // the lane a path start belongs to, as the canvas badges it (IF, ELSE, BRANCH 1, SPLIT PATH 2, SUCCESS, TIMEOUT, LOOP…)
+  const dtLaneTag = (bp, f) => { if (!bp.length) return { t:"Start", tone:"start" }; const seg = bp[bp.length-1];
+    if (!isBranchSeg(seg)) return { t:"Loop", tone:"loop" };
+    const par = nodeAt(f, bp.slice(0,-1)) || {}, lane = (par.paths||[])[seg.path] || {};
+    if (seg.success) return { t:"Success", tone:"merge" };
+    if (seg.otherwise) return par.kind==="merge" ? { t:"Timeout", tone:"merge" } : { t:"Otherwise", tone:"if" };
+    if (isIfElse(par)) return seg.path===0 ? { t:"IF", tone:"if" } : { t:"Else", tone:"if" };
+    if (isSplitBranch(par)) return { t:"Split path "+(seg.path+1), tone:"split", n:lane.name };
+    return { t:"Branch "+(seg.path+1), tone:"if", n:lane.name }; };
+  // every place a piece can go, in tree order: each path's start, then right after each step (a flow node = after its whole
+  // block). pk = the row it hangs under, so the list can draw the tree and keep a parent visible for context.
+  const dtTargets = (pid) => { const out = [], f = dtFlowRef.current;
+    const walk = (arr, bp, depth, pk) => {
+      const where = dtPathLabel(bp, f), r0 = dtCanDrop(pid, bp, 0), sk = pathKey(bp)+":0", lt = dtLaneTag(bp, f);
+      out.push({ pid, key:sk, pk, bp, index:0, depth, start:true, tag:lt.t, tone:lt.tone, lname:lt.n, label: bp.length ? "Start of "+where : "Start of the workflow", where: bp.length ? "first step of "+where : "first step, right after the trigger", ok:r0.ok, why:r0.why, firstId:arr[0] && arr[0].id });
+      arr.forEach((n, i) => { const r = dtCanDrop(pid, bp, i+1), k = dtKindOf(n), block = !!dtLanes(n), p = [...bp, i], key = pathKey(bp)+":"+(i+1);
+        out.push({ pid, key, pk: bp.length ? sk : null, bp, index:i+1, depth, kind:k, block, label:dtCap(dtLine(n)), where:(block ? "after the whole "+DT_TYPE[k].k+" · " : "")+"in "+where, ok:r.ok, why:r.why, nodeId:n.id });
+        if (n.kind==="branch" || n.kind==="merge") { (n.paths||[]).forEach((pp, k2)=>walk(pp.children||[], [...p, { path:k2 }], depth+1, key));
+          if (n.success) walk(n.success.children||[], [...p, { success:true }], depth+1, key); if (n.otherwise) walk(n.otherwise.children||[], [...p, { otherwise:true }], depth+1, key); }
+        else if (n.kind==="loop") walk(n.children||[], p, depth+1, key);
       }); };
-    walk(f, [], 0); return out; };
+    walk(f, [], 0, null); return out; };
   // the canvas highlight while a step is hovered in the list: a soft box over that step + a "goes here" line under it
   const dtRectOf = (id) => { const w = id && document.querySelector(`[data-dtn="${id}"]`); if (!w) return null;
     let l = 1e9, t = 1e9, r = -1e9, b = -1e9; [...w.children].forEach(c => { const x = c.getBoundingClientRect(); if (!x.width && !x.height) return; l = Math.min(l, x.left); t = Math.min(t, x.top); r = Math.max(r, x.right); b = Math.max(b, x.bottom); });
     return r > l ? { l, t, r, b, el:w.children[0] } : null; };
-  const dtHighlight = (tg) => { const h = dtHl.current; cancelAnimationFrame(h.raf);
-    if (!h.box) { h.box = document.createElement("div"); h.box.setAttribute("data-nf", "dt-hl"); h.line = document.createElement("div"); h.line.setAttribute("data-nf", "dt-hl-line");
-      const s = document.createElement("span"); s.textContent = "Goes here"; h.line.appendChild(s); document.body.appendChild(h.box); document.body.appendChild(h.line); }
-    const off = () => { h.box.classList.remove("on"); h.line.classList.remove("on"); };
-    const id = tg && (tg.nodeId || tg.firstId); const R0 = id && dtRectOf(id); if (!R0) { off(); return; }
-    dtScrollTo(R0.el);
-    const tick = () => { const R = dtRectOf(id); if (!R) { off(); return; }
-      if (tg.nodeId) { Object.assign(h.box.style, { left:(R.l+4)+"px", top:(R.t-2)+"px", width:(R.r-R.l-8)+"px", height:(R.b-R.t+4)+"px" }); h.box.classList.add("on"); } else h.box.classList.remove("on");
-      Object.assign(h.line.style, { left:(R.l+24)+"px", top:(tg.nodeId ? R.b+2 : R.t-6)+"px", width:Math.max(120, R.r-R.l-48)+"px" }); h.line.classList.add("on");
-      h.line.classList.toggle("onbox", !!tg.nodeId);   // over a step: the box's own dashed edge is the line, only the label shows
+  // ── preview (user 2026-11-05): hovering a place in the Reattach list, or dragging over the canvas, draws the piece ITSELF
+  //    in the flow — faded, inside a dashed "Attaches here" boundary — exactly as it will look once attached. Render-only:
+  //    the doc (and undo) never sees it.
+  const dtHlEnsure = () => { const h = dtHl.current; if (h.box) return h;
+    h.box = document.createElement("div"); h.box.setAttribute("data-nf", "dt-hl"); h.box.appendChild(document.createElement("span"));
+    const acts = document.createElement("div"); acts.className = "dt-hla";
+    const put = document.createElement("button"); put.type = "button"; put.className = "dt-hput"; put.textContent = "Put it here"; put.onclick = (e)=>{ e.stopPropagation(); h.onPut && h.onPut(); };
+    const see = document.createElement("button"); see.type = "button"; see.className = "dt-hsee"; put.setAttribute("data-dt-act", ""); see.setAttribute("data-dt-act", "");
+    see.onclick = (e)=>{ e.stopPropagation(); h.onSee && h.onSee(); };
+    acts.appendChild(put); acts.appendChild(see); h.box.appendChild(acts);
+    h.line = document.createElement("div"); h.line.setAttribute("data-nf", "dt-hl-line"); h.line.appendChild(document.createElement("span"));
+    document.body.appendChild(h.box); document.body.appendChild(h.line); return h; };
+  // the preview's OWN connectors turn blue + dashed (user 2026-11-05): the elbow from the rail into its paths and the lines
+  // between its inner steps. The rail of the path it is dropped into (the leftmost vertical line) stays as it is.
+  const dtMarkLines = (els, all) => { const lines = [];
+    els.forEach(root => root.querySelectorAll("div").forEach(d => { const st = d.getAttribute("style") || ""; if (!/var\(--border2\)/.test(st)) return;
+      const r = d.getBoundingClientRect(); if (!r.width && !r.height) return;
+      const elbow = /border-bottom/.test(st) && /border-left/.test(st), vert = !elbow && r.width <= 3 && r.height > 3;
+      if (elbow || vert) lines.push({ d, r, elbow }); }));
+    const eb = lines.filter(x => x.elbow), rail = Math.min(...(eb.length ? eb : lines).map(x => x.r.left), 1e9);   // the outermost elbow sits on the rail it drops onto
+    lines.forEach(({ d, r, elbow }) => { const own = all || elbow || Math.abs(r.left - rail) > 3; d.toggleAttribute("data-dt-pl", own); if (own) d.toggleAttribute("data-dt-pv", !elbow); }); };
+  const dtHighlight = (tg) => setDtPrev(tg && tg.ok ? { pid:tg.pid, bp:tg.bp, index:tg.index, scroll:true } : null);
+  // the blue preview lines are painted onto the real line elements; clear them as soon as the preview ends, because React
+  // keeps those same elements for the steps once they are attached (user 2026-11-05)
+  const dtUnmarkLines = () => document.querySelectorAll("[data-dt-pl]").forEach(d => { d.removeAttribute("data-dt-pl"); d.removeAttribute("data-dt-pv"); });
+  useEffect(()=>{ const h = dtHlEnsure(); cancelAnimationFrame(h.raf); dtUnmarkLines();
+    if (!dtPrev) { h.box.classList.remove("on", "prev", "dtslot", "acts"); return; }
+    const slot = !!dtPrev.slot; h.box.classList.toggle("dtslot", slot); h.box.classList.toggle("acts", !!dtPrev.acts);
+    h.box.firstChild.textContent = (slot || dtPrev.acts) ? "" : "Attaches here";   // with actions, Put it here / Back sit where the chip was h.box.querySelector(".dt-hsee").textContent = slot ? "See preview" : "Back";
+    h.line.classList.remove("on"); let first = true, marks = 0;
+    const tick = () => { const els = [...document.querySelectorAll("[data-dt-prev] > *")]; let l = 1e9, t = 1e9, r = -1e9, b = -1e9;
+      els.forEach(c => { const x = c.getBoundingClientRect(); if (!x.width && !x.height) return; l = Math.min(l, x.left); t = Math.min(t, x.top); r = Math.max(r, x.right); b = Math.max(b, x.bottom); });
+      if (r > l) { const sl = slot ? 26 : 0;   // the empty box starts right of the rail, so its blue connector stays in view
+        Object.assign(h.box.style, { left:(l-10+sl)+"px", top:(t-10)+"px", width:(r-l+20-sl)+"px", height:(b-t+16)+"px" }); h.box.classList.add("on", "prev");
+        if (first && dtPrev.scroll) dtScrollTo(els[0]);
+        if (first || ++marks % 12 === 0) dtMarkLines(els, slot); first = false; }
+      else h.box.classList.remove("on");
       h.raf = requestAnimationFrame(tick); };
-    tick(); };
-  const dtPick = (pid, tg) => { const p = detached.find(x=>x.id===pid); if (!p || !tg.ok) return; dtArrive.current = p.items[0].id; attachAt(pid, tg.bp, tg.index); };
-  // drag a piece (its card, or the panel / popover title) onto the canvas (user 2026-11-05): nothing on the canvas moves and
-  // no drop spots appear — ONE "Put it here" line follows the pointer, at the place in the flow nearest to it (grey with the
-  // reason where the piece can't go). Let go there → it attaches with the landing glow. Esc or letting go elsewhere cancels.
+    tick(); return ()=>{ cancelAnimationFrame(h.raf); dtUnmarkLines(); }; }, [dtPrev]);
+  useEffect(()=>{ if (dtPrev && !detached.some(x=>x.id===dtPrev.pid)) setDtPrev(null); }, [detached, dtPrev]);
+  const dtPick = (pid, tg) => { const p = detached.find(x=>x.id===pid); if (!p || !tg.ok) return; setDtPrev(null); dtArrive.current = p.items[0].id; attachAt(pid, tg.bp, tg.index); };
+  // drag a piece (its card, or the panel / popover title) onto the canvas (user 2026-11-05). Once dragged out the piece is
+  // PICKED: it follows the pointer even after the button is let go. Wherever it can go, the flow opens a real gap there —
+  // an empty dashed "Put it here" box with its connector in blue. Click "Put it here" to attach, or "See preview" to fill the
+  // box with the piece's whole flow (then "Put it here" or "Back"). Esc or a click anywhere else cancels. A place it can't go
+  // shows a grey line with the reason.
   const dtDrag = (pid, e, onState) => { if (e.button!==0 || (e.target.closest && e.target.closest("button,a,input"))) return;
     const p = detached.find(x=>x.id===pid); if (!p) return; const v = dtView(p);
-    const sx = e.clientX, sy = e.clientY; let lx = sx, ly = sy, ghost = null, tick = null, best = null, scroller = null;
-    const h = dtHl.current; const targets = dtTargets(pid).filter(t => t.nodeId || t.firstId);
-    const ensure = () => { if (h.box) return; h.box = document.createElement("div"); h.box.setAttribute("data-nf", "dt-hl"); h.line = document.createElement("div"); h.line.setAttribute("data-nf", "dt-hl-line");
-      h.line.appendChild(document.createElement("span")); document.body.appendChild(h.box); document.body.appendChild(h.line); };
-    const pos = (t) => { const R = dtRectOf(t.nodeId || t.firstId); if (!R) return null; return { x:R.l, y: t.nodeId ? R.b+2 : R.t-6, w:Math.max(160, R.r-R.l-48) }; };
-    const hitAt = () => { let b = null, bd = 1e9;
-      targets.forEach(t => { const q = pos(t); if (!q) return; const dy = Math.abs(ly-q.y), dx = lx < q.x ? q.x-lx : Math.max(0, lx-(q.x+q.w+60))*0.3; const d = dy + dx*0.6;
-        if (d < bd) { bd = d; b = { t, q }; } });
+    const sx = e.clientX, sy = e.clientY; let lx = sx, ly = sy, ghost = null, tick = null, best = null, scroller = null, base = [], cur = "", frozen = false, live = true;
+    const h = dtHlEnsure(), all = dtTargets(pid).filter(t => t.nodeId || t.firstId);
+    // where each place sits WITHOUT the gap (content coordinates), so opening the gap never moves the target under you
+    const measure = () => { const any = document.querySelector("[data-dtn] > *"); scroller = any && dtScrollerOf(any); const st = scroller ? scroller.scrollTop : 0;
+      base = all.map(t => { const R = dtRectOf(t.nodeId || t.firstId); return R ? { t, x:R.l, y:(t.nodeId ? R.b+2 : R.t-6) + st, w:Math.max(160, R.r-R.l-48) } : null; }).filter(Boolean); };
+    const prevRect = () => { let t = 1e9, b = -1e9; document.querySelectorAll("[data-dt-prev] > *").forEach(c => { const x = c.getBoundingClientRect(); if (!x.height) return; t = Math.min(t, x.top); b = Math.max(b, x.bottom); }); return b > t ? { t, b } : null; };
+    const show = (q, full) => setDtPrev({ pid, bp:q.t.bp, index:q.t.index, scroll:false, slot:!full, acts:true });
+    const hitAt = () => { if (frozen) return; const st = scroller ? scroller.scrollTop : 0, P = cur ? prevRect() : null; let eff = ly;
+      if (P) { if (ly >= P.t - 8 && ly <= P.b + 8) return;                  // over the gap itself: keep it where it is
+        if (ly > P.b) { const below = base.find(q => q.y - st > P.t && q.t.nodeId); const R = below && dtRectOf(below.t.nodeId); eff = ly - (R ? (R.b + 2) - (below.y - st) : (P.b - P.t)); } }
+      let b = null, bd = 1e9;
+      base.forEach(q => { const y = q.y - st, dy = Math.abs(eff - y), dx = lx < q.x ? q.x - lx : Math.max(0, lx - (q.x + q.w + 60)) * 0.3, d = dy + dx*0.6; if (d < bd) { bd = d; b = q; } });
       best = bd < 90 ? b : null;
-      if (!best) { h.line.classList.remove("on"); if (ghost) ghost.classList.remove("ok"); return; }
-      const sp = h.line.firstChild; sp.textContent = best.t.ok ? "Put it here" : "Can’t go here · " + best.t.why;
-      h.line.classList.remove("onbox"); h.line.classList.toggle("bad", !best.t.ok);
-      Object.assign(h.line.style, { left:(best.q.x+24)+"px", top:best.q.y+"px", width:best.q.w+"px" }); h.line.classList.add("on");
-      if (ghost) ghost.classList.toggle("ok", !!best.t.ok); };
+      const k = best && best.t.ok ? best.t.key : "";
+      if (k !== cur) { cur = k; if (k) show(best, false); else setDtPrev(null); }
+      if (best && !best.t.ok) { h.line.firstChild.textContent = "Can’t go here · " + best.t.why; h.line.classList.remove("onbox"); h.line.classList.add("on", "bad");
+        Object.assign(h.line.style, { left:(best.x+24)+"px", top:(best.y - st)+"px", width:best.w+"px" }); }
+      else h.line.classList.remove("on", "bad");
+      if (ghost) ghost.classList.toggle("ok", !!k); };
     // near the canvas's top / bottom edge the flow scrolls by itself, so every place can be reached
-    const edge = () => { if (!scroller) { const any = document.querySelector("[data-dtn] > *"); scroller = any && dtScrollerOf(any); } if (!scroller) return;
-      const sr = scroller.getBoundingClientRect(), d = ly < sr.top+70 ? -14 : ly > sr.bottom-90 ? 14 : 0; if (d) scroller.scrollTop += d; hitAt(); };
-    const end = (drop) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key, true); clearInterval(tick);
-      if (!ghost) return; ghost.remove(); h.line.classList.remove("on", "bad"); document.documentElement.classList.remove("dt-dragging");
-      const hit = drop && best && best.t.ok ? best.t : null; onState && onState(false);
-      setTimeout(()=>{ dtDragged.current = false; }, 0); if (hit) dtPick(pid, hit); };
+    const edge = () => { if (!scroller || frozen) return; const sr = scroller.getBoundingClientRect(), d = ly < sr.top+70 ? -14 : ly > sr.bottom-90 ? 14 : 0; if (d) scroller.scrollTop += d; hitAt(); };
+    const end = (hit) => { if (!live) return; live = false;
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key, true); window.removeEventListener("pointerdown", down, true);
+      clearInterval(tick); h.onPut = h.onSee = null;
+      if (ghost) ghost.remove(); h.line.classList.remove("on", "bad"); document.documentElement.classList.remove("dt-dragging", "dt-carrying");
+      onState && onState(false); setTimeout(()=>{ dtDragged.current = false; }, 0);
+      if (hit) dtPick(pid, hit); else setDtPrev(null); };
+    h.onPut = () => { if (best && best.t.ok) end(best.t); };
+    h.onSee = () => { if (!best || !best.t.ok) return; frozen = !frozen; if (ghost) ghost.style.display = frozen ? "none" : ""; show(best, frozen); };
     const move = (ev) => { lx = ev.clientX; ly = ev.clientY;
-      if (!ghost) { if (Math.hypot(lx-sx, ly-sy) < 6) return; dtDragged.current = true; ensure(); h.box.classList.remove("on"); onState && onState(true);
+      if (!ghost) { if (Math.hypot(lx-sx, ly-sy) < 6) return; dtDragged.current = true; setDtPrev(null); measure(); onState && onState(true);
         document.documentElement.classList.add("dt-dragging");
         ghost = document.createElement("div"); ghost.setAttribute("data-nf", "dt-ghost");
-        const b = document.createElement("b"); b.textContent = v.title; const sp = document.createElement("span"); sp.textContent = dtSteps(v.steps) + " · drop it in the workflow";
+        const b = document.createElement("b"); b.textContent = v.title; const sp = document.createElement("span"); sp.textContent = dtSteps(v.steps) + " · click Put it here · Esc cancels";
         ghost.appendChild(b); ghost.appendChild(sp); document.body.appendChild(ghost); tick = setInterval(edge, 16); }
-      ghost.style.left = lx+"px"; ghost.style.top = ly+"px"; hitAt(); };
-    const up = () => end(true);
-    const key = (ev) => { if (ev.key==="Escape" && ghost) { ev.stopPropagation(); ev.preventDefault(); end(false); } };
-    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("keydown", key, true); };
+      if (!frozen) { ghost.style.left = lx+"px"; ghost.style.top = ly+"px"; } hitAt(); };
+    // letting go does NOT attach: the piece stays picked, so "See preview" / "Put it here" can be clicked
+    const up = () => { if (!ghost) { end(null); return; } document.documentElement.classList.add("dt-carrying"); };
+    const down = (ev) => { if (ev.target.closest && ev.target.closest("[data-dt-act]")) return; if (document.documentElement.classList.contains("dt-carrying")) { ev.stopPropagation(); ev.preventDefault(); end(null); } };
+    const key = (ev) => { if (ev.key==="Escape" && ghost) { ev.stopPropagation(); ev.preventDefault(); end(null); } };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("keydown", key, true); window.addEventListener("pointerdown", down, true); };
   // after a reattach: the steps settle in with a short glow and the canvas scrolls to them
   useEffect(()=>{ const id = dtArrive.current; if (!id) return; dtArrive.current = null;
     requestAnimationFrame(()=>{ const w = document.querySelector(`[data-dtn="${id}"]`); if (!w) return; const el = w.children[0]; if (el) dtScrollTo(el);
@@ -12654,7 +12726,7 @@ function App() {
     if (showLead) out.push(<InsertZone key="iz-lead" basePath={basePath} index={0} dbl={izDbl} noRail={izNoRail} label={izLabel} />);
     rendered.forEach((el, i) => {
       const simple = el && nodes[i] && !(nodes[i].kind==="branch" || nodes[i].kind==="merge" || nodes[i].kind==="loop");
-      const tagged = (EMBED && el && nodes[i]) ? <div key={"dtn-"+nodes[i].id} data-dtn={nodes[i].id} style={{ display:"contents" }}>{el}</div> : el;
+      const tagged = (EMBED && el && nodes[i]) ? <div key={"dtn-"+nodes[i].id} data-dtn={nodes[i].id} data-dt-prev={dtPrevIds && dtPrevIds.has(nodes[i].id) ? "" : undefined} data-dt-slot={nodes[i].id==="__dtslot" ? "" : undefined} style={{ display:"contents" }}>{el}</div> : el;
       put((ci>0 && i===ci-1 && simple) ? <div key="dt-src" data-nf="cutsrc">{tagged}</div> : tagged, i);
       if (i < rendered.length-1) put(<InsertZone key={"iz-"+i} basePath={basePath} index={i+1} dbl={izDbl} noRail={izNoRail} label={izLabel} />, i+1 === ci ? -1 : i+1);
     });

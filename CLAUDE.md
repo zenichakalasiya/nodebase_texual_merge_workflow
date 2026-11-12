@@ -620,28 +620,45 @@ Reference docs in the repo root (generated this project):
 - `OPERATORS.md`: Linear vs the real product's operators, side by side.
 - `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
 
-**Detached steps (Linear view, skin sections 47–54).** Hover the line between
+**Detached steps (Linear view, skin sections 47–59).** Hover the line between
 two steps → a trash icon cuts everything below it into a "detached" piece
 (`detachAt`). Pieces live in `doc.detached`, so undo/redo covers them. They
 never run, and they are never folded or stored away: the stack stays on the
 right until each piece is reattached or deleted (the toolbar "Detached N"
-button and the fold button were removed; `dtFold` is dead code).
+button and the fold button were removed; `dtFold` is dead code). Cards show
+no time.
 - **Two designs**, top bar **Detach** switch (`dtVer`, message `wf:'dtver'`):
-  **1 · Panel** — click a card → drill-down detail with Reattach + Delete under
-  the title; **2 · Popover** — hover a card → Reattach/Delete icons on the card
-  and a popover to its LEFT. The stack stays spread while a popover is open.
+  **1 · Panel** — click a card → drill-down detail with a primary **Reattach**
+  text button + delete icon at its top right; **2 · Popover** — hover a card →
+  the same Reattach button + delete icon on the card, and a popover to its
+  LEFT. The stack stays spread while a popover is open.
 - **Detail content:** 2-line summary + Read more (plain text), then the steps
   drawn like the canvas (`DtCanvas` / `dtCanvasOf`, `dc-*` CSS): lanes branch
-  80px right, dot-to-dot connectors, no stubs. No time, no "Was in", no
-  warning notes.
-- **Reattach:** a step list on the left (`DtPicker`, `dtTargets`); hovering a
-  row outlines that step on the canvas (one dashed box + "Goes here"), click
-  attaches with a landing glow (`dtPick`). Rules live in `dtCanDrop()`.
-- **Drag:** cards and the panel/popover title drag onto the canvas (`dtDrag`)
-  — ONE "Put it here" line follows the pointer (grey + reason where it can't
-  go); nothing else on the canvas reacts. Empty paths aren't drop targets
-  (Reattach covers them). The old "Put it here" everywhere spots
-  (`placing` / `dtDropBar`) are unused.
+  80px right, 28px between paths, dot-to-dot connectors, no stubs. No time,
+  no "Was in", no warning notes.
+- **Preview in the flow** (`dtPrev` state, declared next to `flow`): while a
+  place is previewed, `flow` itself is the real flow WITH the piece inserted
+  (`dtShown`) so every canvas helper agrees; the attach/detach logic reads the
+  real flow via `dtFlowRef`. Render-only — the doc and undo never see it.
+  Preview steps are tagged `data-dt-prev` (faded), wrapped in a dashed
+  "Attaches here" box (`dtHl` overlay), and their own connectors are painted
+  blue + dashed (`dtMarkLines`, cleared by `dtUnmarkLines` when it ends).
+- **Reattach list** (`DtPicker`, `dtTargets`, `dtLaneTag`): only places the
+  piece can go, drawn as a tree like the canvas — "Start of the workflow",
+  steps with type icon + "After this step / After the whole IF / Else", and
+  each path as its canvas badge (IF, ELSE, BRANCH 1, SPLIT PATH 2, SUCCESS,
+  TIMEOUT, LOOP) hanging off its parent on an elbow. Ineligible parents stay
+  visible, muted, for context (`pk` = parent key). Hover → full preview;
+  click → attach with a landing glow (`dtPick`). Rules live in `dtCanDrop()`.
+- **Drag = pick up** (`dtDrag`): drag a card / panel or popover title out and
+  let go — the piece stays picked and follows the pointer. The flow opens a
+  real gap (a hidden empty step `__dtslot`, `data-dt-slot`) shown as an empty
+  dashed box with a blue connector and **Put it here** / **See preview**;
+  See preview fills it with the whole flow (**Put it here** / **Back**). Esc or
+  clicking elsewhere cancels. Can't-go places show a grey line with the
+  reason. Empty paths aren't drag targets (the list covers them). The old
+  drop spots (`placing` / `dtDropBar`) are unused.
+- Don't name overlay classes `slot` — V8 uses `.slot` for its dashed blanks.
 - Every rendered step is wrapped in `<div data-dtn={id} style="display:contents">`
   so the highlight can find it.
 - `EMBED_DEMO_DOC` is the full demo flow (IF/Else, 3-lane split, merge,

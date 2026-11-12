@@ -1398,3 +1398,99 @@ html.embed .dc-node > .dc-row + .dc-lanes::before{ height:42px; }
 /* when the next thing is a group of paths (IF / Else, Branch, Split), the line runs on to that group's first elbow */
 html.embed .dc-lane:has(> .dc-path > .dc-node:first-child > .dc-lanes:first-child) > .dc-row::before{ bottom:-38px; }
 html.embed .dc-node:not(:last-child):has(+ .dc-node > .dc-lanes:first-child)::before{ bottom:-28px; }
+
+
+/* 55. Preview + CTAs (user 2026-11-05).
+   · The piece is previewed IN the flow (Reattach hover / drag): its steps faded, inside one dashed "Attaches here" boundary.
+   · Cards carry no time. V1: "Reattach" CTA, delete icon at the top right. V2: on hover a primary "Reattach" + delete icon. */
+html.embed [data-dt-prev] > *{ opacity:.55; filter:saturate(.55); pointer-events:none; animation:dtPrevIn .22s ease-out both; }
+@keyframes dtPrevIn{ from{ opacity:0; } to{ opacity:.55; } }
+html.embed [data-nf="dt-hl"].prev{ border:1.5px dashed #3d8bd0; background:rgba(61,139,208,.045); border-radius:12px; }
+html.embed [data-nf="dt-hl"] > span{ display:none; }
+html.embed [data-nf="dt-hl"].prev > span{ display:block; position:absolute; left:12px; top:0; transform:translateY(-50%); padding:3px 8px; border-radius:6px;
+  background:#3d8bd0; color:#fff; font:500 11px 'Inter',system-ui,sans-serif; white-space:nowrap; }
+/* V1: delete sits at the detail's top right, the title leaves room for it */
+html.embed [data-nf="dt-nc"] .dt-nd .dt-ndcard{ position:relative; }
+html.embed [data-nf="dt-nc"] .dt-btnd.dt-tr{ position:absolute; top:12px; right:12px; width:30px; height:30px; padding:0; justify-content:center; border-radius:8px; z-index:1; }
+html.embed [data-nf="dt-nc"] .dt-nd .dt-ndhd{ padding-right:38px; }
+/* V2: the primary text CTA on the card */
+html.embed .dt-rb{ height:26px; padding:0 10px; border:none; border-radius:7px; background:#3d8bd0; color:#fff; font-size:12px; font-weight:500;
+  display:inline-flex; align-items:center; gap:5px; cursor:pointer; white-space:nowrap; }
+html.embed .dt-rb:hover{ background:#3479b8; }
+html.embed [data-nf="dt-nc"] .dt-cacts{ align-items:center; gap:6px; }
+
+/* 56. V1 detail (user 2026-11-05): Reattach moves up to the top right, just left of the delete icon */
+html.embed [data-nf="dt-nc"] .dt-tra{ position:absolute; top:12px; right:12px; display:flex; align-items:center; gap:6px; z-index:1; }
+html.embed [data-nf="dt-nc"] .dt-tra .dt-btnd.dt-tr{ position:static; }
+html.embed [data-nf="dt-nc"] .dt-tra .dt-rb{ height:30px; border-radius:8px; padding:0 12px; }
+html.embed [data-nf="dt-nc"] .dt-nd .dt-ndhd{ padding-right:132px; }
+
+
+/* 57. Preview connectors (user 2026-11-05): the previewed piece's own lines — the elbow from the rail into its paths and the
+   lines between its inner steps — are drawn blue + dashed, like the "Attaches here" boundary. The rail it drops onto stays. */
+html.embed [data-dt-prev] > *{ opacity:.62; }
+html.embed [data-dt-pl]{ border-color:#3d8bd0 !important; border-left-style:dashed !important; border-bottom-style:dashed !important; }
+html.embed [data-dt-pl][data-dt-pv]{ background:none !important; border-left:1.5px dashed #3d8bd0 !important; width:0 !important; }
+@keyframes dtPrevIn{ from{ opacity:0; } to{ opacity:.62; } }
+html.embed [data-dt-prev] > *{ filter:none; }   /* faded but not greyed, so the blue connectors stay clearly blue */
+/* blue preview lines only ever show inside a live preview — never on attached steps */
+html.embed :not([data-dt-prev]) [data-dt-pl]:not([data-dt-prev] *){ border-color:var(--border2) !important; border-style:solid !important; }
+html.embed [data-dt-pl][data-dt-pv]:not([data-dt-prev] *){ background:var(--border2) !important; border-left:none !important; width:1.6px !important; }
+
+
+/* 58. Drag = pick up (user 2026-11-05). The flow opens a real gap where the piece would go: an empty dashed "Put it here" box
+   whose connector is blue. Its actions: Put it here (attach) · See preview (fills the box with the whole flow) / Back. */
+html.embed [data-dt-slot] > *{ visibility:hidden; animation:none; }
+html.embed [data-dt-slot] [data-dt-pl]{ visibility:visible; }
+html.embed [data-nf="dt-hl"].dtslot{ background:rgba(61,139,208,.06); border:1.5px dashed #3d8bd0; display:flex; align-items:center; justify-content:center; }
+html.embed [data-nf="dt-hl"].dtslot > span{ display:none; }
+html.embed [data-nf="dt-hl"] .dt-hla{ display:none; }
+html.embed [data-nf="dt-hl"].acts .dt-hla{ display:flex; gap:8px; align-items:center; pointer-events:auto; }
+html.embed [data-nf="dt-hl"].acts:not(.dtslot) .dt-hla{ position:absolute; right:10px; top:0; transform:translateY(-50%); }
+html.embed [data-nf="dt-hl"] .dt-hla button{ pointer-events:auto !important; cursor:pointer !important; height:28px; padding:0 12px; border-radius:8px;
+  font:500 12px 'Inter',system-ui,sans-serif; white-space:nowrap; }
+html.embed [data-nf="dt-hl"] .dt-hput{ border:none; background:#3d8bd0; color:#fff; box-shadow:0 2px 8px rgba(61,139,208,.3); }
+html.embed [data-nf="dt-hl"] .dt-hput:hover{ background:#3479b8; }
+html.embed [data-nf="dt-hl"] .dt-hsee{ border:1px solid rgba(61,139,208,.45); background:#fff; color:#3d8bd0; }
+html.embed [data-nf="dt-hl"] .dt-hsee:hover{ background:#eef5fc; }
+/* while carrying (button let go), the canvas stays quiet but the box's actions can be clicked */
+html.embed.dt-carrying body *{ pointer-events:none !important; }
+html.embed.dt-carrying [data-nf="dt-hl"] .dt-hla, html.embed.dt-carrying [data-nf="dt-hl"] .dt-hla button{ pointer-events:auto !important; }
+html.embed.dt-carrying, html.embed.dt-carrying *{ cursor:grabbing; user-select:none; }
+html.embed [data-nf="dt-hl"] .dt-hla button{ text-decoration:none !important; border-bottom-style:solid; }
+html.embed [data-nf="dt-hl"].acts:not(.dtslot) .dt-hla{ left:118px; right:auto; }   /* full preview: actions sit beside the "Attaches here" chip */
+html.embed [data-nf="dt-hl"].acts:not(.dtslot) .dt-hla button{ height:24px; padding:0 10px; }
+html.embed [data-dt-slot] [data-dt-pl]{ border-left-width:2px !important; }
+html.embed [data-nf="dt-hl"] .dt-hla button{ background-image:none !important; }
+html.embed [data-nf="dt-hl"] .dt-hput{ background-color:#3d8bd0 !important; }
+html.embed [data-nf="dt-hl"] .dt-hsee{ background-color:#fff !important; }
+html.embed [data-nf="dt-hl"] .dt-hput{ border:none !important; }
+html.embed [data-nf="dt-hl"] .dt-hsee{ border:1px solid rgba(61,139,208,.45) !important; }
+
+
+/* 59. Reattach list as a tree (user 2026-11-12): rows hang off their parent like the canvas — a guide line down each level,
+   an elbow into each path, and the path's own badge (IF / ELSE / BRANCH 1 / SPLIT PATH 2 / SUCCESS / TIMEOUT / LOOP).
+   Parents of eligible places stay visible, muted and not clickable, for context. The drag preview has no chip. */
+html.embed [data-nf="dt-pick"] .dp-l{ padding:2px 6px 8px; }
+html.embed [data-nf="dt-pick"] .dp-r{ position:relative; min-height:44px; gap:10px; padding-top:5px; padding-bottom:5px; }
+html.embed [data-nf="dt-pick"] .dp-r.hd{ min-height:38px; }
+html.embed [data-nf="dt-pick"] .dp-g{ position:absolute; top:0; bottom:0; width:1.5px; background:#dfe6ee; pointer-events:none; }
+html.embed [data-nf="dt-pick"] .dp-el{ position:absolute; top:0; height:50%; border-left:1.5px solid #dfe6ee; border-bottom:1.5px solid #dfe6ee; border-bottom-left-radius:8px; pointer-events:none; }
+html.embed [data-nf="dt-pick"] .dp-r .dt-vi{ position:relative; z-index:1; box-shadow:0 0 0 3px #fff; }
+html.embed [data-nf="dt-pick"] .dp-r:hover:not(:disabled) .dt-vi{ box-shadow:0 0 0 3px #eef5fc; }
+html.embed [data-nf="dt-pick"] .dp-t b{ font-size:12.5px; font-weight:500; }
+html.embed [data-nf="dt-pick"] .dp-t small{ font-size:11px; margin-top:1px; }
+html.embed [data-nf="dt-pick"] .dp-hd{ display:flex; align-items:center; gap:6px; min-width:0; }
+html.embed [data-nf="dt-pick"] .dp-hd .dc-b{ font-size:9.5px; padding:4px 7px; }
+html.embed [data-nf="dt-pick"] .dp-hd b{ font-size:12px; }
+html.embed [data-nf="dt-pick"] .t-trg{ background:#e8f1fb; color:#3d8bd0; }
+html.embed .dc-b.t-start{ color:#3d8bd0; background:#e8f1fb; }
+html.embed [data-nf="dt-pick"] .dp-r.ctx{ cursor:default; opacity:1; min-height:34px; }
+html.embed [data-nf="dt-pick"] .dp-r.ctx:hover{ background:none; }
+html.embed [data-nf="dt-pick"] .dp-r.ctx .dp-t b{ color:var(--dt-muted); font-weight:500; font-size:12px; }
+html.embed [data-nf="dt-pick"] .dp-r.ctx .dt-vi, html.embed [data-nf="dt-pick"] .dp-r.ctx .dc-b{ opacity:.6; }
+/* drag preview: no "Attaches here" chip — Put it here / Back sit in its place, top left */
+html.embed [data-nf="dt-hl"].acts:not(.dtslot) > span{ display:none; }
+html.embed [data-nf="dt-hl"].acts:not(.dtslot) .dt-hla{ left:12px; right:auto; }
+html.embed [data-nf="dt-pick"] .dp-r.hd .dp-t{ flex-direction:row; align-items:center; gap:8px; }
+html.embed [data-nf="dt-pick"] .dp-r.hd .dp-t small{ margin-top:0; }
