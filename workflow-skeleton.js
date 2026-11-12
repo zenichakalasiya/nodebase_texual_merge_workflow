@@ -113,4 +113,6 @@
       if(v === '2') cycle(); else stop(); },   // 3 · New workflow and 4 · Loader are CSS only
     restart(){ if(root.classList.contains('skel-v2')) cycle(); }
   };
+  /* FINAL (user 2026-11-12): skeleton 2 · step by step is the only design — start building as soon as the page loads */
+  window.SkelV2.set('2');
 })();

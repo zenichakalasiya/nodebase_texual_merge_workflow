@@ -12,7 +12,9 @@
 <link rel="stylesheet" href="workflow-chrome.css">
 <link rel="stylesheet" href="workflow-skeleton.css">
 <script>/* ?skeleton=hold keeps the loading skeletons on screen for design review */
-if(/[?&]skeleton=hold\b/.test(location.search)) document.documentElement.classList.add('skel-hold');</script>
+if(/[?&]skeleton=hold\b/.test(location.search)) document.documentElement.classList.add('skel-hold');
+/* the loading skeleton is FINAL on version 2 · step by step (user 2026-11-12) — from the very first paint */
+document.documentElement.classList.add('skel-v2');</script>
 <style>
   :root{
     --page-text:#364658;

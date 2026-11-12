@@ -629,7 +629,7 @@ reads "Detach this branch's steps" — the branch stays, empty. Pieces live in
 away: the stack (374px wide, `DT_W`) stays on the right until each piece is
 reattached or deleted. Cards show no time; every card has a ⋮ menu
 (Reattach / Delete) on hover; V1 cards also show a › on hover.
-- **Two designs**, top bar **Detach** switch (`dtVer`, message `wf:'dtver'`):
+- **Two designs (FINAL = 1 · Panel since Version 2; the switch is gone)** (`dtVer`, message `wf:'dtver'`):
   **1 · Panel** — click a card → drill-down detail at the card's exact width,
   with **Reattach** + delete icon at its top right; its left edge has a
   resizer (`startRsz`, max = the flow's natural width, double-click = fit /
@@ -688,19 +688,21 @@ back. It's built from the drawn rail divs, so it follows any shape.
 
 **Loading skeletons** (`workflow-skeleton.css` / `.js`, markup in
 `workflow-canvas.html`; Node view `.nskel`, Linear view `.lskel`). The top
-bar's **Skeleton** button holds the skeleton on screen; the **Skeleton**
-switch next to it (both views, every load starts on 1) picks the design:
-1 · Whole (static), 2 · Step by step (`SkelV2` builds it node by node — Node:
-the blue line draws at a constant speed and each node lands as it arrives;
-Linear: the column is revealed top to bottom with a blue rail tip),
-3 · New workflow (trigger only + the empty next spot), 4 · Loader (a small
-workflow icon animation, CSS only). All grey except the blue line. No loading
-text (screen-reader label only).
+bar's **Skeleton** button holds the skeleton on screen for review.
+**FINAL (Version 2, 2026-11-12): design 2 · Step by step** — `html.skel-v2`
+is set in the page head from first paint and `SkelV2.set('2')` starts the
+build on load (Node: the blue line draws at a constant speed and each node
+lands as it arrives; Linear: the column is revealed top to bottom with a blue
+rail tip). The design switch is gone. Designs 1 (whole), 3 (trigger only) and
+4 (loader) still exist in the CSS/markup but nothing can select them. All
+grey except the blue line. No loading text (screen-reader label only).
 
-The top bar's design switches (Linear view only) are **Text field** (A / B / C
-/ D, always starts on B) and **Detach** (1 / 2). The **Popup** switch is
-hidden (V1 always). Picker, Email and Tags switches were removed once those
-were finalised. Side-by-side field rows (panel > 510px) are CSS container
+**Design switches: none left.** Version 2 (2026-11-12) finalised **Text field
+B** (Editor in popup) and **Detach 1 · Panel** — their switches were removed;
+the top bar sends `textver:'B'` / `dtver:'1'` on frame ready, which are also
+the Linear view's own defaults. The **Popup** switch is hidden (V1 always).
+Picker, Email and Tags switches were removed earlier once finalised. So the
+Detach V2 (Popover) code is still in `DetachTray` but unreachable. Side-by-side field rows (panel > 510px) are CSS container
 queries in `node-skin.css` (14e, plus section 36 that keeps them side by side
 while a value popup is open).
 

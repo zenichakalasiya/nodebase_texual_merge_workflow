@@ -1,4 +1,9 @@
-# Handoff — 2026-11-12 17:05
+# Handoff — 2026-11-12 17:05 (updated: Version 2 released)
+
+## Version 2 (released 2026-11-12, git tag `v2`)
+Finalised and published by the user: **Skeleton 2 · Step by step**, **Detach 1 · Panel**, **Text field B**. All three
+design switches were removed from the top bar (the Skeleton preview button stays). Skeleton 2 runs from first paint.
+The other options' code (skeletons 1/3/4, Detach Popover) is still in the files but unreachable — candidates for cleanup.
 
 ## Read first
 

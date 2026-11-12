@@ -175,19 +175,13 @@
       + `</div>`
       + `<div class="pagebar-right">`
         /* Email recipients + Tags designs were FINALISED on 1.2 (user 2026-10-19) — their version switches are gone */
-        /* Text field trial (user 2026-10-21): three ways a free-text field gets the Specific | Dynamic popup */
-        + `<label class="email-ver" id="textVer" data-tip="Subject / Description field — design option"><span>Text field</span>`
-          + `<select id="textVerSel" aria-label="Text field design option"><option value="A">A · Either / or</option><option value="B">B · Editor in popup</option><option value="C">C · Type in field</option><option value="D">D · Type + f(x)</option></select></label>`
+        /* Text field FINALISED on B · Editor in popup (user 2026-11-12, Version 2) — its switch is gone */
         /* Sidebar popup trial: V1 opens below the field · V2 opens on the field, its tabs covering it (user 2026-10-22) */
         + `<label class="email-ver" id="popVer" hidden data-tip="Popups opened from a sidebar field — design option"><span>Popup</span>`
           + `<select id="popVerSel" aria-label="Sidebar popup design option"><option value="1">V1 · Below</option><option value="2">V2 · On the field</option></select></label>`
-        /* Detached-steps design trial (user 2026-11-05): 1 Panel (drill-down) · 2 Popover (Linear view only) */
-        + `<label class="email-ver" id="dtVer" data-tip="Detached steps — design option"><span>Detach</span>`
-          + `<select id="dtVerSel" aria-label="Detached steps design option"><option value="1">1 · Panel</option><option value="2">2 · Popover</option></select></label>`
+        /* Detached steps FINALISED on 1 · Panel (user 2026-11-12, Version 2) — its switch is gone */
         /* Skeleton preview (user 2026-11-03): shows the open view's loading skeleton, for handover to dev */
-        /* Skeleton design (user 2026-11-05): 1 whole skeleton at once · 2 builds step by step — both views */
-        + `<label class="email-ver skel-ver" id="skelVer" data-tip="Loading skeleton — design option">`
-          + `<select id="skelVerSel" aria-label="Loading skeleton design option"><option value="1">Skeleton 1 · Whole</option><option value="2">Skeleton 2 · Step by step</option><option value="3">Skeleton 3 · New workflow</option><option value="4">Skeleton 4 · Loader</option></select></label>`
+        /* Loading skeleton FINALISED on 2 · Step by step (user 2026-11-12, Version 2) — its switch is gone; the Skeleton button still previews it */
         + `<button class="btn-outline skel-btn" id="skelBtn" type="button" aria-pressed="false" data-tip="Preview the loading skeleton of this view">Skeleton</button>`
         + `<div class="enable-row"><span>Enabled</span>`
           + `<button class="switch on" id="enableSw" role="switch" aria-checked="true"><span>ON</span><i></i></button></div>`
@@ -513,17 +507,7 @@
     const syncSkel = () => skelBtn.setAttribute('aria-pressed', String(document.documentElement.classList.contains('skel-hold')));
     syncSkel();
     skelBtn.addEventListener('click', () => { document.documentElement.classList.toggle('skel-hold'); syncSkel(); window.SkelV2 && SkelV2.restart(); });
-    const skSel = $('#skelVerSel');
-    skSel.value = '1';   // every load starts on 1
-    skSel.addEventListener('change', () => window.SkelV2 && SkelV2.set(skSel.value));
-    const tvSel = $('#textVerSel');
-    tvSel.value = 'B';   // every load starts on B (user 2026-11-05): a pick lasts for this visit only
-    tvSel.addEventListener('change', () => {
-      linearSend({ wf:'textver', v: tvSel.value });
-    });
-    const dvSel = $('#dtVerSel');
-    dvSel.value = '1';
-    dvSel.addEventListener('change', () => linearSend({ wf:'dtver', v: dvSel.value }));
+    /* Version 2 finals (user 2026-11-12): skeleton 2 · step by step, Text field B, Detach 1 · Panel — no switches */
     const pvSel = $('#popVerSel');
     pvSel.value = '1';   // Popup switch hidden (user 2026-11-05): V1 always
     pvSel.addEventListener('change', () => {
@@ -537,9 +521,9 @@
         /* its loading skeleton stays at least ~0.6s, so a fast load never flickers */
         setTimeout(() => linearEl.classList.add('ready'), Math.max(0, 600 - (performance.now() - linearStart)));
         linearSend({ wf:'details', name: flowName, desc: flowDesc });
-        linearSend({ wf:'textver', v: $('#textVerSel').value });
+        linearSend({ wf:'textver', v: 'B' });
         linearSend({ wf:'popver', v: $('#popVerSel').value });
-        linearSend({ wf:'dtver', v: $('#dtVerSel').value });
+        linearSend({ wf:'dtver', v: '1' });
         if(isLinear()) linearFrame.focus();
       } else if(m.wf === 'lock'){
         /* while locked, a click anywhere outside the Linear frame unpicks the piece (user 2026-11-12) */
