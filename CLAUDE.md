@@ -620,18 +620,24 @@ Reference docs in the repo root (generated this project):
 - `OPERATORS.md`: Linear vs the real product's operators, side by side.
 - `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
 
-**Detached steps (Linear view, skin sections 47–59).** Hover the line between
-two steps → a trash icon cuts everything below it into a "detached" piece
-(`detachAt`). Pieces live in `doc.detached`, so undo/redo covers them. They
-never run, and they are never folded or stored away: the stack stays on the
-right until each piece is reattached or deleted (the toolbar "Detached N"
-button and the fold button were removed; `dtFold` is dead code). Cards show
-no time.
+**Detached steps (Linear view, skin sections 47–65).** Hover a gap between
+steps → an **unlink** icon floats left of the + (grey, instant tooltip; hover
+tints the steps it takes grey, never red) and cuts everything below into a
+"detached" piece (`detachAt`). In the gap right under a branch's header it
+reads "Detach this branch's steps" — the branch stays, empty. Pieces live in
+`doc.detached`, so undo/redo covers them. They never run and are never folded
+away: the stack (374px wide, `DT_W`) stays on the right until each piece is
+reattached or deleted. Cards show no time; every card has a ⋮ menu
+(Reattach / Delete) on hover; V1 cards also show a › on hover.
 - **Two designs**, top bar **Detach** switch (`dtVer`, message `wf:'dtver'`):
-  **1 · Panel** — click a card → drill-down detail with a primary **Reattach**
-  text button + delete icon at its top right; **2 · Popover** — hover a card →
-  the same Reattach button + delete icon on the card, and a popover to its
-  LEFT. The stack stays spread while a popover is open.
+  **1 · Panel** — click a card → drill-down detail at the card's exact width,
+  with **Reattach** + delete icon at its top right; its left edge has a
+  resizer (`startRsz`, max = the flow's natural width, double-click = fit /
+  back). Small flows keep a small card; long ones grow to the screen bottom
+  (12px margin) then scroll both ways. **2 · Popover** — hover a card → a
+  popover to its LEFT. The stack stays spread while a popover or ⋮ menu is
+  open. Cards are `position:absolute` (JS lays the stack out) — never make
+  them relative.
 - **Detail content:** 2-line summary + Read more (plain text), then the steps
   drawn like the canvas (`DtCanvas` / `dtCanvasOf`, `dc-*` CSS): lanes branch
   80px right, 28px between paths, dot-to-dot connectors, no stubs. No time,
@@ -650,19 +656,35 @@ no time.
   TIMEOUT, LOOP) hanging off its parent on an elbow. Ineligible parents stay
   visible, muted, for context (`pk` = parent key). Hover → full preview;
   click → attach with a landing glow (`dtPick`). Rules live in `dtCanDrop()`.
-- **Drag = pick up** (`dtDrag`): drag a card / panel or popover title out and
-  let go — the piece stays picked and follows the pointer. The flow opens a
-  real gap (a hidden empty step `__dtslot`, `data-dt-slot`) shown as an empty
-  dashed box with a blue connector and **Put it here** / **See preview**;
-  See preview fills it with the whole flow (**Put it here** / **Back**). Esc or
-  clicking elsewhere cancels. Can't-go places show a grey line with the
-  reason. Empty paths aren't drag targets (the list covers them). The old
-  drop spots (`placing` / `dtDropBar`) are unused.
+- **Drag & drop** (`dtDrag`): while dragging, the flow opens a small
+  one-line **"Drop here"** gap (a hidden empty step `__dtslot`, `data-dt-slot`)
+  at the nearest valid place; steps it can't follow fade (`data-dt-no`; a
+  container stays bright while any place inside it is valid) and hovering
+  them says "Can't go here". Let go → the gap becomes the full preview with
+  **⠿ · Confirm place · ×** top right: ⠿ picks it up again (drag, or click
+  then click), Confirm attaches, × / Esc / a click outside the workflow (or
+  outside the frame — parent sends `wf:'dtcancel'`) cancels. Places are
+  measured once on the bare flow. Empty workflows / branches anchor on the
+  "do this…" opener (`data-dt-empty`) or their gap (`data-iz` key).
+- **Placing lock** (`dtLock`, `html.dt-lock`, message `wf:'lock'` →
+  `body.wf-lock` in the parent): from drag start to confirm/cancel the stack
+  and node drawer hide, the page bar is disabled, and only toolbar buttons
+  with `data-keep` (Undo, Redo, Guide, Shortcuts) work; Undo/Redo cancel the
+  placement first.
 - Don't name overlay classes `slot` — V8 uses `.slot` for its dashed blanks.
 - Every rendered step is wrapped in `<div data-dtn={id} style="display:contents">`
   so the highlight can find it.
 - `EMBED_DEMO_DOC` is the full demo flow (IF/Else, 3-lane split, merge,
   branch, loop); `EMBED_ACTIONS_DOC` is the old flat list, used by the gallery.
+
+**Rails (Linear view).** The double-line concept is v5.17's: main path =
+two solid lines, condition spines = solid + dashed right, End / empty =
+both dashed, elbows double (or single for conditions). `vLines`,
+`elbowLines`, `convergeLines` are byte-identical to v5.17 — V8 had
+collapsed them to one line. A soft blue **rail pulse** (`data-nf="rail-pulse"`,
+skin 64–65) travels down the canvas as one wave; at each height only the
+innermost path's rail glows, so it moves from the main rail into branches and
+back. It's built from the drawn rail divs, so it follows any shape.
 
 **Loading skeletons** (`workflow-skeleton.css` / `.js`, markup in
 `workflow-canvas.html`; Node view `.nskel`, Linear view `.lskel`). The top

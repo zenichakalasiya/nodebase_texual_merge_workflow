@@ -1494,3 +1494,101 @@ html.embed [data-nf="dt-hl"].acts:not(.dtslot) > span{ display:none; }
 html.embed [data-nf="dt-hl"].acts:not(.dtslot) .dt-hla{ left:12px; right:auto; }
 html.embed [data-nf="dt-pick"] .dp-r.hd .dp-t{ flex-direction:row; align-items:center; gap:8px; }
 html.embed [data-nf="dt-pick"] .dp-r.hd .dp-t small{ margin-top:0; }
+
+
+/* 60. Detached steps — ⋮ menus, Drop here → preview review, and the placing lock (user 2026-11-12). */
+/* ⋮ on every card (both designs, on hover) and on the V1 detail */
+html.embed [data-nf="dt-nc"] .dt-card .dt-cacts{ display:none; margin-left:auto; }
+html.embed [data-nf="dt-nc"] .dt-card:hover .dt-cacts, html.embed [data-nf="dt-nc"] .dt-card:focus-within .dt-cacts, html.embed [data-nf="dt-nc"] .dt-card.on .dt-cacts{ display:inline-flex; }
+html.embed .dt-kb{ width:28px; height:28px; border-radius:8px; border:1px solid transparent; background:transparent; color:var(--dt-muted); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+html.embed .dt-kb:hover, html.embed .dt-kb[aria-expanded="true"]{ background:#f1f4f8; border-color:#e3e8ef; color:var(--dt-ink); }
+html.embed [data-nf="dt-nc"] .dt-tra{ gap:0; }
+html.embed [data-nf="dt-nc"] .dt-nd .dt-ndhd{ padding-right:36px; }
+html.embed [data-nf="dt-menu"]{ position:fixed; z-index:90; width:176px; padding:5px; background:#fff; border:1px solid #e3e8ef; border-radius:10px; box-shadow:0 12px 32px -8px rgba(29,42,62,.25); }
+html.embed [data-nf="dt-menu"] button{ width:100%; display:flex; align-items:center; gap:9px; height:32px; padding:0 9px; border:none; background:none; border-radius:7px; font-size:12.5px; color:var(--dt-ink); cursor:pointer; text-align:left; }
+html.embed [data-nf="dt-menu"] button:hover{ background:#f1f4f8; }
+html.embed [data-nf="dt-menu"] button svg{ color:var(--dt-muted); }
+html.embed [data-nf="dt-menu"] button.red, html.embed [data-nf="dt-menu"] button.red svg{ color:#e5484d; }
+html.embed [data-nf="dt-menu"] button.red:hover{ background:#fff4f3; }
+
+/* while dragging: a small one-line "Drop here" gap — text on the left, 8px in */
+html.embed [data-dt-slot] > *{ max-height:40px !important; min-height:0 !important; overflow:hidden; }
+html.embed [data-nf="dt-hl"].dtslot{ justify-content:flex-start; padding-left:8px; }
+html.embed [data-nf="dt-hl"].dtslot > span{ display:block !important; position:static; transform:none; padding:0; background:none; color:#3d8bd0; font:500 12px 'Inter',system-ui,sans-serif; }
+/* review: the preview with ⠿ · Confirm place · × at its top right */
+html.embed [data-nf="dt-hl"].acts:not(.dtslot) > span{ display:none; }
+html.embed [data-nf="dt-hl"].acts:not(.dtslot) .dt-hla{ position:absolute; left:auto; right:10px; top:0; transform:translateY(-50%); gap:6px; }
+html.embed [data-nf="dt-hl"] .dt-hla button{ height:28px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; }
+html.embed [data-nf="dt-hl"] .dt-hgrip, html.embed [data-nf="dt-hl"] .dt-hx{ width:28px; padding:0 !important; background-color:#fff !important; border:1px solid #d5dfea !important; color:#5f7287; }
+html.embed [data-nf="dt-hl"] .dt-hgrip{ cursor:grab !important; }
+html.embed [data-nf="dt-hl"] .dt-hgrip:hover, html.embed [data-nf="dt-hl"] .dt-hx:hover{ background-color:#f1f4f8 !important; color:var(--dt-ink); }
+html.embed [data-nf="dt-hl"] .dt-hput{ padding:0 14px; border-radius:999px !important; }
+html.embed.dt-review [data-nf="dt-hl"] .dt-hla, html.embed.dt-review [data-nf="dt-hl"] .dt-hla button{ pointer-events:auto !important; }
+
+/* steps the piece can't follow fade, so the places it can go stand out; hovering them says "Can't go here" in grey */
+html.embed [data-dt-no] > *{ opacity:.35; transition:opacity .2s ease; }
+html.embed [data-dt-no] [data-dt-no] > *{ opacity:1; }
+html.embed [data-nf="dt-hl-line"].bad{ border-top-color:#c8d1db; }
+html.embed [data-nf="dt-hl-line"].bad span{ background:#f1f4f8; color:#8a99ab; font-weight:500; }
+
+/* the placing lock: the canvas is quiet, the drawer hides, only Undo / Redo / Guide / Shortcuts stay usable */
+html.embed.dt-lock body *{ pointer-events:none !important; }
+html.embed.dt-lock [data-nf="bar"] button[data-keep], html.embed.dt-lock [data-nf="dt-hl"] .dt-hla, html.embed.dt-lock [data-nf="dt-hl"] .dt-hla button{ pointer-events:auto !important; }
+html.embed.dt-lock [data-nf="bar"] button:not([data-keep]){ opacity:.35; }
+html.embed.dt-lock aside[data-nf="side"] *{ pointer-events:auto !important; }
+
+
+/* 61. Detached panel (V1, user 2026-11-12): 10% wider (374px, set inline); the drill-down keeps the card's exact width; the
+   steps scroll both ways; a left-edge resizer (on hover) widens it up to the flow's own width. V1 cards show › on hover. */
+html.embed [data-nf="dt-nc"][data-detail]{ min-width:0; max-width:none; transition:width .18s ease; }
+html.embed [data-nf="dt-nc"][data-detail][data-rsz]{ transition:none; }
+html.embed [data-nf="dt-nc"][data-detail] .dt-flowbox{ overflow:auto; }
+html.embed [data-nf="dt-nc"] .dt-rsz{ position:absolute; left:-7px; top:44px; bottom:12px; width:14px; cursor:ew-resize; z-index:3; display:flex; align-items:center; justify-content:center; touch-action:none; }
+html.embed [data-nf="dt-nc"] .dt-rsz::before{ content:''; position:absolute; left:6px; top:0; bottom:0; width:2px; border-radius:1px; background:#3d8bd0; opacity:0; transition:opacity .15s ease; }
+html.embed [data-nf="dt-nc"] .dt-rsz > span{ width:8px; height:34px; border-radius:5px; background:#fff; border:1px solid #cdd8e4; box-shadow:0 2px 6px rgba(29,42,62,.14); opacity:0; transition:opacity .15s ease;
+  background-image:radial-gradient(#8a99ab 1px, transparent 1.2px); background-size:4px 5px; background-position:center; }
+html.embed [data-nf="dt-nc"][data-detail]:hover .dt-rsz > span, html.embed [data-nf="dt-nc"] .dt-rsz:hover > span, html.embed [data-nf="dt-nc"][data-rsz] .dt-rsz > span{ opacity:1; }
+html.embed [data-nf="dt-nc"] .dt-rsz:hover::before, html.embed [data-nf="dt-nc"][data-rsz] .dt-rsz::before{ opacity:.55; }
+html.embed [data-nf="dt-nc"][data-rsz], html.embed [data-nf="dt-nc"][data-rsz] *{ cursor:ew-resize !important; user-select:none; }
+/* V1 card: › on hover */
+html.embed [data-nf="dt-nc"] .dt-go{ position:absolute; right:12px; bottom:14px; display:inline-flex; color:#3d8bd0; opacity:0; transform:translateX(-4px); transition:opacity .15s ease, transform .15s ease; pointer-events:none; }
+html.embed [data-nf="dt-nc"][data-ver="1"] .dt-card:hover .dt-go, html.embed [data-nf="dt-nc"][data-ver="1"] .dt-card:focus-visible .dt-go{ opacity:1; transform:none; }
+html.embed [data-nf="dt-nc"] .dt-go{ right:12px; width:28px; justify-content:center; }   /* same 28px column as the ⋮ above, so both sit on one vertical line */
+
+/* 62. V1 detail height (user 2026-11-12): a small flow keeps a small card; a flow that has to scroll grows the card down to the
+   bottom of the screen (12px margin, like the right side) before it scrolls. Reattach + delete are back in the detail. */
+html.embed [data-nf="dt-nc"][data-detail]{ max-height:calc(100vh - 24px); }
+html.embed [data-nf="dt-nc"][data-detail] .dt-body{ flex:0 1 auto; min-height:0; max-height:none; }
+html.embed [data-nf="dt-nc"][data-detail] .dt-nd{ flex:0 1 auto; min-height:0; }
+html.embed [data-nf="dt-nc"][data-detail] .dt-ndcard{ flex:0 1 auto; min-height:0; max-height:none; }
+html.embed [data-nf="dt-nc"][data-detail] .dt-flowbox{ flex:1 1 auto; min-height:0; }
+html.embed [data-nf="dt-nc"] .dt-tra{ gap:6px; }
+html.embed [data-nf="dt-nc"] .dt-nd .dt-ndhd{ padding-right:132px; }
+
+
+/* 63. Detach control (user 2026-11-12): an unlink icon floating LEFT of the + (off the line), neutral grey — detaching isn't
+   deleting, so no red anywhere. The steps it would take are tinted grey; the tooltip shows at once, above the icon. */
+html.embed{ --dt-cut:#b9c4d0; --dt-cut-bg:#f1f4f8; }
+html.embed [data-nf="dt-trash"]{ left:-19px; top:50%; transform:translate(-50%,-50%); width:22px; height:22px; border-radius:7px;
+  background:#fff; border:1px solid #d5dfea; color:#5f7287; box-shadow:0 2px 6px rgba(29,42,62,.12); }
+html.embed [data-nf="dt-trash"]:hover{ background:#f1f4f8; border-color:#b9c4d0; color:var(--dt-ink); }
+html.embed [data-nf="dt-trash"][data-blocked]{ color:#b9c4d0; box-shadow:none; }
+html.embed [data-nf="dt-tip"]{ left:-4px; top:auto; bottom:calc(100% + 8px); transform:none; }
+html.embed [data-nf="dt-trash"]:hover [data-nf="dt-tip"]{ transition-delay:0s; }
+
+
+/* 64. Main-rail pulse (user 2026-11-12): the Linear skeleton's soft blue glow, running down the real main path's rail only. */
+html.embed [data-nf="rail-pulse"]{ position:absolute; width:4px; overflow:hidden; pointer-events:none; z-index:1; }
+html.embed [data-nf="rail-pulse"]::after{ content:''; position:absolute; left:0; top:-80px; width:4px; height:80px; border-radius:2px;
+  background:linear-gradient(180deg, transparent, rgba(61,139,208,.4), transparent);
+  animation:railPulse var(--d, 2.6s) cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes railPulse{ from{ transform:translateY(0); opacity:0; } 15%{ opacity:1; } 85%{ opacity:1; } to{ transform:translateY(calc(var(--h, 400px) + 80px)); opacity:0; } }
+@media (prefers-reduced-motion:reduce){ html.embed [data-nf="rail-pulse"]{ display:none !important; } }
+
+
+/* 65. Rail pulse, split into every path (user 2026-11-12): one wave down the canvas; each rail it crosses glows. */
+html.embed [data-nf="rail-pulse"]{ position:absolute; inset:0; width:auto; height:auto; overflow:visible; pointer-events:none; z-index:1; }
+html.embed [data-nf="rail-pulse"]::after{ content:none; animation:none; }
+html.embed [data-nf="rail-pulse"] .rp-run{ position:absolute; width:4px; overflow:hidden; }
+html.embed [data-nf="rail-pulse"] .rp-run > i{ position:absolute; left:0; top:0; width:4px; height:80px; border-radius:2px; opacity:0;
+  background:linear-gradient(180deg, transparent, rgba(61,139,208,.4), transparent); transition:opacity .25s ease; will-change:transform; }

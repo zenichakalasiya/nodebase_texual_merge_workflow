@@ -1,34 +1,48 @@
-# Handoff — 2026-11-12 12:31
+# Handoff — 2026-11-12 17:05
 
 ## Read first
 
-In `CLAUDE.md`, read **"Detached steps"**. It was rewritten this session and now covers the in-flow preview, the tree-style Reattach list, and drag = pick up. Everything this session is in `linear/index.html` and `linear/node-skin.css` (sections 55–59).
+In `CLAUDE.md`, read **"Detached steps"** (rewritten again) and the new **"Rails (Linear view)"** paragraph.
+
+Everything this session is in:
+- `linear/index.html`
+- `linear/node-skin.css`, sections 60–65
+- `workflow-chrome.js` / `.css`, for the placing lock and click-away cancel
 
 ## What we worked on this session
 
-Made reattaching detached steps much clearer:
-- You can see the piece **inside the workflow** before attaching it.
-- The Reattach list became a clean tree, like the canvas.
-- Drag became pick up + a "Put it here" gap.
+1. Reworked detached steps end to end:
+   - ⋮ menus.
+   - A new drag-and-drop cycle: Drop here → preview → Confirm place.
+   - A placing lock.
+   - A wider V1 panel with a resizer.
+   - An unlink icon instead of the trash.
+   - Detaching a single branch's steps.
+2. Brought back v5.17's double-line rails.
+3. Added a blue pulse that travels down the real Linear canvas.
 
 ## Completed
 
-- **CTAs:**
-  - The time is gone from the cards.
-  - V1: a primary **Reattach** text button and the delete icon sit at the top right of the detail.
-  - V2: the same Reattach button and delete icon appear on the card on hover.
-- **Preview in the flow:** hovering a place in the Reattach list renders the piece faded inside the real flow, in a dashed "Attaches here" box. Its own connectors are blue and dashed, and they're cleared once the preview ends or the piece is attached.
-- **Reattach list:**
-  - Shows only valid places.
-  - Drawn as a tree: Start of the workflow; steps with their icon and "After this step"; paths with their canvas badges hanging off elbows.
-  - Ineligible parents stay visible, muted, for context.
-  - Search gives flat results, with the location underneath.
-- **Drag = pick up:**
-  - Letting go keeps the piece picked.
-  - A real gap opens with **Put it here** / **See preview**. See preview fills it with the whole flow, then shows **Put it here** / **Back**.
-  - Esc or clicking away cancels.
-- **Detail diagram:** more vertical room, 28px between paths.
-- **Removed:** the detail warning note.
+- **⋮ menus:** each card has Reattach / Delete under a ⋮ on hover. The V1 detail keeps Reattach + delete at its top right.
+- **Drag & drop:**
+  - Dragging shows a small one-line "Drop here" gap.
+  - Letting go shows the full preview with ⠿ · Confirm place · ×.
+  - ⠿ picks it up again.
+  - Cancel with ×, Esc, a click outside the workflow, or a click outside the frame.
+  - Empty workflows and empty branches can be drop targets.
+- **Placing lock:** while placing, the stack and drawer are hidden and the top bar is disabled. Only Undo / Redo / Guide / Shortcuts work, and Undo / Redo cancel the placement first.
+- **Fading:** steps the piece can't follow fade. Containers stay bright when places inside them are valid (this fixed a split that looked disabled).
+- **V1 panel:**
+  - 374px wide; the detail keeps the card's width.
+  - A resizer on the left edge (double-click to fit the whole flow).
+  - Small flows keep a small card; long ones fill to the bottom, then scroll.
+  - A › on card hover, aligned with the ⋮.
+- **Stack:** the stack spacing bug is fixed (cards must stay `position:absolute`). The stack stays spread while a ⋮ menu is open.
+- **Detach control:**
+  - An unlink icon floating left of the +, with an instant tooltip and a grey highlight.
+  - In the gap under a branch header, "Detach this branch's steps"; the branch stays, empty.
+- **Rails:** v5.17's double-line helpers are restored exactly.
+- **Rail pulse:** one soft blue wave. At each height it glows only on the innermost path, so it moves into branches and back.
 
 ## In progress
 
@@ -36,30 +50,31 @@ Nothing mid-flight.
 
 ## Next steps
 
-- **Untested:**
-  - The drag preview's top-left button change (no "Attaches here" chip).
-  - Dragging deep into branches.
-  - Edge auto-scroll while carrying.
+- **Not yet tested:**
+  - Fading for a piece that only fits at path ends.
+  - Dragging into an empty branch.
+  - Clicking empty canvas while carrying after ⠿.
+  - Guide / Shortcuts while locked.
 - **Ask the user:**
-  - Should empty paths accept a drag? Only the list can target them today.
-  - Is the "stays put while over the gap or preview" behaviour fine for big pieces?
-  - Which Detach design (V1 or V2) is final, and when should each skeleton or loader show?
-- **Optional cleanup:** remove the dead code — `dtFold`, `trayFolded`, `placing`, `dtDropBar`, `dt-banner`, and the unused "Goes here" line path.
-- **Older items:**
-  - The real Get records caps.
-  - Field Lab refresh.
-  - f(x) for the rich-text fields.
+  - Should the rail pulse run all the time or only at certain moments?
+  - Should the pulse also travel along the elbows?
+  - Should the mini steps diagram in the cards use double lines too?
+  - Which Detach design (V1 / V2) and which skeleton/loader to keep?
+- **Optional cleanup:** remove the dead code — `dtFold`, `trayFolded`, `placing`, `dtDropBar`, `dt-banner`, the old "Goes here" line, and `.dt-hsee` CSS.
+- **Older items:** the real Get records caps; Field Lab refresh; f(x) for the rich-text fields.
 
 ## Decisions made
 
-- **The preview is rendered, not committed.** While previewing, `flow` itself includes the piece, so every canvas helper agrees on paths. The attach logic uses `dtFlowRef` (the real flow). A first attempt that only changed the render call crashed (`recordsInScope`).
-- **Drag doesn't attach on release.** You always click **Put it here**, so **See preview** can be clicked first. This was the user's choice.
-- **The Reattach list hides ineligible places.** It only keeps their parents, muted, so a deep place never loses its context.
+- **Detaching a single branch** detaches its **steps only**; the branch and its condition stay (user's choice).
+- **Detach icon** = unlink (broken chain), grey. Detaching must not look like deleting.
+- **Drag doesn't attach on release.** Release shows the preview, and Confirm place attaches.
+- **The lock starts at drag start,** not only after the drop. Guide / Shortcuts may open their panels while locked; the product header stays active.
+- **Rail pulse** moves at a steady ~300px/s rather than a fixed 2.6s, so long flows don't race.
 
 ## Gotchas & notes
 
-- **Class names:** V8 uses `.slot` for its dashed blank words. An overlay with class `slot` inherits a dashed underline, so ours is `dtslot`.
-- **Line detection:** `dtMarkLines` treats a div as an elbow only if it has BOTH border-left and border-bottom. Blanks' dashed underlines have only border-bottom.
-- **Reused DOM:** React reuses the preview's DOM for the attached steps, so imperative marks must be cleared (`dtUnmarkLines`).
-- **Hit testing while carrying:** `body *` gets `pointer-events:none`. `elementsFromPoint` then won't find the canvas, so debug by position instead.
-- **Local server:** it was killed once for low memory and restarted on :8777.
+- **Stack cards must stay `position:absolute`.** The JS lays the stack out with transforms, and making cards relative caused the big gaps.
+- **Drag targets** are measured once, on the bare flow. Re-measuring with a preview open shifts everything below it.
+- **Comments in patches:** a patch once put a `//` comment on a line that had a second statement after it, which turned that statement into part of the comment. Keep inserted comments on their own lines.
+- **Large patches:** use script files (`scratchpad/dt/patchN.js`) with exact-string replace and count checks. Some anchors appear twice in the file (e.g. `const [menu, setMenu]`, the Shortcuts tool), so use longer anchors.
+- **Local server:** port 8777 was killed once for low memory and restarted.

@@ -6761,6 +6761,10 @@ function ExpressionBuilder({ text, setText, scope, onDone, onClose, onBack, back
 const DT_P = {
   trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>',
   x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  chev:'<path d="m9 6 6 6-6 6"/>',
+  unlink:'<path d="m18.84 12.25 1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="m5.17 11.75-1.71 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71"/><path d="M8 2v3M2 8h3M16 22v-3M22 16h-3"/>',
+  dots:'<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>',
+  grip:'<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
   collapse:'<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
   layers:'<path d="m12 2 10 5-10 5L2 7l10-5Z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
   bolt:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',
@@ -6871,7 +6875,29 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
   const [confirmId, setConfirmId] = React.useState(null);
   const [pick, setPick] = React.useState(null);          // { id, anchor } while the Reattach list is open
   const [popId, setPopId] = React.useState(null);        // ver 2: the card whose popover is open
-  const [dragging, setDragging] = React.useState(false);  // a piece is being dragged onto the canvas — popover + step list step aside
+  const [dragging, setDragging] = React.useState(false);
+  const DT_W = 374;                                    // the stack + its cards (user 2026-11-12: ~10% wider than 340)
+  const [panelW, setPanelW] = React.useState(null);    // V1 detail: widened with the left-edge resizer (null = DT_W)
+  const [rsz, setRsz] = React.useState(false);
+  React.useEffect(()=>{ if (!detailId) setPanelW(null); }, [detailId]);   // back to the list → back to the card width
+  // the widest the panel needs to be to show the whole flow without scrolling sideways
+  const fitW = () => { const box = boxRef.current, root = box && box.querySelector(".dc-root"), fb = box && box.querySelector(".dt-flowbox");
+    if (!root || !fb) return DT_W; const mw = root.style.minWidth; root.style.minWidth = "0"; const natural = root.offsetWidth; root.style.minWidth = mw;   // the flow at its own width
+    const need = natural + (box.offsetWidth - fb.clientWidth) + 28 + 8;   // + the steps area's own side padding
+    return Math.max(DT_W, Math.min(need, window.innerWidth - right - 80)); };
+  const startRsz = (e) => { e.preventDefault(); e.stopPropagation(); const x0 = e.clientX, w0 = boxRef.current.offsetWidth, max = fitW(); setRsz(true);
+    const mv = (ev) => setPanelW(Math.round(Math.max(DT_W, Math.min(max, w0 + (x0 - ev.clientX)))));
+    const upr = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upr); setRsz(false); };
+    window.addEventListener("pointermove", mv); window.addEventListener("pointerup", upr); };
+  const [menu, setMenu] = React.useState(null);   // { id, top, left, anchor } — the ⋮ menu (user 2026-11-12)
+  React.useEffect(()=>{ if (!menu) return; const k = (e)=>{ if (e.key==="Escape") { e.stopPropagation(); setMenu(null); } };
+    const d = (e)=>{ if (!e.target.closest || !e.target.closest('[data-nf="dt-menu"],.dt-kb')) setMenu(null); };
+    window.addEventListener("keydown", k, true); document.addEventListener("mousedown", d, true);
+    return ()=>{ window.removeEventListener("keydown", k, true); document.removeEventListener("mousedown", d, true); }; }, [menu]);
+  const openMenu = (id, btn) => { const r = btn.getBoundingClientRect(); clearTimeout(popT.current);
+    setMenu(m => m && m.id===id ? null : { id, top:r.bottom+6, left:Math.max(8, r.right-176), anchor: btn.closest("[data-dt-card]") || btn.closest("[data-nf='dt-nc']") }); };
+  const Kebab = ({ id }) => <button type="button" className="dt-kb" aria-label="More actions" aria-haspopup="menu" aria-expanded={!!menu && menu.id===id}
+    onPointerDown={(e)=>e.stopPropagation()} onClick={(e)=>{ e.stopPropagation(); openMenu(id, e.currentTarget); }}><DtIc n="dots" s={15}/></button>;  // a piece is being dragged onto the canvas — popover + step list step aside
   const [, setTick] = React.useState(0);
   const boxRef = React.useRef(null), stackRef = React.useRef(null), prevN = React.useRef(pieces.length), prevExp = React.useRef(expanded), popT = React.useRef(null);
   const v2 = ver==="2";
@@ -6883,7 +6909,7 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
   const grab = (id) => (e) => { if (onDrag) onDrag(id, e, (on)=>{ setDragging(on); if (on) { setPick(null); setPopId(null); onHoverTarget(null); } }); };
   // ver 2: the stack stays spread while a card's popover is open, so moving into the popover never folds the cards away
   // under it — that card keeps its highlight and the popover stays lined up with it (user 2026-11-05)
-  const spread = expanded || !!popP;
+  const spread = expanded || !!popP || !!menu;   // …and while a card's ⋮ menu is open, so moving into the menu never folds the stack (user 2026-11-12)
   const pickP = pick ? pieces.find(p=>p.id===pick.id) : null;
   React.useEffect(()=>{ if (detailId && !pieces.some(p=>p.id===detailId)) setDetailId(null); if (pick && !pickP) setPick(null); });
   React.useEffect(()=>{ if (!confirmId) return; const k = (e)=>{ if (e.key==="Escape") { e.stopPropagation(); e.preventDefault(); setConfirmId(null); } };
@@ -6924,9 +6950,12 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
   const popCard = popP && boxRef.current && boxRef.current.querySelector(`[data-dt-card="${popP.id}"]`);
   const popTop = popCard ? Math.max(12, Math.min(popCard.getBoundingClientRect().top, window.innerHeight - 320)) : 0;
   return (<>
-    <aside ref={boxRef} data-nf="dt-nc" data-ver={ver} data-detail={detail ? "" : undefined} aria-label="Detached steps" style={{ right:right+"px" }}
+    <aside ref={boxRef} data-nf="dt-nc" data-ver={ver} data-detail={detail ? "" : undefined} data-rsz={rsz ? "" : undefined} aria-label="Detached steps" style={{ right:right+"px", width:((detail && panelW) || DT_W)+"px" }}
       onMouseEnter={()=>setOpen(true)} onMouseLeave={()=>{ setOpen(false); if (v2) popOut(); }}
       onFocus={()=>setOpen(true)} onBlur={(e)=>{ if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
+      {detail && <div className="dt-rsz" role="separator" aria-orientation="vertical" aria-label="Resize — drag to widen, double-click to fit the whole flow"
+        title="Drag to widen · double-click to fit the whole flow" onPointerDown={startRsz}
+        onDoubleClick={()=>setPanelW(w => { const f = fitW(); return (w && w >= f - 2) ? null : f; })}><span/></div>}
       <div className="dt-h">
         <div className="dt-ti">{detail
           ? <button type="button" className="dt-backb" onClick={()=>{ setDetailId(null); setPick(null); }}><DtIc n="back" s={14} w={2.2}/>{pieces.length>1 ? "All detached · "+pieces.length : "Back"}</button>
@@ -6937,6 +6966,7 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
           <div key="dt-detail" className="dt-nd"><div className="dt-ndcard">
             <div className="dt-fix">
               {/* top right (user 2026-11-05): Reattach (primary, text) with the delete icon to its right */}
+              {/* opened detail (user 2026-11-12): Reattach + delete icon at the top right, as before — the ⋮ stays on the outer cards */}
               <div className="dt-tra">
                 <button type="button" className="dt-rb" aria-expanded={!!pick} onClick={(e)=>openPick(detail.id, e.currentTarget.closest("[data-nf='dt-nc']"))}><DtIc n="link" s={12}/>Reattach</button>
                 <Tooltip label="Delete these steps" side="bottom"><button type="button" className="dt-btnd dt-tr" aria-label="Delete these steps" onClick={()=>setConfirmId(detail.id)}><DtIc n="trash" s={14}/></button></Tooltip>
@@ -6955,10 +6985,8 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
                 onKeyDown={(e)=>{ if ((e.key==="Enter" || e.key===" ") && e.target===e.currentTarget) { e.preventDefault(); if (v2) setPopId(p.id); else setDetailId(p.id); } }}>
                 <div className="dt-in"><span className={"dt-vi "+t.c}><DtIc n={t.ic} s={17}/></span>
                   <div className="dt-nk"><span className="dt-nkt">{t.k}</span>
-                    {v2 && <span className="dt-cacts">
-                      <button type="button" className="dt-rb" onClick={(e)=>openPick(p.id, e.currentTarget.closest("[data-dt-card]"))}><DtIc n="link" s={12}/>Reattach</button>
-                      <Tooltip label="Delete" side="top"><button type="button" className="dt-ib red" aria-label="Delete these steps" onClick={()=>setConfirmId(p.id)}><DtIc n="trash" s={13}/></button></Tooltip>
-                    </span>}</div>
+                    <span className="dt-cacts"><Kebab id={p.id}/></span></div>
+                  {!v2 && <span className="dt-go" aria-hidden="true"><DtIc n="chev" s={15} w={2.2}/></span>}
                   <div className="dt-ntl">{p.title}</div>
                   <div className="dt-nbd"><span className="dt-cnt">{dtSteps(p.steps)}</span><span className="dt-dot"/><span className="dt-frm">from {p.from}</span></div>
                 </div>
@@ -6969,12 +6997,16 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
       </div>
     </aside>
     {/* ver 2: the detail, in a popover to the LEFT of the hovered card — as wide and tall as the piece needs */}
-    {popP && <div data-nf="dt-pop" role="dialog" aria-label={popP.title} style={{ right:(right+352)+"px", top:popTop+"px", maxHeight:`calc(100vh - ${popTop+16}px)` }}
+    {popP && <div data-nf="dt-pop" role="dialog" aria-label={popP.title} style={{ right:(right+DT_W+12)+"px", top:popTop+"px", maxHeight:`calc(100vh - ${popTop+16}px)` }}
       onMouseEnter={()=>clearTimeout(popT.current)} onMouseLeave={popOut}>
       <div className="dt-ndcard"><div className="dt-fix dt-grab" onPointerDown={grab(popP.id)} title="Drag into the workflow"><DtHead p={popP}/></div><DtBody p={popP}/></div>
     </div>}
     {pickP && <DtPicker piece={pickP} targets={targetsFor(pickP.id)} anchor={pick.anchor} onHover={onHoverTarget}
       onPick={(t)=>{ setPick(null); onHoverTarget(null); setDetailId(null); onPick(pickP.id, t); }} onClose={()=>setPick(null)} />}
+    {menu && <div data-nf="dt-menu" role="menu" style={{ top:menu.top+"px", left:menu.left+"px" }}>
+      <button type="button" role="menuitem" onClick={()=>{ const m = menu; setMenu(null); openPick(m.id, m.anchor); }}><DtIc n="link" s={14}/>Reattach</button>
+      <button type="button" role="menuitem" className="red" onClick={()=>{ const m = menu; setMenu(null); setConfirmId(m.id); }}><DtIc n="trash" s={14}/>Delete</button>
+    </div>}
     {conf && <div data-nf="dt-modal-bg" onMouseDown={(e)=>{ if (e.target===e.currentTarget) setConfirmId(null); }}>
       <div className="dt-modal" role="dialog" aria-modal="true" aria-label="Delete detached steps">
         <h4>Delete “{dtShort(conf.title)}”{conf.steps>1 ? " and what’s in it" : ""}?</h4>
@@ -7243,7 +7275,8 @@ function App() {
       else if (m.wf === "details") { if (typeof m.name === "string") setName(m.name); if (typeof m.desc === "string" && m.desc.trim()) setDesc(m.desc); }
       else if (m.wf === "pickver" && ["1","2"].includes(m.v)) setPickVer(m.v);
       else if (m.wf === "textver" && ["A","B","C","D"].includes(m.v)) setTextVer(m.v);
-      else if (m.wf === "dtver" && ["1","2"].includes(m.v)) setDtVer(m.v);   // Detach design: 1 Panel · 2 Popover (user 2026-11-05)
+      else if (m.wf === "dtver" && ["1","2"].includes(m.v)) setDtVer(m.v);
+      else if (m.wf === "dtcancel" && dtCancel.current) dtCancel.current();   // a click outside the Linear view unpicks a picked piece (user 2026-11-12)   // Detach design: 1 Panel · 2 Popover (user 2026-11-05)
       else if (m.wf === "popver" && ["1","2"].includes(m.v)) { setPop(null); setOpenSlot(null); setPopVer(m.v); }
       else if (m.wf === "selpanel" && ["white","tinted"].includes(m.v)) document.documentElement.dataset.selpanel = m.v;   // Selected-side look (user 2026-10-21)
     };
@@ -10743,10 +10776,14 @@ function App() {
   const dtHlEnsure = () => { const h = dtHl.current; if (h.box) return h;
     h.box = document.createElement("div"); h.box.setAttribute("data-nf", "dt-hl"); h.box.appendChild(document.createElement("span"));
     const acts = document.createElement("div"); acts.className = "dt-hla";
-    const put = document.createElement("button"); put.type = "button"; put.className = "dt-hput"; put.textContent = "Put it here"; put.onclick = (e)=>{ e.stopPropagation(); h.onPut && h.onPut(); };
-    const see = document.createElement("button"); see.type = "button"; see.className = "dt-hsee"; put.setAttribute("data-dt-act", ""); see.setAttribute("data-dt-act", "");
-    see.onclick = (e)=>{ e.stopPropagation(); h.onSee && h.onSee(); };
-    acts.appendChild(put); acts.appendChild(see); h.box.appendChild(acts);
+    const mk = (cls, html, label) => { const b = document.createElement("button"); b.type = "button"; b.className = cls; b.setAttribute("data-dt-act", ""); b.setAttribute("aria-label", label); b.innerHTML = html; return b; };
+    const ic = (n) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${DT_P[n]}</svg>`;
+    const grip = mk("dt-hgrip", ic("grip"), "Pick it up again"), put = mk("dt-hput", "Confirm place", "Confirm place"), x = mk("dt-hx", ic("x"), "Cancel");
+    grip.title = "Drag to another place"; x.title = "Cancel";
+    grip.onpointerdown = (e)=>{ e.stopPropagation(); e.preventDefault(); h.onGrip && h.onGrip(e); };
+    put.onclick = (e)=>{ e.stopPropagation(); h.onPut && h.onPut(); };
+    x.onclick = (e)=>{ e.stopPropagation(); h.onClose && h.onClose(); };
+    acts.appendChild(grip); acts.appendChild(put); acts.appendChild(x); h.box.appendChild(acts);
     h.line = document.createElement("div"); h.line.setAttribute("data-nf", "dt-hl-line"); h.line.appendChild(document.createElement("span"));
     document.body.appendChild(h.box); document.body.appendChild(h.line); return h; };
   // the preview's OWN connectors turn blue + dashed (user 2026-11-05): the elbow from the rail into its paths and the lines
@@ -10757,7 +10794,7 @@ function App() {
       const elbow = /border-bottom/.test(st) && /border-left/.test(st), vert = !elbow && r.width <= 3 && r.height > 3;
       if (elbow || vert) lines.push({ d, r, elbow }); }));
     const eb = lines.filter(x => x.elbow), rail = Math.min(...(eb.length ? eb : lines).map(x => x.r.left), 1e9);   // the outermost elbow sits on the rail it drops onto
-    lines.forEach(({ d, r, elbow }) => { const own = all || elbow || Math.abs(r.left - rail) > 3; d.toggleAttribute("data-dt-pl", own); if (own) d.toggleAttribute("data-dt-pv", !elbow); }); };
+    lines.forEach(({ d, r, elbow }) => { const own = all || elbow || Math.abs(r.left - rail) > 4.5; d.toggleAttribute("data-dt-pl", own); if (own) d.toggleAttribute("data-dt-pv", !elbow); }); };
   const dtHighlight = (tg) => setDtPrev(tg && tg.ok ? { pid:tg.pid, bp:tg.bp, index:tg.index, scroll:true } : null);
   // the blue preview lines are painted onto the real line elements; clear them as soon as the preview ends, because React
   // keeps those same elements for the steps once they are attached (user 2026-11-05)
@@ -10765,7 +10802,7 @@ function App() {
   useEffect(()=>{ const h = dtHlEnsure(); cancelAnimationFrame(h.raf); dtUnmarkLines();
     if (!dtPrev) { h.box.classList.remove("on", "prev", "dtslot", "acts"); return; }
     const slot = !!dtPrev.slot; h.box.classList.toggle("dtslot", slot); h.box.classList.toggle("acts", !!dtPrev.acts);
-    h.box.firstChild.textContent = (slot || dtPrev.acts) ? "" : "Attaches here";   // with actions, Put it here / Back sit where the chip was h.box.querySelector(".dt-hsee").textContent = slot ? "See preview" : "Back";
+    h.box.firstChild.textContent = slot ? "Drop here" : dtPrev.acts ? "" : "Attaches here";
     h.line.classList.remove("on"); let first = true, marks = 0;
     const tick = () => { const els = [...document.querySelectorAll("[data-dt-prev] > *")]; let l = 1e9, t = 1e9, r = -1e9, b = -1e9;
       els.forEach(c => { const x = c.getBoundingClientRect(); if (!x.width && !x.height) return; l = Math.min(l, x.left); t = Math.min(t, x.top); r = Math.max(r, x.right); b = Math.max(b, x.bottom); });
@@ -10777,54 +10814,133 @@ function App() {
       h.raf = requestAnimationFrame(tick); };
     tick(); return ()=>{ cancelAnimationFrame(h.raf); dtUnmarkLines(); }; }, [dtPrev]);
   useEffect(()=>{ if (dtPrev && !detached.some(x=>x.id===dtPrev.pid)) setDtPrev(null); }, [detached, dtPrev]);
+  // while a piece is being placed (dragging → dropped → reviewing the preview) the rest of the builder steps back: the stack
+  // and the node drawer hide, the top bar is disabled (via the parent), and only Undo / Redo / Guide / Shortcuts stay usable.
+  const [dtLock, setDtLock] = useState(false);
+  const dtCancel = useRef(null);   // cancels the placement in progress (Esc, a click away, or the parent page)
+  // the loading skeleton's soft blue pulse, on the REAL canvas (user 2026-11-12): ONE wave travels down the canvas at a steady
+  // pace and every rail it crosses glows at that height — so where the line splits (IF / Else, Branching, Split path, Merge
+  // success / timeout, Loop) the glow carries on down every path as well as the main one. Built from the drawn rail lines
+  // themselves (vertical runs, double rails merged), so it follows any shape. Same soft gradient as the skeleton.
+  useEffect(()=>{ if (!EMBED || GALLERY) return;
+    if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const SPEED = 300, GLOW = 80;   // px / s · glow length
+    let layer = null, ro = null, raf = 0, host = null, runs = [], top0 = 0, total = 0, dirty = true, t0 = performance.now(), lastMeasure = 0;
+    const measure = () => { dirty = false; lastMeasure = performance.now();
+      const first = document.querySelector("[data-dtn] > *"); host = first && first.closest(".mx-auto");
+      if (!host) { if (layer) layer.style.display = "none"; runs = []; return; }
+      if (!layer || layer.parentElement !== host) { if (layer) layer.remove(); layer = document.createElement("div"); layer.setAttribute("data-nf", "rail-pulse"); layer.setAttribute("aria-hidden", "true"); host.appendChild(layer);
+        if (ro) ro.disconnect(); ro = new ResizeObserver(() => { dirty = true; }); ro.observe(host); }
+      layer.style.display = "";
+      const hr = host.getBoundingClientRect(), z = hr.width / (host.offsetWidth || 1) || 1;
+      // every vertical rail line (not elbows, not the preview / overlays), in host coordinates
+      const segs = [...host.querySelectorAll("div.absolute")].map(d => { const st = d.getAttribute("style") || "";
+          if (!/var\(--border2\)/.test(st) || /border-bottom/.test(st) || d.closest("[data-dt-prev],[data-nf='rail-pulse']")) return null;
+          const r = d.getBoundingClientRect(); if (r.width > 4 || r.height < 8) return null;
+          return { x:(r.left + r.width/2 - hr.left)/z, t:(r.top - hr.top)/z, b:(r.bottom - hr.top)/z }; })
+        .filter(Boolean).sort((a, b) => a.x - b.x || a.t - b.t);
+      // one column per rail: same x (a double rail's two lines merge) and touching vertically
+      const cols = [];
+      segs.forEach(sg => { const c = cols.find(c => Math.abs(c.x - sg.x) < 5 && sg.t <= c.b + 12 && sg.b >= c.t - 12);
+        if (c) { c.t = Math.min(c.t, sg.t); c.b = Math.max(c.b, sg.b); } else cols.push({ ...sg }); });
+      runs = cols.filter(c => c.b - c.t > 40);
+      top0 = runs.length ? Math.min(...runs.map(r => r.t)) : 0; total = runs.length ? Math.max(...runs.map(r => r.b)) - top0 : 0;
+      layer.innerHTML = "";
+      runs.forEach(r => { const el = document.createElement("div"); el.className = "rp-run";
+        Object.assign(el.style, { left:(r.x - 2)+"px", top:r.t+"px", height:(r.b - r.t)+"px" });
+        const g = document.createElement("i"); el.appendChild(g); layer.appendChild(el); r.g = g; }); };
+    const tick = (now) => { raf = requestAnimationFrame(tick);
+      if (dirty && now - lastMeasure > 120) measure();
+      if (!runs.length || total <= 0) return;
+      const period = total / SPEED + 0.9, t = ((now - t0) / 1000) % period, y = top0 + t * SPEED - GLOW / 2;   // the wave's height
+      // ONE line (user 2026-11-12): at any height only the innermost path glows — the wave leaves the main rail for the branch it
+      // enters (and a nested branch for its own), then returns to the main rail when that block ends. No second line beside it.
+      const mid = y + GLOW / 2, here = runs.filter(r => mid >= r.t && mid <= r.b), deepest = here.length ? Math.max(...here.map(r => r.x)) : -1;
+      runs.forEach(r => { const local = y - r.t, on = here.includes(r) && r.x >= deepest - 6;
+        r.g.style.opacity = on ? "1" : "0"; r.g.style.transform = "translateY(" + local + "px)"; }); };
+    measure(); raf = requestAnimationFrame(tick); const onR = () => { dirty = true; }; window.addEventListener("resize", onR);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", onR); if (ro) ro.disconnect(); if (layer) layer.remove(); }; }, [flow, triggers, lzoom]);
+  useEffect(()=>{ if (!EMBED) return; document.documentElement.classList.toggle("dt-lock", dtLock);
+    try { window.parent.postMessage({ wf:"lock", on:dtLock }, "*"); } catch (e) {} }, [dtLock]);
   const dtPick = (pid, tg) => { const p = detached.find(x=>x.id===pid); if (!p || !tg.ok) return; setDtPrev(null); dtArrive.current = p.items[0].id; attachAt(pid, tg.bp, tg.index); };
-  // drag a piece (its card, or the panel / popover title) onto the canvas (user 2026-11-05). Once dragged out the piece is
-  // PICKED: it follows the pointer even after the button is let go. Wherever it can go, the flow opens a real gap there —
-  // an empty dashed "Put it here" box with its connector in blue. Click "Put it here" to attach, or "See preview" to fill the
-  // box with the piece's whole flow (then "Put it here" or "Back"). Esc or a click anywhere else cancels. A place it can't go
-  // shows a grey line with the reason.
+  // drag a piece onto the canvas (user 2026-11-12). While dragging, the flow opens a small "Drop here" gap at the nearest place
+  // it can go (places it can't go are faded; hovering them says "Can't go here"). Let go → the gap becomes the piece's preview
+  // with ⠿ · Confirm place · × at its top right. ⠿ shrinks it back and picks the piece up again (press-drag it, or click it
+  // and click where it should go). × or Esc cancels. Undo / Redo cancel first. The builder is locked until it ends.
   const dtDrag = (pid, e, onState) => { if (e.button!==0 || (e.target.closest && e.target.closest("button,a,input"))) return;
     const p = detached.find(x=>x.id===pid); if (!p) return; const v = dtView(p);
-    const sx = e.clientX, sy = e.clientY; let lx = sx, ly = sy, ghost = null, tick = null, best = null, scroller = null, base = [], cur = "", frozen = false, live = true;
-    const h = dtHlEnsure(), all = dtTargets(pid).filter(t => t.nodeId || t.firstId);
-    // where each place sits WITHOUT the gap (content coordinates), so opening the gap never moves the target under you
+    const sx = e.clientX, sy = e.clientY; let lx = sx, ly = sy, ghost = null, tick = null, best = null, scroller = null, base = [], cur = "", phase = "wait", sticky = false, gx = 0, gy = 0, live = true;
+    // a path with no steps yet (an empty workflow under its trigger, or an empty branch) anchors on its placeholder / Add step gap
+    const anchorOf = (t) => (!t.bp.length && document.querySelector("[data-dt-empty] > *")) || document.querySelector('[data-iz="' + pathKey(t.bp) + ':0"]');
+    const rectOf = (t) => { if (t.nodeId || t.firstId) return dtRectOf(t.nodeId || t.firstId); const a = anchorOf(t); if (!a) return null; const r = a.getBoundingClientRect(); return r.height ? { l:r.left, t:r.top, r:r.right, b:r.bottom } : null; };
+    const h = dtHlEnsure(), full = dtTargets(pid), all = full.filter(t => t.nodeId || t.firstId || anchorOf(t));
+    // a step that holds paths stays bright while any place INSIDE it is valid — only its own "after" spot may be off
+    const byKey = new Map(full.map(t => [t.key, t])), holdsOk = new Set();
+    full.forEach(t => { if (!t.ok) return; let c = t.pk ? byKey.get(t.pk) : null; while (c) { holdsOk.add(c.key); c = c.pk ? byKey.get(c.pk) : null; } });
     const measure = () => { const any = document.querySelector("[data-dtn] > *"); scroller = any && dtScrollerOf(any); const st = scroller ? scroller.scrollTop : 0;
-      base = all.map(t => { const R = dtRectOf(t.nodeId || t.firstId); return R ? { t, x:R.l, y:(t.nodeId ? R.b+2 : R.t-6) + st, w:Math.max(160, R.r-R.l-48) } : null; }).filter(Boolean); };
+      base = all.map(t => { const R = rectOf(t); return R ? { t, x:R.l, y:(t.nodeId ? R.b+2 : R.t-6) + st, w:Math.max(160, R.r-R.l-48) } : null; }).filter(Boolean); };
+    // the steps a piece can't follow are faded, so the places it can go stand out
+    const dim = (on) => { document.querySelectorAll("[data-dt-no]").forEach(d => d.removeAttribute("data-dt-no"));
+      if (on) all.forEach(t => { if (!t.ok && t.nodeId && !holdsOk.has(t.key)) { const w = document.querySelector(`[data-dtn="${t.nodeId}"]`); if (w) w.setAttribute("data-dt-no", ""); } }); };
     const prevRect = () => { let t = 1e9, b = -1e9; document.querySelectorAll("[data-dt-prev] > *").forEach(c => { const x = c.getBoundingClientRect(); if (!x.height) return; t = Math.min(t, x.top); b = Math.max(b, x.bottom); }); return b > t ? { t, b } : null; };
-    const show = (q, full) => setDtPrev({ pid, bp:q.t.bp, index:q.t.index, scroll:false, slot:!full, acts:true });
-    const hitAt = () => { if (frozen) return; const st = scroller ? scroller.scrollTop : 0, P = cur ? prevRect() : null; let eff = ly;
-      if (P) { if (ly >= P.t - 8 && ly <= P.b + 8) return;                  // over the gap itself: keep it where it is
+    const hitAt = () => { if (phase !== "drag") return; if (gx && Math.hypot(lx-gx, ly-gy) < 28) return;   // just picked up again with ⠿: hold the place until the pointer moves off
+      const st = scroller ? scroller.scrollTop : 0, P = cur ? prevRect() : null; let eff = ly;
+      if (P) { if (ly >= P.t - 8 && ly <= P.b + 8) return;
         if (ly > P.b) { const below = base.find(q => q.y - st > P.t && q.t.nodeId); const R = below && dtRectOf(below.t.nodeId); eff = ly - (R ? (R.b + 2) - (below.y - st) : (P.b - P.t)); } }
       let b = null, bd = 1e9;
       base.forEach(q => { const y = q.y - st, dy = Math.abs(eff - y), dx = lx < q.x ? q.x - lx : Math.max(0, lx - (q.x + q.w + 60)) * 0.3, d = dy + dx*0.6; if (d < bd) { bd = d; b = q; } });
       best = bd < 90 ? b : null;
       const k = best && best.t.ok ? best.t.key : "";
-      if (k !== cur) { cur = k; if (k) show(best, false); else setDtPrev(null); }
-      if (best && !best.t.ok) { h.line.firstChild.textContent = "Can’t go here · " + best.t.why; h.line.classList.remove("onbox"); h.line.classList.add("on", "bad");
+      if (k !== cur) { cur = k; setDtPrev(k ? { pid, bp:best.t.bp, index:best.t.index, scroll:false, slot:true } : null); }
+      if (best && !best.t.ok) { h.line.firstChild.textContent = "Can’t go here"; h.line.classList.remove("onbox"); h.line.classList.add("on", "bad");
         Object.assign(h.line.style, { left:(best.x+24)+"px", top:(best.y - st)+"px", width:best.w+"px" }); }
       else h.line.classList.remove("on", "bad");
       if (ghost) ghost.classList.toggle("ok", !!k); };
-    // near the canvas's top / bottom edge the flow scrolls by itself, so every place can be reached
-    const edge = () => { if (!scroller || frozen) return; const sr = scroller.getBoundingClientRect(), d = ly < sr.top+70 ? -14 : ly > sr.bottom-90 ? 14 : 0; if (d) scroller.scrollTop += d; hitAt(); };
-    const end = (hit) => { if (!live) return; live = false;
+    const edge = () => { if (!scroller || phase !== "drag") return; const sr = scroller.getBoundingClientRect(), d = ly < sr.top+70 ? -14 : ly > sr.bottom-90 ? 14 : 0; if (d) scroller.scrollTop += d; hitAt(); };
+    const showGhost = (on) => { if (ghost) { ghost.style.display = on ? "" : "none"; ghost.style.left = lx+"px"; ghost.style.top = ly+"px"; } };
+    const end = (hit) => { if (!live) return; live = false; dtCancel.current = null;
       window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("keydown", key, true); window.removeEventListener("pointerdown", down, true);
-      clearInterval(tick); h.onPut = h.onSee = null;
+      clearInterval(tick); h.onPut = h.onGrip = h.onClose = null; dim(false);
       if (ghost) ghost.remove(); h.line.classList.remove("on", "bad"); document.documentElement.classList.remove("dt-dragging", "dt-carrying");
-      onState && onState(false); setTimeout(()=>{ dtDragged.current = false; }, 0);
+      onState && onState(false); setDtLock(false); setTimeout(()=>{ dtDragged.current = false; }, 0);
       if (hit) dtPick(pid, hit); else setDtPrev(null); };
-    h.onPut = () => { if (best && best.t.ok) end(best.t); };
-    h.onSee = () => { if (!best || !best.t.ok) return; frozen = !frozen; if (ghost) ghost.style.display = frozen ? "none" : ""; show(best, frozen); };
+    // let go over a place → review: the gap becomes the full preview with its actions
+    const drop = () => { if (best && best.t.ok) { phase = "review"; sticky = false; showGhost(false); document.documentElement.classList.remove("dt-dragging", "dt-carrying");
+        document.documentElement.classList.add("dt-review"); h.line.classList.remove("on", "bad");
+        setDtPrev({ pid, bp:best.t.bp, index:best.t.index, scroll:false, slot:false, acts:true }); return true; } return false; };
+    // places are measured once, on the bare flow (no gap / preview in it) — re-measuring with a preview open would shift them
+    const begin = () => { phase = "drag"; if (!base.length) measure(); dim(true); document.documentElement.classList.remove("dt-review"); document.documentElement.classList.add("dt-dragging"); showGhost(true); hitAt(); };
+    h.onPut = () => { if (phase === "review" && best && best.t.ok) end(best.t); };
+    h.onClose = () => end(null);
+    // ⠿: shrink back to the "Drop here" gap and pick the piece up again
+    h.onGrip = (ev) => { if (phase !== "review") return; lx = ev.clientX; ly = ev.clientY; gx = lx; gy = ly; sticky = false; phase = "grip";
+      if (best && best.t.ok) setDtPrev({ pid, bp:best.t.bp, index:best.t.index, scroll:false, slot:true }); cur = best && best.t.ok ? best.t.key : "";
+      begin(); };
     const move = (ev) => { lx = ev.clientX; ly = ev.clientY;
-      if (!ghost) { if (Math.hypot(lx-sx, ly-sy) < 6) return; dtDragged.current = true; setDtPrev(null); measure(); onState && onState(true);
-        document.documentElement.classList.add("dt-dragging");
+      if (!ghost) { if (Math.hypot(lx-sx, ly-sy) < 6) return; dtDragged.current = true; setDtPrev(null); onState && onState(true); setDtLock(true); setDrawer(null); dtCancel.current = () => end(null);
         ghost = document.createElement("div"); ghost.setAttribute("data-nf", "dt-ghost");
-        const b = document.createElement("b"); b.textContent = v.title; const sp = document.createElement("span"); sp.textContent = dtSteps(v.steps) + " · click Put it here · Esc cancels";
-        ghost.appendChild(b); ghost.appendChild(sp); document.body.appendChild(ghost); tick = setInterval(edge, 16); }
-      if (!frozen) { ghost.style.left = lx+"px"; ghost.style.top = ly+"px"; } hitAt(); };
-    // letting go does NOT attach: the piece stays picked, so "See preview" / "Put it here" can be clicked
-    const up = () => { if (!ghost) { end(null); return; } document.documentElement.classList.add("dt-carrying"); };
-    const down = (ev) => { if (ev.target.closest && ev.target.closest("[data-dt-act]")) return; if (document.documentElement.classList.contains("dt-carrying")) { ev.stopPropagation(); ev.preventDefault(); end(null); } };
-    const key = (ev) => { if (ev.key==="Escape" && ghost) { ev.stopPropagation(); ev.preventDefault(); end(null); } };
+        const b = document.createElement("b"); b.textContent = v.title; const sp = document.createElement("span"); sp.textContent = dtSteps(v.steps) + " · drop it on a highlighted place";
+        ghost.appendChild(b); ghost.appendChild(sp); document.body.appendChild(ghost); tick = setInterval(edge, 16); begin(); }
+      if (phase === "drag") { showGhost(true); hitAt(); } };
+    const up = () => { if (!ghost) { end(null); return; }
+      if (phase !== "drag" || sticky) return;
+      if (Math.hypot(lx-gx, ly-gy) < 6 && gx) { sticky = true; document.documentElement.classList.add("dt-carrying"); return; }   // ⠿ clicked, not dragged: carry it
+      if (!drop()) { sticky = true; document.documentElement.classList.add("dt-carrying"); } };   // let go where it can't go: keep it picked
+    // carrying (⠿ was clicked): the next click drops it; Undo / Redo cancel the placement first, then run
+    const down = (ev) => { const t = ev.target;
+      if (t.closest && t.closest("[data-keep='undo'],[data-keep='redo']")) { end(null); return; }
+      if (t.closest && t.closest("[data-dt-act],[data-keep]")) return;
+      // reviewing the preview: a click outside its box unpicks (the piece goes back to the stack)
+      if (phase === "review") { const r = h.box.getBoundingClientRect(), x = ev.clientX, y = ev.clientY;
+        if (!(x >= r.left && x <= r.right && y >= r.top - 20 && y <= r.bottom)) { ev.stopPropagation(); ev.preventDefault(); end(null); } return; }
+      if (sticky && phase === "drag") { ev.stopPropagation(); ev.preventDefault();
+        // a click on the workflow (its steps, or the Drop here box) drops; a click on empty canvas outside it unpicks (user 2026-11-12)
+        const x = ev.clientX, y = ev.clientY, pad = 24, inR = (r) => r.height && x >= r.left-pad && x <= r.right+pad && y >= r.top-pad && y <= r.bottom+pad;
+        const onFlow = (h.box.classList.contains("on") && inR(h.box.getBoundingClientRect())) || [...document.querySelectorAll("[data-dtn] > *")].some(c => inR(c.getBoundingClientRect()));
+        if (!onFlow) end(null); else drop(); } };
+    const key = (ev) => { if (!ghost) return;
+      if (ev.key === "Escape") { ev.stopPropagation(); ev.preventDefault(); end(null); }
+      else if ((ev.ctrlKey || ev.metaKey) && (ev.key === "z" || ev.key === "Z" || ev.key === "y")) end(null); };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("keydown", key, true); window.addEventListener("pointerdown", down, true); };
   // after a reattach: the steps settle in with a short glow and the canvas scrolls to them
   useEffect(()=>{ const id = dtArrive.current; if (!id) return; dtArrive.current = null;
@@ -11008,22 +11124,26 @@ function App() {
   const RAIL_DASH  = { width:0, borderLeft:`${RAIL_W}px dashed var(--border2)` };
   // o: rightDashed → left solid + right dashed (condition branch); bothDashed → both dashed (End placeholder)
   // `o.col` overrides the line colour (used by the MERGE loop line, drawn in the merge accent so it reads as one path).
-  const vLines = (x, pos, o={}) => { const cs = o.col ? { background:o.col, borderColor:o.col } : {}; return (
-    <div className="absolute" style={{ left:`${x+1.2}px`, ...pos, ...(o.bothDashed ? RAIL_DASH : RAIL_SOLID), ...cs }}/>
-  ); }; // ONE line (was a double rail) — centred on the 9px marker column, same x as vSingle
+  // DOUBLE rail restored from v5.17 (user 2026-11-12) — V8 had collapsed it to one line
+  const vLines = (x, pos, o={}) => { const cs = o.col ? { background:o.col, borderColor:o.col } : {}; return (<>
+    <div className="absolute" style={{ left:`${x}px`, ...pos, ...(o.bothDashed ? RAIL_DASH : RAIL_SOLID), ...cs }}/>
+    <div className="absolute" style={{ left:`${x+RAIL_OFF}px`, ...pos, ...((o.rightDashed||o.bothDashed) ? RAIL_DASH : RAIL_SOLID), ...cs }}/>
+  </>); };
   const vSingle = (x, pos, o={}) => <div className="absolute" style={{ left:`${x}px`, ...pos, width:`${RAIL_W}px`, background:(o.col||"var(--border2)") }}/>;
   // family-tree elbow (spine → lane): double = two parallel curves; single (condition) = only the RIGHT line curves off.
   const elbowLines = (xL, h, w, o={}) => {
     const c = o.col || "var(--border2)";
     const one = (x, hh, ww, r) => <div className="absolute" style={{ left:`${x}px`, top:0, width:`${ww}px`, height:`${hh}px`, borderLeft:`${RAIL_W}px solid ${c}`, borderBottom:`${RAIL_W}px solid ${c}`, borderBottomLeftRadius:`${r}px` }}/>;
-    return one(xL+1.2, h, w-1.2, 14); // single rounded L (spine → lane)
+    if (o.single) return one(xL+RAIL_OFF, h, w-RAIL_OFF, 12);
+    return (<>{one(xL, h, w, 12)}{one(xL+RAIL_OFF, h-RAIL_OFF, w-RAIL_OFF, Math.max(2, 12-RAIL_OFF))}</>);
   };
   // CONVERGE — the mirror of elbowLines for a LOOP CLOSE: a lane on the RIGHT comes DOWN and curves LEFT back onto the
   // spine (borderRight + borderBottom + rounded bottom-right). Used at the bottom of a merge to bring the paths together.
   const convergeLines = (xL, h, w, o={}) => {
     const c = o.col || "var(--border2)";
     const one = (x, hh, ww, r) => <div className="absolute" style={{ left:`${x}px`, top:0, width:`${ww}px`, height:`${hh}px`, borderRight:`${RAIL_W}px solid ${c}`, borderBottom:`${RAIL_W}px solid ${c}`, borderBottomRightRadius:`${r}px` }}/>;
-    return one(xL+1.2, h, w-1.2, 14); // single rounded L (lane → spine)
+    if (o.single) return one(xL, h, w-RAIL_OFF, 12);
+    return (<>{one(xL, h, w, 12)}{one(xL+RAIL_OFF, h-RAIL_OFF, w-RAIL_OFF, Math.max(2, 12-RAIL_OFF))}</>);
   };
   const Station = ({ marker, isFirst, isLast, head, headColor, headBg, hoverBg, onRemove, removeLabel, onInsert, onCopy, onHead, onAddCond, addLabel="new condition", addAccent="var(--c-if)", addActive=false, addHoverOnly=false, addAlwaysShow=false, addDisabled=false, addDisabledTip=null, wideContent, dnd, onFocus, onClick, focused, help, innerRef, dense, gapBottom, okBorder, editing, bgLeft="16px", bgRight="16px", padLeft="34px", padRight="28px", padY, markerY, headerBg, doubleRail, dashRail, noRail, dim, dimBg, children }) => {
     const [xHover, setXHover] = useState(false);
@@ -11684,7 +11804,7 @@ function App() {
     // FULL-WIDTH target: open on mousedown + stopPropagation so clicking THIS zone while another menu is open
     // SWITCHES (the press opens this one and prevents the global close listener from just closing the old one).
     <button onMouseDown={(e)=>{ e.stopPropagation(); openInsert(basePath, index, e.currentTarget.querySelector('[data-iz-card]')||e.currentTarget); }}
-      data-nf={hot ? "iz-hot" : undefined} className={"relative block w-full text-left group/iz focus:outline-none " + (dragging ? "pointer-events-none " : "cursor-pointer")} style={{ background:"transparent" }}>
+      data-nf={hot ? "iz-hot" : undefined} data-iz={zk} className={"relative block w-full text-left group/iz focus:outline-none " + (dragging ? "pointer-events-none " : "cursor-pointer")} style={{ background:"transparent" }}>
       {/* continuous connector line — full height, grows with the zone. DOUBLE = main path / parallel lane; SINGLE = a condition branch (user 2026-07-21). noRail = the LOOP body, where the box border is the one edge line. */}
       {noRail ? null : (dbl ? vLines(7, { top:0, bottom:0 }) : vSingle(8.2, { top:0, bottom:0 }))}
       {/* DETACH trash — outside the clipped height box below, so its tooltip is never cut off */}
@@ -11694,10 +11814,13 @@ function App() {
           onClick={(e)=>{ e.stopPropagation(); e.preventDefault(); if (!dtBlocked) detachAt(basePath, index); }}
           onMouseEnter={()=>{ if (!dtBlocked) setCutHover(zk); }} onMouseLeave={()=>setCutHover(c=>c===zk ? null : c)}
           className={"absolute flex items-center justify-center transition-opacity duration-200 " + (hot ? "opacity-100" : "opacity-0 group-hover/iz:opacity-100")}>
-          <DtIc n="trash" s={12} w={2}/>
+          <DtIc n="unlink" s={12} w={2}/>
           <span data-nf="dt-tip">{dtBlocked
             ? <><b>Can’t detach here</b><span>A Merge stays with the paths it joins. Detach from above them instead.</span></>
-            : <><b>Detach {dtSteps(dtN)}</b><span>Everything below this line{basePath.length ? " in "+dtPathLabel(basePath, flowRef.current) : ""} moves to the Detached stack. It won’t run until you attach it.</span></>}</span>
+            : (index===0 && basePath.length)
+              // the gap right under a branch's header detaches that one branch's steps; the branch itself stays (user 2026-11-12)
+              ? <><b>Detach this branch’s steps ({dtN})</b><span>The steps in {dtPathLabel(basePath, flowRef.current)} move to the Detached stack. The branch stays, empty. They won’t run until you attach them.</span></>
+              : <><b>Detach {dtSteps(dtN)}</b><span>Everything below this line{basePath.length ? " in "+dtPathLabel(basePath, flowRef.current) : ""} moves to the Detached stack. It won’t run until you attach it.</span></>}</span>
         </span>)}
       {/* collapsed = the resting gap; opens on hover OR while its menu is open (izOpen → no collapse-jump). During a
           drag the hover-expand is disabled so the zone stays a stable 31px gap. */}
@@ -13041,7 +13164,7 @@ function App() {
             })()}
 
             {/* trunk opener — the green "Then do this…" prompt for the first action */}
-            <Opener path={[]} />
+            <div data-dt-empty="" style={{ display:"contents" }}><Opener path={[]} /></div>
 
             {/* v5: Add step / Publish moved to the floating canvas toolbar (see bottom of builder) */}
 
@@ -14409,8 +14532,8 @@ function App() {
       {/* v5: floating canvas toolbar — flow control ▏ primary/secondary ▏ help */}
       {showBuilder && (() => {
         const sep = <span className="w-px h-5 mx-2 shrink-0" style={{ background:"var(--border2)" }} />;
-        const Tool = ({onClick, title, kbd, children}) => (
-          <Tooltip label={title} kbd={kbd} side="top"><button onClick={onClick}
+        const Tool = ({onClick, title, kbd, children, keep}) => (
+          <Tooltip label={title} kbd={kbd} side="top"><button onClick={onClick} data-keep={keep}
             className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--pop-hover)]"
             style={{ color:"var(--muted)" }}>{children}</button></Tooltip>
         );
@@ -14473,8 +14596,8 @@ function App() {
           {EMBED && (()=>{ const off = exprEdit ? 640 : (drawer||refOpen||savePanel||helpOpen) ? (sideW+10) : 0;
             const pl = placing && detached.find(x=>x.id===placing);
             return (<>
-              <DetachTray pieces={detached.map(dtView)} ver={dtVer} folded={trayFolded} right={off+12} unfoldFrom={dtUnfold}
-                onDelete={dtDelete} onFold={dtFold} targetsFor={dtTargets} onHoverTarget={dtHighlight} onPick={dtPick} onDrag={dtDrag} dragged={dtDragged} />
+              {!dtLock && <DetachTray pieces={detached.map(dtView)} ver={dtVer} folded={trayFolded} right={off+12} unfoldFrom={dtUnfold}
+                onDelete={dtDelete} onFold={dtFold} targetsFor={dtTargets} onHoverTarget={dtHighlight} onPick={dtPick} onDrag={dtDrag} dragged={dtDragged} />}
               {pl && <div data-nf="dt-banner" role="status" style={{ transform:`translateX(calc(-50% - ${off/2}px))` }}>
                 <div className="dt-bt"><b>Where should “{dtShort(dtCap(dtLine(pl.items[0])))}” go?</b>
                   <small>Click a blue spot in the list.{dtEndOnly(pl.items) ? " It holds a split path, so only the ends of paths are open." : ""} Esc cancels.</small></div>
@@ -14495,11 +14618,11 @@ function App() {
               {sep}
               <Tool onClick={()=>setLzoom(1)} title="Fit to screen">{NI('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>')}</Tool>
               {sep}
-              <Tool onClick={()=>{ setHelpOpen(false); setRefSel(null); setRefOpen(true); }} title="Guide">{NI('<path d="M9.2 17h5.6M10 20.5h4"/><path d="M12 3a6 6 0 0 1 3.6 10.8c-.5.4-.8 1-.8 1.6H9.2c0-.6-.3-1.2-.8-1.6A6 6 0 0 1 12 3Z"/>')}</Tool>
-              <Tool onClick={()=>{ setRefOpen(false); setHelpOpen(true); }} title="Keyboard shortcuts" kbd="?">{NI('<path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6Z"/>')}</Tool>
+              <Tool onClick={()=>{ setHelpOpen(false); setRefSel(null); setRefOpen(true); }} title="Guide" keep="guide">{NI('<path d="M9.2 17h5.6M10 20.5h4"/><path d="M12 3a6 6 0 0 1 3.6 10.8c-.5.4-.8 1-.8 1.6H9.2c0-.6-.3-1.2-.8-1.6A6 6 0 0 1 12 3Z"/>')}</Tool>
+              <Tool onClick={()=>{ setRefOpen(false); setHelpOpen(true); }} title="Keyboard shortcuts" kbd="?" keep="shortcuts">{NI('<path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6Z"/>')}</Tool>
               {sep}
-              <Tool onClick={undo} title="Undo" kbd={["Ctrl","Z"]}>{NI('<path d="M4 8h10a5.5 5.5 0 0 1 0 11H8"/><path d="M7.5 4.5 4 8l3.5 3.5"/>')}</Tool>
-              <Tool onClick={redo} title="Redo" kbd={["Ctrl","⇧","Z"]}>{NI('<path d="M20 8H10a5.5 5.5 0 0 0 0 11h6"/><path d="M16.5 4.5 20 8l-3.5 3.5"/>')}</Tool>
+              <Tool onClick={undo} title="Undo" kbd={["Ctrl","Z"]} keep="undo">{NI('<path d="M4 8h10a5.5 5.5 0 0 1 0 11H8"/><path d="M7.5 4.5 4 8l3.5 3.5"/>')}</Tool>
+              <Tool onClick={redo} title="Redo" kbd={["Ctrl","⇧","Z"]} keep="redo">{NI('<path d="M20 8H10a5.5 5.5 0 0 0 0 11h6"/><path d="M16.5 4.5 20 8l-3.5 3.5"/>')}</Tool>
               <Tooltip label="Reset" kbd={["⇧","R"]} side="top"><button data-nf="bartext" onClick={reset}>{NI('<path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M21 4v5h-5"/>')}Reset</button></Tooltip>
               {/* no "Detached N" toolbar button (user 2026-11-05): detached steps are never folded or stored away — the stack
                   stays on screen until each piece is reattached or deleted */}
@@ -14512,7 +14635,7 @@ function App() {
             <Tool onClick={()=>{ setHelpOpen(false); setRefSel(null); setRefOpen(true); }} title="Help & node reference">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.6.6 1 1.3 1 2.1h6c0-.8.4-1.5 1-2.1A6 6 0 0012 3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Tool>
-            <Tool onClick={()=>{ setRefOpen(false); setHelpOpen(true); }} title="Keyboard shortcuts" kbd="?"><span className="text-[length:var(--fs-14)] font-semibold">⌘</span></Tool>
+            <Tool onClick={()=>{ setRefOpen(false); setHelpOpen(true); }} title="Keyboard shortcuts" kbd="?" keep="shortcuts"><span className="text-[length:var(--fs-14)] font-semibold">⌘</span></Tool>
             {sep}
             {/* flow control */}
             <Tool onClick={undo} title="Undo" kbd={["Ctrl","Z"]}>

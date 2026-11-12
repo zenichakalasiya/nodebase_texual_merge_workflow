@@ -388,3 +388,6 @@ body.side-drag .bottombar{transition:none;}
   text-align:center;transition:background .15s;
 }
 .fc-walkthrough:hover{background:rgba(61,139,208,.18);}
+
+/* Linear view is placing a detached piece (user 2026-11-12): the page bar — view switch, Publish, menus, switches — is disabled */
+body.wf-lock .pagebar .page-title, body.wf-lock .pagebar .viewswitch, body.wf-lock .pagebar .pagebar-right > *{ pointer-events:none; opacity:.4; transition:opacity .2s ease; }

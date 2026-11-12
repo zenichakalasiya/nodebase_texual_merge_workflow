@@ -541,6 +541,13 @@
         linearSend({ wf:'popver', v: $('#popVerSel').value });
         linearSend({ wf:'dtver', v: $('#dtVerSel').value });
         if(isLinear()) linearFrame.focus();
+      } else if(m.wf === 'lock'){
+        /* while locked, a click anywhere outside the Linear frame unpicks the piece (user 2026-11-12) */
+        if(m.on && !window.__wfUnpick){ window.__wfUnpick = (ev) => { if(document.body.classList.contains('wf-lock')) linearSend({ wf:'dtcancel' }); };
+          document.addEventListener('pointerdown', window.__wfUnpick, true); }
+
+        /* a detached piece is being placed in the Linear view (user 2026-11-12): the page bar is disabled until it's confirmed or cancelled */
+        document.body.classList.toggle('wf-lock', !!m.on);
       } else if(m.wf === 'state'){
         flowName = m.name || ''; flowDesc = m.desc || '';
         $('#fdName').value = flowName; $('#fdDesc').value = flowDesc;
