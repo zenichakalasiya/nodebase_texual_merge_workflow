@@ -620,11 +620,18 @@ Reference docs in the repo root (generated this project):
 - `OPERATORS.md`: Linear vs the real product's operators, side by side.
 - `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
 
-**Detached steps (Linear view, skin sections 47–65).** Hover a gap between
-steps → an **unlink** icon floats left of the + (grey, instant tooltip; hover
-tints the steps it takes grey, never red) and cuts everything below into a
-"detached" piece (`detachAt`). In the gap right under a branch's header it
-reads "Detach this branch's steps" — the branch stays, empty. Pieces live in
+**Detached steps (Linear view, skin sections 47–69).** Detaching starts from
+a node's OWN marker: hovering a row shows a grey **unlink** icon right beside
+its marker (⠿ drag grip · unlink · marker; instant tooltip; hover tints just
+that node grey via `dtOne`/`data-nf="cutset"`, never red). On a step / IF row
+/ BRANCH 1 row / Loop it detaches **only that node** with what's inside it
+(`dtDetachOne`); on a branch header (ELSE, BRANCH 2+, SPLIT PATH N,
+Otherwise, Merge success/timeout — Station prop `dtLane`) it detaches that
+branch's steps and the branch stays, empty. Merge rows and a whole Split have
+no icon. `dtCtl(dnd, lane)` decides; `dnd` now carries the node's `path`.
+The old gap icon beside the + is switched off (`false &&` in InsertZone).
+Hover state must stay referentially stable (same target → same object) or the
+remounting row loops. Pieces live in
 `doc.detached`, so undo/redo covers them. They never run and are never folded
 away: the stack (374px wide, `DT_W`) stays on the right until each piece is
 reattached or deleted. Cards show no time; every card has a ⋮ menu
@@ -682,9 +689,13 @@ two solid lines, condition spines = solid + dashed right, End / empty =
 both dashed, elbows double (or single for conditions). `vLines`,
 `elbowLines`, `convergeLines` are byte-identical to v5.17 — V8 had
 collapsed them to one line. A soft blue **rail pulse** (`data-nf="rail-pulse"`,
-skin 64–65) travels down the canvas as one wave; at each height only the
-innermost path's rail glows, so it moves from the main rail into branches and
-back. It's built from the drawn rail divs, so it follows any shape.
+skin 64–66) travels down the canvas as one wave from the trigger: the main
+rail keeps glowing and, at every split, the glow also turns off along the
+elbow into each path (late by the elbow's length) and down it — nested paths
+split again. Built from the drawn rail divs (each path's parent = nearest rail
+to its left), so it follows any shape. The "Drop here" gap is a fixed 32px
+box (24px gap, padding included) everywhere; cards show a grab hand on hover
+(no grip icon).
 
 **Loading skeletons** (`workflow-skeleton.css` / `.js`, markup in
 `workflow-canvas.html`; Node view `.nskel`, Linear view `.lskel`). The top

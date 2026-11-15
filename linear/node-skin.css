@@ -1592,3 +1592,29 @@ html.embed [data-nf="rail-pulse"]::after{ content:none; animation:none; }
 html.embed [data-nf="rail-pulse"] .rp-run{ position:absolute; width:4px; overflow:hidden; }
 html.embed [data-nf="rail-pulse"] .rp-run > i{ position:absolute; left:0; top:0; width:4px; height:80px; border-radius:2px; opacity:0;
   background:linear-gradient(180deg, transparent, rgba(61,139,208,.4), transparent); transition:opacity .25s ease; will-change:transform; }
+
+
+/* 66. (user 2026-11-12) The rail pulse SPLITS: the line keeps going and also turns off along each elbow into every path.
+   Detach hover: a slightly darker grey so the steps it would take stand out from the canvas. */
+html.embed [data-nf="rail-pulse"] .rp-elbow{ position:absolute; height:4px; overflow:hidden; }
+html.embed [data-nf="rail-pulse"] .rp-elbow > i{ position:absolute; left:0; top:0; width:80px; height:4px; border-radius:2px; opacity:0;
+  background:linear-gradient(90deg, transparent, rgba(61,139,208,.4), transparent); transition:opacity .25s ease; will-change:transform; }
+html.embed{ --dt-cut:#9aa9ba; --dt-cut-bg:#e7ecf2; }
+
+/* 67. Detached cards (user 2026-11-12): a grab hand on hover says the card can be dragged — no grip icon */
+html.embed [data-nf="dt-nc"] .dt-card:hover{ cursor:grab !important; }
+html.embed [data-nf="dt-nc"] .dt-card:active{ cursor:grabbing !important; }
+/* 68. Slim "Drop here" (user 2026-11-12): the gap the flow opens is 24px, so the dashed box is 32px tall (was 56px) */
+html.embed [data-dt-slot] > *{ max-height:24px !important; }
+html.embed [data-nf="dt-hl"].dtslot{ border-radius:8px; }
+html.embed [data-nf="dt-hl"].dtslot > span{ font-size:11.5px !important; line-height:1; }
+/* the gap is 24px EVERYWHERE — padding included (inside a split path, above a Merge, the step carries extra bottom padding) */
+html.embed [data-dt-slot] > *{ box-sizing:border-box !important; height:24px !important; padding-top:0 !important; padding-bottom:0 !important; margin-top:0 !important; margin-bottom:0 !important; }
+
+
+/* 69. Detach from a node's own marker (user 2026-11-12): the unlink icon sits right beside the marker (⠿ grip · unlink · marker),
+   shown on the row's hover; its tooltip opens upward. */
+html.embed [data-nf="dt-trash"][data-node]{ transform:translate(-50%,-50%); width:22px; height:22px; z-index:5; }
+html.embed [data-nf="dt-trash"][data-node] [data-nf="dt-tip"]{ left:-4px; bottom:calc(100% + 8px); top:auto; }
+html.embed [data-nf="dt-trash"][data-loop]{ opacity:0; }
+html.embed *:hover > [data-nf="dt-trash"][data-loop]{ opacity:1; }
