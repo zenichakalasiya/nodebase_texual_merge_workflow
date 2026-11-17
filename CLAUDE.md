@@ -608,6 +608,21 @@ Functional edits made inside V8 (all in `linear/index.html`):
 - **Content (Send email)**: the reply toolbar sits inside the writing box via
   the `cbar` hook (`data-rt`, skin 43).
 - **Search highlight** in every list popup is yellow (`SEARCH_MARK`, `#FDE68A`).
+- **Triggers: "field changes" vs "activity"** (2026-11-17, Request family
+  only — Request / Incident / Service Request, `ACT_MODULES`). "When record is
+  updated" is split into **When a field changes** (`changed`, fields from
+  `triggerFieldsFor`) and **When there's activity on a record** (`activity`,
+  the `ACTIVITY` list: reply, note, collaboration, diagnosis, solution, AI
+  summary, task, merged, marked / unmarked as spam, converted — features,
+  read from the real product's request page). An activity sentence has
+  blanks act → variant (`subs`, e.g. reply by technician / requester / CC
+  user) → module. **Smart search** in the trigger picker
+  (`smartTriggerSearch`, the Popover's `moduleMorph`): typing a word lists the
+  full sentences with the word highlighted; a module word in the query
+  pre-fills the module; hovering a row previews its sentence in the flow
+  (`trigPreview`, `data-nf="trig-prev"`, skin 74); after picking, every blank
+  stays changeable. Approval / Signature status and escalation levels are
+  still listed as fields — **waiting on the manager** to say where they go.
 - **Ask for approval** stage headings are tinted `#F6F9FC`.
 - **Request Signature** is a new step under Approval (template list is
   sample data).
@@ -620,16 +635,26 @@ Reference docs in the repo root (generated this project):
 - `OPERATORS.md`: Linear vs the real product's operators, side by side.
 - `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
 
-**Detached steps (Linear view, skin sections 47–69).** Detaching starts from
-a node's OWN marker: hovering a row shows a grey **unlink** icon right beside
-its marker (⠿ drag grip · unlink · marker; instant tooltip; hover tints just
-that node grey via `dtOne`/`data-nf="cutset"`, never red). On a step / IF row
-/ BRANCH 1 row / Loop it detaches **only that node** with what's inside it
-(`dtDetachOne`); on a branch header (ELSE, BRANCH 2+, SPLIT PATH N,
-Otherwise, Merge success/timeout — Station prop `dtLane`) it detaches that
-branch's steps and the branch stays, empty. Merge rows and a whole Split have
-no icon. `dtCtl(dnd, lane)` decides; `dnd` now carries the node's `path`.
-The old gap icon beside the + is switched off (`false &&` in InsertZone).
+**Detached steps (Linear view, skin sections 47–73).** Detaching starts from
+a **gap** again (2026-11-17, the original concept): the unlink icon sits on
+the connector between two steps (InsertZone, `[data-iz=key] [data-nf=dt-trash]`)
+and detaches the next step **and everything after it to the end of that path**
+(`detachAt` → `dtFlyOut` → `detachAtNow`). Hovering it highlights that whole
+run (`cutHover` / `data-nf="cutset"`), and the connector is coloured from the
+icon's own point downward, never above it (skin 72). The per-node marker icons
+of 2026-11-15 are switched off (`DT_ON_NODE = false`; `dtCtl` returns null).
+The lift-off copy flies only the part visible in the window, scaled evenly
+into the card (`dtFlyOut`: box > scaler > inner), so merge paths no longer fly
+in from the top.
+**Split paths (v5.17 rules)**, all through `splitTakePath(f, sp, pi, mkId)`:
+adding a split as the 2nd step wraps the first flow into Split path 1;
+deleting a path renumbers the others and drops it from any Merge's
+`feeders`; with 2 paths, deleting one unwraps the split — the remaining path's
+steps, then the success steps of the Merges that stay, inline into the parent
+(a removed Merge's Timeout steps are dropped). The gap at the top of a split
+path detaches **the whole path** (`dtSplitAt` / `detachSplitNow`); a Merge fed
+only by that path, with its branches, goes with it into the piece; Merges
+shared with other paths stay. Split-path cards are named "Split path N".
 Hover state must stay referentially stable (same target → same object) or the
 remounting row loops. Pieces live in
 `doc.detached`, so undo/redo covers them. They never run and are never folded
@@ -640,7 +665,9 @@ reattached or deleted. Cards show no time; every card has a ⋮ menu
   **1 · Panel** — click a card → drill-down detail at the card's exact width,
   with **Reattach** + delete icon at its top right; its left edge has a
   resizer (`startRsz`, max = the flow's natural width, double-click = fit /
-  back). Small flows keep a small card; long ones grow to the screen bottom
+  back) — shown only when the flow is wider than the card (`canRsz`); on
+  hover / drag the card's whole left outline turns blue (skin 71/73). Card
+  ⋮ / › icons are absolutely placed so the card never shifts on hover (skin 73). Small flows keep a small card; long ones grow to the screen bottom
   (12px margin) then scroll both ways. **2 · Popover** — hover a card → a
   popover to its LEFT. The stack stays spread while a popover or ⋮ menu is
   open. Cards are `position:absolute` (JS lays the stack out) — never make

@@ -273,7 +273,7 @@ const CADENCE   = ["hourly","daily","weekly","monthly","on a specific date"];
 const WEEKDAYS  = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const DOM       = Array.from({length:28},(_,i)=>String(i+1)).concat(["last day"]);
 
-const PLACEHOLDER = { module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often",
+const PLACEHOLDER = { act:"activity", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often",
   weekday:"a weekday", dom:"a day", time:"a time", date:"a date" };
 
 const TRIGGER_TYPES = [
@@ -722,7 +722,8 @@ const USECASE_META = {
 const RECORD_EVENT_ITEMS = [
   { header:"Record events" },
   { id:"created", label:"When a record is created", icon:I.plus,   keywords:"create new add raise log open" },
-  { id:"changed", label:"When a record is updated", icon:I.field,  keywords:"update change modify edit field value" },
+  { id:"changed", label:"When a field changes", icon:I.field,  keywords:"update updated change changes modify edit field value" },
+  { id:"activity", label:"When there's activity on a record", icon:I.bell, keywords:"activity reply note collaboration diagnosis solution task merge spam convert summary" },
   { id:"archived", label:"When a record is archived", icon:I.field, keywords:"archive delete remove retire close" },
 ];
 const TIME_ONCE = { id:"once", label:"Once", icon:I.cal, keywords:"once one time single run date schedule when specific" };
@@ -752,7 +753,8 @@ const TRIGGER_MENU_FLAT = [ ...RECORD_EVENT_ITEMS, { header:"Time based" }, TIME
 // Service Request) an inline chooser fills the SLOT instead of multiplying rows.
 const TRIGGER_EVENTS = [
   { id:"created",  icon:I.plus,  tail:"is created",  verbs:["create","created","creates","new","add","added","raise","raised","log","logged","open","opened"] },
-  { id:"changed",  icon:I.field, tail:"is updated",  verbs:["update","updated","updates","change","changed","changes","modify","modified","edit","edited"] },
+  { id:"changed",  icon:I.field, tail:"'s field changes", verbs:["update","updated","updates","change","changed","changes","modify","modified","edit","edited","field"] },
+  { id:"activity", icon:I.bell, tail:" has new activity", verbs:["activity"], only:["Request","Incident","Service Request"] },
   { id:"archived", icon:I.field, tail:"is archived", verbs:["archive","archived","archives","delete","deleted","remove","removed","retire","retired"] },
 ];
 // cohesive families whose members share a base word → an inline chooser, never extra rows. `min` = the
@@ -853,13 +855,70 @@ function moduleMorphFor(raw) {
     // groups read clearly.
     rows.push({ header:"Event Trigger › "+module, headerNode:(
       <span><span style={{color:"var(--faint)"}}>Event Trigger › </span><span style={{color:"var(--accent2)", fontWeight:600}}>{module}</span></span>) });
-    events.forEach(e => rows.push({
+    events.filter(e => !e.only || e.only.includes(module)).forEach(e => { const tail = /^['\s]/.test(e.tail) ? e.tail : " "+e.tail; rows.push({
       id:module+":"+e.id, typeId:e.id, module, icon:e.icon, help:TRIGGER_HELP[e.id],
-      label:`When ${moduleArticle(module)} ${module} ${e.tail}`,
-      labelNode:<>When {moduleArticle(module)} {module} {e.tail}</>,
-    }));
+      label:`When ${moduleArticle(module)} ${module}${tail}`,
+      labelNode:<>When {moduleArticle(module)} {module}{tail}</>,
+    }); });
     if (mi < modules.length-1) rows.push({ divider:true });
   });
+  return { rows };
+}
+// ── "When there's activity on a record" (user 2026-11-17) — REQUEST ONLY for now. Built from the real product's Request
+//    trigger list: the attributes that are something ADDED / DONE on a request (replies, notes, tasks, merge, spam…), as
+//    opposed to a field whose value changes ("When a field changes"). Each activity is its own readable sentence; the
+//    activity word is a blank (switch reply → note without starting over) and a variant, when it has one, is a 2nd blank.
+//    `id` is also the word shown in the sentence. @M = "a/an {module}".
+const ACT_MODULES = ["Request", "Incident", "Service Request"];
+const ACTIVITY = [
+  { id:"reply",         grp:"Replies",               label:"A reply is sent",          tpl:"a {act} is sent by {sub} on @M", subs:["a technician","the requester","a CC user"], kw:"reply replies replied respond response conversation message email" },
+  { id:"note",          grp:"Notes & collaboration", label:"A note is added",          tpl:"a {act} is added to @M", kw:"note notes internal comment" },
+  { id:"collaboration", grp:"Notes & collaboration", label:"A collaboration is added", tpl:"a {act} is added to @M", kw:"collaboration collaborate collab" },
+  { id:"diagnosis",     grp:"Resolution",            label:"A diagnosis is added",     tpl:"a {act} is added to @M", kw:"diagnosis diagnose" },
+  { id:"solution",      grp:"Resolution",            label:"A solution is added",      tpl:"a {act} is added to @M", kw:"solution solve resolve fix" },
+  { id:"AI summary",    grp:"Resolution",            label:"An AI summary is generated", tpl:"an {act} is generated for @M", kw:"ai summary summarize summarise generated" },
+  { id:"task",          grp:"Tasks",                 label:"A task is added or deleted", tpl:"a {act} is {sub} on @M", subs:["added","deleted"], kw:"task tasks todo" },
+  { id:"merged",        grp:"Merge",                 label:"Merged with another request", tpl:"@M is {act} as the {sub} request", subs:["primary","secondary"], kw:"merge merged primary secondary" },
+  { id:"marked as spam",   grp:"Spam",               label:"Marked as spam",           tpl:"@M is {act}", kw:"spam junk" },
+  { id:"unmarked as spam", grp:"Spam",               label:"Unmarked as spam",         tpl:"@M is {act}", kw:"spam junk not unmark" },
+  { id:"converted",     grp:"Conversions",           label:"Converted to another type", tpl:"@M is {act} to {sub}", subs:["an Incident","a Service Request","another service"], kw:"convert converted conversion" },
+];
+const actOptions = () => { const out = []; let g = null; ACTIVITY.forEach(a => { if (a.grp !== g) { g = a.grp; out.push({ header:g }); } out.push({ id:a.id, label:a.label }); }); return out; };
+// the sentence a trigger reads as (for search rows), with the placeholder word for any blank still open
+const trigSentence = (typeId, vals) => "When " + triggerView({ typeId, vals:vals||{} }).tpl.replace(/\{(\w+)\}/g, (_,k) => (vals && vals[k]) || PLACEHOLDER[k] || k);
+// yellow-mark every typed word inside a row label (user 2026-11-17: "highlight that word")
+const markWords = (text, toks) => { if (!toks.length) return text; const low = text.toLowerCase(), hit = new Array(text.length).fill(false);
+  toks.forEach(t => { let at = low.indexOf(t); while (t && at >= 0) { for (let k = at; k < at + t.length; k++) hit[k] = true; at = low.indexOf(t, at + t.length); } });
+  const out = []; let k = 0; while (k < text.length) { const on = hit[k]; let e = k; while (e < text.length && hit[e] === on) e++;
+    out.push(on ? <mark key={k} style={{ ...SEARCH_MARK, color:"#1d2a3e" }}>{text.slice(k, e)}</mark> : text.slice(k, e)); k = e; } return <>{out}</>; };
+const SMART_STOP = ["when","a","an","the","is","on","to","by","of","for","as","with","record","there","there's","added","sent","changes","change","changed","update","updated","updates"];
+// SMART TRIGGER SEARCH (user 2026-11-17): type a word ("reply", "spam", "priority") and get the FULL sentences it can
+// mean — every activity variant + every field — with the word highlighted; hovering one previews it in the trigger
+// row; picking it fills those blanks (the record is still asked for). A module word is still the module morph above.
+function smartTriggerSearch(raw) {
+  const q = (raw||"").toLowerCase().trim(); if (!q) return null;
+  const morph = moduleMorphFor(raw);
+  const all = queryTokens(q), toks = all.filter(t => t.length >= 2 && !SMART_STOP.includes(t));
+  // a module word is the morph's job — don't also read it as an activity / field word
+  const modWord = (t) => t.length >= 3 && TRIGGER_MODULES.some(m => m.toLowerCase().split(" ").some(w => w.startsWith(t)));
+  const isAct = (t) => ACTIVITY.some(a => a.kw.split(" ").some(w => w.startsWith(t)));   // "task" is a module AND an activity → keep both
+  const words = toks.filter(t => !modWord(t) || isAct(t));
+  if (!words.length) return morph;
+  // a module word typed WITH an activity / field word fills the record too ("reply incident" → "…on an Incident")
+  const modToks = toks.filter(t => modWord(t) && !isAct(t)); let mod = null;
+  if (modToks.length) { const c = TRIGGER_MODULES.filter(m => modToks.every(t => m.toLowerCase().split(" ").some(w => w.startsWith(t))));
+    mod = c.find(m => m.toLowerCase()===modToks.join(" ")) || (c.includes("Request") ? "Request" : c[0]) || null; }
+  const rows = [], hl = all.filter(t => t.length >= 2 && !["an","is","on","to","by","the","of","when"].includes(t));
+  const acts = []; if (!mod || ACT_MODULES.includes(mod)) ACTIVITY.forEach(a => (a.subs || [null]).forEach(sub => {
+    const vals = { act:a.id, ...(sub ? { sub } : {}), ...(mod ? { module:mod } : {}) }, text = trigSentence("activity", vals);
+    if (words.every(w => (a.kw + " " + text).toLowerCase().includes(w))) acts.push({ id:"s:act:"+a.id+":"+(sub||""), typeId:"activity", vals, icon:I.bell, help:TRIGGER_HELP.activity, label:text, labelNode:markWords(text, hl) }); }));
+  const flds = triggerFieldsFor(mod || "Request").filter(f => words.every(w => (f.label + " " + f.id).toLowerCase().includes(w)))
+    .map(f => { const vals = { field:f.id, ...(mod ? { module:mod } : {}) }, text = "When " + (mod ? moduleArticle(mod)+" "+mod : "a record") + "'s " + f.label + " changes";
+      return { id:"s:fld:"+f.id, typeId:"changed", vals, icon:I.field, help:TRIGGER_HELP.changed, label:text, labelNode:markWords(text, hl) }; });
+  if (acts.length) rows.push({ header:"Activity on a record" }, ...acts);
+  if (flds.length) rows.push({ header:"A field changes" }, ...flds);
+  if (!rows.length) return morph;
+  if (morph) rows.push({ divider:true }, ...morph.rows);
   return { rows };
 }
 // values offered when a particular field is chosen (for "field changes to a value")
@@ -898,12 +957,17 @@ function triggerView(trigger) {
     const fld = fields.find(f=>f.id===v.field);
     if (fld && fld.input==="dropdown") {            // dropdown → offer the from→to value chain
       const vals = fld.values || [];
-      return { tpl:"a {module}'s {field} is updated from {from} to {to}",
+      return { tpl:"a {module}'s {field} changes from {from} to {to}",
         slots:[{key:"module",options:TRIGGER_MODULES},{key:"field",options:fields},
                {key:"from",options:["any",...vals]},{key:"to",options:vals.filter(x=>x!==v.from)}] };
     }
-    return { tpl:"a {module}'s {field} is updated",      // text / date / number / etc. → just "is updated"
+    return { tpl:"a {module}'s {field} changes",      // text / date / number / etc. → just "changes" (user 2026-11-17: was "is updated")
       slots:[{key:"module",options:TRIGGER_MODULES},{key:"field",options:fields}] };
+  }
+  if (id==="activity") {   // user 2026-11-17 — Request only; the activity word and its variant are blanks
+    const a = ACTIVITY.find(x => x.id===v.act), M = (v.module ? moduleArticle(v.module) : "a") + " {module}";
+    if (!a) return { tpl:"there's {act} on "+M, slots:[{key:"act",options:actOptions()},{key:"module",options:ACT_MODULES}] };
+    return { tpl:a.tpl.replace("@M", M), slots:[{key:"act",options:actOptions()}, ...(a.subs ? [{key:"sub",options:a.subs}] : []), {key:"module",options:ACT_MODULES}] };
   }
   // time-based triggers (2026-07-10 rework): five clear cadences, each a PROPER sentence (replaces the old
   // "date is reached" + nested "every time period" cadence picker). Once has a date AND time.
@@ -3091,7 +3155,8 @@ const ACTION_HELP = {
 const TRIG_HELP = (title, body, eg) => ({ title, color:"var(--c-when)", bg:"var(--c-when-bg)", graphic:G.trigger, body, eg });
 const TRIGGER_HELP = {
   created:      TRIG_HELP("Record created", "Runs the moment a new record of the chosen type is created.", "Like — a new Incident is logged, or a Service Request is raised."),
-  changed:      TRIG_HELP("Record updated", "Runs when a record changes — optionally only when a specific field moves from one value to another.", "Like — status goes from Open to Resolved."),
+  changed:      TRIG_HELP("A field changes", "Runs when a field of the record changes — optionally only when it moves from one value to another.", "Like — status goes from Open to Resolved."),
+  activity:     TRIG_HELP("Activity on a record", "Runs when something is added or done on a request — a reply, a note, a task, a merge, spam…", "Like — the requester replies to an Incident."),
   archived:     TRIG_HELP("Record archived", "Runs when a record is archived (soft-deleted / moved out of active use).", "Like — an old asset is retired."),
   __period:TRIG_HELP("Every time period", "Runs on a repeating schedule — pick hourly, daily, weekly, or monthly.", "Like — every Monday at 9am."),
   once:    TRIG_HELP("Once", "Runs one time, at a specific date and time.", "Like — a one-off cleanup on the 31st at 9am."),
@@ -3697,6 +3762,29 @@ const treeSetLevel = (nodes, path, arr) => {
     if (rest.length && isBranchSeg(rest[0])) return withSegChildren(n, rest[0], treeSetLevel(segChildren(n,rest[0]), rest.slice(1), arr));
     return {...n, children: treeSetLevel(n.children||[], rest, arr)};
   });
+};
+// SPLIT PATH removal (user 2026-11-17) — used by Delete and by Detach. Takes path `pi` out of the split at `sp`:
+//  · the other paths renumber (numbers are positional);
+//  · the path drops off its Merge's list; a Merge that joined ONLY this path leaves with it (`moved`: a 1-path split + that
+//    Merge with its Success / Timeout branches — so a detached path keeps its Merge);
+//  · down to ONE path → the split unwraps: that path's steps come back onto the line, its Merge (now joining one path) goes
+//    and the Merge's Success steps carry on after them;  · no paths left → the split is gone.
+const splitTakePath = (f, sp, pi, mkId) => {
+  const lvl = sp.slice(0, -1), idx = sp[sp.length-1], sibs = childrenAt(f, lvl), split = sibs[idx];
+  if (!split || !split.paths || !split.paths[pi]) return { flow:f, moved:null, path:null };
+  const P = split.paths[pi], paths = split.paths.filter((_, k) => k !== pi);
+  let j = idx + 1; const merges = []; while (sibs[j] && sibs[j].kind === "merge") { merges.push(sibs[j]); j++; }
+  let own = null; const kept = [];
+  merges.forEach(m => { const fed = (m.feeders||[]).includes(P.id) || P.feeds === m.id, fs = (m.feeders||[]).filter(x => x !== P.id);
+    if (fed && !fs.length) own = m; else kept.push(fed ? { ...m, feeders:fs } : m); });
+  const before = sibs.slice(0, idx), rest = sibs.slice(j);
+  let level;
+  if (!paths.length) level = [...before, ...kept, ...rest];
+  else if (paths.length === 1) { const { feeds, ...Q } = paths[0];
+    level = [...before, ...(Q.children||[]), ...kept.flatMap(m => (m.success && m.success.children) || []), ...rest]; }
+  else level = [...before, { ...split, paths }, ...kept, ...rest];
+  const moved = own ? [{ ...split, id:mkId(), paths:[P] }, own] : null;
+  return { flow: treeSetLevel(f, lvl, level), moved, path:P, own };
 };
 const treeFindPath = (nodes, id, base=[]) => {
   for (let i=0;i<nodes.length;i++) {
@@ -6879,6 +6967,8 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
   const DT_W = 374;                                    // the stack + its cards (user 2026-11-12: ~10% wider than 340)
   const [panelW, setPanelW] = React.useState(null);    // V1 detail: widened with the left-edge resizer (null = DT_W)
   const [rsz, setRsz] = React.useState(false);
+  // the resizer only shows when the flow is wider than the card, i.e. it scrolls sideways (user 2026-11-17)
+  const [canRsz, setCanRsz] = React.useState(false);
   React.useEffect(()=>{ if (!detailId) setPanelW(null); }, [detailId]);   // back to the list → back to the card width
   // the widest the panel needs to be to show the whole flow without scrolling sideways
   const fitW = () => { const box = boxRef.current, root = box && box.querySelector(".dc-root"), fb = box && box.querySelector(".dt-flowbox");
@@ -6901,6 +6991,7 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
   const [, setTick] = React.useState(0);
   const boxRef = React.useRef(null), stackRef = React.useRef(null), prevN = React.useRef(pieces.length), prevExp = React.useRef(expanded), popT = React.useRef(null);
   const v2 = ver==="2";
+  React.useLayoutEffect(()=>{ const on = !!(detailId && !v2) && fitW() > DT_W + 1; setCanRsz(c => c===on ? c : on); });
   React.useEffect(()=>{ const t = setInterval(()=>setTick(x=>x+1), 20000); return ()=>clearInterval(t); }, []);
   React.useEffect(()=>{ if (pieces.length > prevN.current) { setDetailId(null); setExpanded(false); setPopId(null); } prevN.current = pieces.length; }, [pieces.length]);
   React.useEffect(()=>{ setDetailId(null); setPopId(null); setPick(null); }, [ver]);
@@ -6953,7 +7044,7 @@ function DetachTray({ pieces, ver, folded, right, unfoldFrom, onDelete, onFold, 
     <aside ref={boxRef} data-nf="dt-nc" data-ver={ver} data-detail={detail ? "" : undefined} data-rsz={rsz ? "" : undefined} aria-label="Detached steps" style={{ right:right+"px", width:((detail && panelW) || DT_W)+"px" }}
       onMouseEnter={()=>setOpen(true)} onMouseLeave={()=>{ setOpen(false); if (v2) popOut(); }}
       onFocus={()=>setOpen(true)} onBlur={(e)=>{ if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
-      {detail && <div className="dt-rsz" role="separator" aria-orientation="vertical" aria-label="Resize — drag to widen, double-click to fit the whole flow"
+      {detail && canRsz && <div className="dt-rsz" role="separator" aria-orientation="vertical" aria-label="Resize — drag to widen, double-click to fit the whole flow"
         title="Drag to widen · double-click to fit the whole flow" onPointerDown={startRsz}
         onDoubleClick={()=>setPanelW(w => { const f = fitW(); return (w && w >= f - 2) ? null : f; })}><span/></div>}
       <div className="dt-h">
@@ -7301,7 +7392,8 @@ function App() {
   // (e.g. the removed "do this…" opener) whose 0×0 rect would leave a popover unable to position.
   const isVisibleEl = (el) => { if(!el || !el.getBoundingClientRect) return false; const r = el.getBoundingClientRect(); return r.width>0 || r.height>0; };
   const firstVisibleEl = (...els) => els.find(isVisibleEl) || null;
-  const close = () => { dropPreviewGhost(); setPop(null); setOpenSlot(null); setBranchMenuPath(null); setSmartPreview(null); setSplitPreviewKey(null); if (replaceRef.current) replaceRef.current = null; };
+  const [trigPreview, setTrigPreview] = useState(null);   // the hovered trigger sentence, shown in the trigger row (user 2026-11-17)
+  const close = () => { dropPreviewGhost(); setPop(null); setTrigPreview(null); setOpenSlot(null); setBranchMenuPath(null); setSmartPreview(null); setSplitPreviewKey(null); if (replaceRef.current) replaceRef.current = null; };
   // The Publish split-button's chevron menu (Save & publish · Save only · [Unpublish]). Each option opens the
   // right-side save/publish drawer (name + description); Unpublish only appears once the workflow is live.
   const openPublishMenu = (el) => {
@@ -7686,14 +7778,17 @@ function App() {
     flat: withHelp(TRIGGER_MENU_FLAT),     // search expands the "Every time period" drill → typing "daily" lands it
     wide:true, back, title: back ? "Add trigger" : (replaceId ? "Change trigger" : null), help: NODE_HELP.when,
     // dynamic MODULE SEARCH: typing a module name morphs the generic event rows + pre-fills the module slot.
-    moduleMorph: moduleMorphFor, searchPlaceholder:"Search an event or module — e.g. Incident",
+    moduleMorph: smartTriggerSearch, searchPlaceholder:"Search a trigger — e.g. reply, priority, Incident",
+    // hover / arrow → the trigger row previews the full sentence with its blanks (user 2026-11-17)
+    onActive:(i)=>{ if (!i || i.drill || !(i.typeId || i.id)) return; const typeId = i.typeId || i.id, vals = i.vals || (i.module ? { module:i.module } : {});
+      setTrigPreview(p => p && p.typeId===typeId && JSON.stringify(p.vals)===JSON.stringify(vals) ? p : { tid:replaceId||null, typeId, vals }); },
     selected: replaceId ? (triggers.find(t=>t.id===replaceId)||{}).typeId : undefined,
     onPick:(i)=>{
       // "Every time period" → open the cadence drill (keep the popover open, back → this menu)
       if (i.drill) { setPop(cadenceMenuConfig(anchor, replaceId, ()=>setPop(triggerMenuConfig(anchor, back, replaceId)))); return true; }
       // a morphed row carries `typeId` (its own id is module-qualified & unique) + the resolved module → seed
       // vals.module so the guided chain skips the slot pick.
-      commitTrigger(i.typeId || i.id, i.module ? { module:i.module } : {}, replaceId);
+      commitTrigger(i.typeId || i.id, i.vals ? { ...i.vals } : (i.module ? { module:i.module } : {}), replaceId);
     },
     footer: GEN_AI_FOOTER,
   }; };
@@ -7710,7 +7805,7 @@ function App() {
     return {
       anchor, wide:true, title:"Add trigger", back:()=>close(), source:{ label:"Record", value:mod },
       searchPlaceholder:`Search a field — e.g. ${eg}`,
-      items:[ { header:"A field is updated" }, ...fields.map(f => used.has(f.id) ? { id:f.id, label:f.label, disabled:true, hint:"Already a trigger" } : { id:f.id, label:f.label }) ],
+      items:[ { header:"A field changes" }, ...fields.map(f => used.has(f.id) ? { id:f.id, label:f.label, disabled:true, hint:"Already a trigger" } : { id:f.id, label:f.label }) ],
       onPick:(i)=>{ commitTrigger("changed", { module:mod, field:i.id }); },
       footer: GEN_AI_FOOTER,
     };
@@ -7723,7 +7818,8 @@ function App() {
   // re-open the picker on an EXISTING trigger to swap its type in place (keeps the row; resets its slots, then re-advances)
   const changeTriggerType = (tid, anchor) => { setFocusKey(`trig:${tid}`); setOpenSlot(null); setPop(triggerMenuConfig(anchor, null, tid)); };
 
-  const updateTrigger = (tid, key, val) => setTriggers(ts=>ts.map(t=>t.id===tid?{...t, vals:{...t.vals,[key]:val}}:t));
+  const updateTrigger = (tid, key, val) => { if (key==="act") guidingRef.current = tid;   // a new activity → its variant is asked next
+    setTriggers(ts=>ts.map(t=>t.id===tid?{...t, vals:{...t.vals,[key]:val, ...(key==="act" && t.vals.act!==val ? { sub:undefined } : {})}}:t)); };
   const removeTrigger = (tid) => setTriggers(ts=>ts.filter(t=>t.id!==tid));
 
   // Guided chain: open the next empty slot of trigger `tid`; when all are filled, open the action menu.
@@ -9800,6 +9896,7 @@ function App() {
     const paths = n.paths.map((p,k)=> k===pi ? {...p, combiner:p.combiner==="or"?"and":"or"} : p); return { paths }; })()));
   const removePath = (path, pi) => setFlow(f => {
     const n = nodeAt(f, path); if(!n) return f;
+    if (isSplitBranch(n)) return splitTakePath(f, path, pi, nid).flow;   // split path: renumber · Merge list · unwrap (user 2026-11-17)
     let paths = n.paths.filter((_,k)=>k!==pi);
     const parent = path.slice(0,-1), idx = path[path.length-1];
     const siblings = childrenAt(f, parent);
@@ -10677,7 +10774,7 @@ function App() {
     if (seg.otherwise) return par.kind==="merge" ? "the merge’s timeout path" : "Otherwise";
     const lane = (par.paths||[])[seg.path] || {};
     if (isIfElse(par)) return seg.path===0 ? "the IF path" : "the Else path";
-    if (isSplitBranch(par)) return lane.name || "Path "+(seg.path+1);
+    if (isSplitBranch(par)) return lane.name || "Split path "+(seg.path+1);
     return lane.name ? `Branch ${seg.path+1} : ${lane.name}` : "Branch "+(seg.path+1); };
   const dtView = (p) => { const f = p.items[0];
     return { id:p.id, at:p.at, from:p.from, kind:dtKindOf(f), title:dtCap(dtLine(f)), steps:dtCount(p.items),
@@ -10696,11 +10793,61 @@ function App() {
   const dtScrollTo = (el) => { const s = dtScrollerOf(el);
     if (!s) return; const r = el.getBoundingClientRect(), sr = s.getBoundingClientRect();
     if (r.top < sr.top+70 || r.bottom > sr.bottom-90) s.scrollBy({ top:r.top - sr.top - sr.height/3, behavior:"smooth" }); };
+  // a detach LIFTS OFF from where the steps are (user 2026-11-15): a copy flies into the top of the stack while their spot stays
+  // open; only when it lands is the piece really detached (its card appears with a glow and the spot closes). Before, the spot
+  // closed at once and the card was already in the stack, so the copy seemed to come from somewhere else.
+  const dtElsOf = (nodes) => (nodes||[]).flatMap(n => { const w = document.querySelector(`[data-dtn="${n.id}"]`); return w ? [...w.children].filter(c => c.getBoundingClientRect().height) : []; });
+  const dtFlyOut = (els, done, ids) => {
+    if (!els.length || dtCalm()) { done(); return; }
+    let l = 1e9, t = 1e9, r = -1e9, b = -1e9; els.forEach(e => { const q = e.getBoundingClientRect(); l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom); });
+    // only the part you can SEE flies (user 2026-11-17): a long piece (a split + merge…) used to fly as a box thousands of px
+    // tall, sweeping a huge dashed frame and stray branch lines across the canvas. Clip to the window, keep it card-shaped.
+    const vl = Math.max(l - 4, 0), vt = Math.max(t - 4, 0), vr = Math.min(r + 4, window.innerWidth), vb = Math.min(b + 4, window.innerHeight);
+    if (vr - vl < 8 || vb - vt < 8) { setDtGone(null); done(); return; }
+    const W = vr - vl, H = vb - vt, first = document.querySelector("[data-dt-card]"), fr = first && first.getBoundingClientRect();
+    // where the new card will sit: on top of the stack (or where the stack opens, when it's empty)
+    const to = fr ? { l:fr.left, t:fr.top, w:fr.width, h:fr.height } : { l:window.innerWidth - 12 - 372, t:58, w:370, h:90 };
+    const box = document.createElement("div"); box.setAttribute("data-nf", "dt-fly");
+    box.style.cssText = `left:${vl}px;top:${vt}px;width:${W}px;height:${H}px;transform:none`;
+    const scaler = document.createElement("div"); scaler.style.cssText = "position:absolute;left:0;top:0;transform-origin:0 0";
+    const inner = document.createElement("div"); inner.style.cssText = `position:absolute;left:${(l-vl)/lzoom}px;top:${(t-vt)/lzoom}px;width:${(r-l)/lzoom}px;height:${(b-t)/lzoom}px;zoom:${lzoom}`;
+    els.forEach(e => { const q = e.getBoundingClientRect(), c = e.cloneNode(true); c.removeAttribute("data-nf");
+      c.querySelectorAll('[data-nf="rail-pulse"]').forEach(x => x.remove());          // never drag the rail glow along
+      c.style.cssText += `;position:absolute;left:${(q.left-l)/lzoom}px;top:${(q.top-t)/lzoom}px;width:${q.width/lzoom}px;margin:0`; inner.appendChild(c); });
+    scaler.appendChild(inner); box.appendChild(scaler); document.body.appendChild(box);
+    setDtGone(new Set(ids || []));                                              // the spot stays open while it flies (state, so a re-render keeps it hidden)
+    const sc = to.w / W, dur = 540, ease = "cubic-bezier(.4,0,.2,1)";          // scale by WIDTH, evenly — the box clips the rest, never squashed
+    box.animate([{ left:vl+"px", top:vt+"px", width:W+"px", height:H+"px", borderRadius:"12px" },
+                 { left:to.l+"px", top:to.t+"px", width:to.w+"px", height:to.h+"px", borderRadius:"16px" }], { duration:dur, easing:ease, fill:"forwards" });
+    scaler.animate([{ transform:"scale(1)", opacity:1 }, { transform:`scale(${sc})`, opacity:.25 }], { duration:dur, easing:ease, fill:"forwards" }).onfinish = () => {
+      done(); setDtGone(null);
+      requestAnimationFrame(() => requestAnimationFrame(() => { const c = document.querySelector("[data-dt-card]");
+        if (c) { c.classList.add("dt-arrive"); setTimeout(() => c.classList.remove("dt-arrive"), 1300); }
+        box.animate([{ opacity:1 }, { opacity:0 }], { duration:200, fill:"forwards" }).onfinish = () => box.remove(); })); }; };
+  // which split path a gap under a SPLIT PATH header belongs to (null = an ordinary gap)
+  const dtSplitAt = (bp, index, f) => { if (index !== 0 || !bp.length) return null; const seg = bp[bp.length-1];
+    if (!isBranchSeg(seg) || seg.path === undefined) return null; const sp = bp.slice(0, -1), n = nodeAt(f, sp);
+    if (!isSplitBranch(n)) return null; const r = splitTakePath(f, sp, seg.path, () => "x");
+    return { sp, pi:seg.path, items: r.moved || (r.path.children||[]), own:r.own }; };
+  const detachSplitNow = (bp) => { const f0 = dtFlowRef.current, seg = bp[bp.length-1], sp = bp.slice(0, -1);
+    const r = splitTakePath(f0, sp, seg.path, nid), items = r.moved || ((r.path && r.path.children) || []); if (!items.length) return;
+    const id = "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2,5); dtFly.current = null;
+    const piece = { id, at:Date.now(), from:dtPathLabel(bp, f0), above:null, items };
+    commit(prev => ({ ...prev, flow: splitTakePath(prev.flow, sp, seg.path, nid).flow, detached:[piece, ...(prev.detached||[])] }));
+    const ids = new Set(); const walk = (ns)=> (ns||[]).forEach(n=>{ ids.add(n.id); walk(branchKids(n)); }); walk(items);
+    if (drawer!=null && ids.has(drawer)) setDrawer(null);
+    setCutHover(null); setDtOne(null); setPlacing(null); setTrayFolded(false);
+    dtFlash(`Detached ${dtSteps(dtCount(items))} · it won’t run until you attach it`, true); };
   const detachAt = (bp, index) => {
+    const sx = dtSplitAt(bp, index, dtFlowRef.current);
+    if (sx) { const lane = childrenAt(dtFlowRef.current, bp), fly = sx.own ? [...lane, sx.own] : lane; if (!sx.items.length) return;
+      setCutHover(null); setDtOne(null); dtFlyOut(dtElsOf(fly), () => detachSplitNow(bp), fly.map(n => n.id)); return; }
+    const tail = childrenAt(dtFlowRef.current, bp).slice(index); if (!tail.length) return;
+    setCutHover(null); setDtOne(null); dtFlyOut(dtElsOf(tail), () => detachAtNow(bp, index), tail.map(n => n.id)); };
+  const detachAtNow = (bp, index) => {
     const f0 = dtFlowRef.current, arr = childrenAt(f0, bp), tail = arr.slice(index); if (!tail.length) return;
     const id = "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
-    const cut = document.querySelector('[data-nf="cutset"]');
-    dtFly.current = cut ? { id, rect:cut.getBoundingClientRect(), el:cut.cloneNode(true) } : null;
+    dtFly.current = null;
     const piece = { id, at:Date.now(), from:dtPathLabel(bp, f0), above: index>0 ? dtCap(dtLine(arr[index-1])) : null, items:tail };
     commit(prev => ({ ...prev, flow: treeSetLevel(prev.flow, bp, childrenAt(prev.flow, bp).slice(0, index)), detached:[piece, ...(prev.detached||[])] }));
     const ids = new Set(); const walk = (ns)=> (ns||[]).forEach(n=>{ ids.add(n.id); walk(branchKids(n)); }); walk(tail);
@@ -10818,22 +10965,27 @@ function App() {
   // and the node drawer hide, the top bar is disabled (via the parent), and only Undo / Redo / Guide / Shortcuts stay usable.
   const [dtLock, setDtLock] = useState(false);
   const dtCancel = useRef(null);
+  const [dtGone, setDtGone] = useState(null);   // ids lifting off to the stack — their spot stays open (hidden) until the copy lands
   // ── detach from a node's own marker (user 2026-11-12): a node's unlink icon detaches ONLY that node (and what's inside it);
   //    a branch header's detaches that branch's steps (the branch stays, empty). Hovering it tints just that, grey.
   const [dtOne, setDtOne] = useState(null);   // { id } | { bp }
-  const dtOneIds = (() => { if (!dtOne) return null; if (dtOne.id) return new Set([dtOne.id]);
+  const dtOneIds = (() => { if (!dtOne) return null; if (dtOne.ids) return dtOne.ids; if (dtOne.id) return new Set([dtOne.id]);
     try { return new Set(childrenAt(flow, dtOne.bp).map(n => n.id)); } catch (e) { return null; } })();
-  const dtDetachOne = (bp, i) => { const f0 = dtFlowRef.current, arr = childrenAt(f0, bp), node = arr[i]; if (!node) return;
+  const dtDetachOne = (bp, i) => { const node = childrenAt(dtFlowRef.current, bp)[i]; if (!node) return;
+    setDtOne(null); dtFlyOut(dtElsOf([node]), () => dtDetachOneNow(bp, i), [node.id]); };
+  const dtDetachOneNow = (bp, i) => { const f0 = dtFlowRef.current, arr = childrenAt(f0, bp), node = arr[i]; if (!node) return;
     const id = "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
-    const w = document.querySelector(`[data-dtn="${node.id}"]`), el = w && [...w.children].find(c => c.getBoundingClientRect().height);
-    dtFly.current = el ? { id, rect:el.getBoundingClientRect(), el:el.cloneNode(true) } : null;
+    dtFly.current = null;
     const piece = { id, at:Date.now(), from:dtPathLabel(bp, f0), above: i>0 ? dtCap(dtLine(arr[i-1])) : null, items:[node] };
     commit(prev => { const a = childrenAt(prev.flow, bp); return { ...prev, flow: treeSetLevel(prev.flow, bp, [...a.slice(0, i), ...a.slice(i+1)]), detached:[piece, ...(prev.detached||[])] }; });
     const ids = new Set(); const walk = (ns) => (ns||[]).forEach(n => { ids.add(n.id); walk(branchKids(n)); }); walk([node]);
     if (drawer!=null && ids.has(drawer)) setDrawer(null);
     setCutHover(null); setTrayFolded(false); dtFlash(`Detached ${dtSteps(dtCount([node]))} · it won’t run until you attach it`, true); };
   // what a row's unlink icon does (null = no icon on that row)
-  const dtCtl = (dnd, lane) => { if (!EMBED || dtLock) return null; const f = dtFlowRef.current;
+  // the per-node unlink icon was tried and dropped (user 2026-11-17): detach lives on the CONNECTOR gaps again — a gap's icon
+  // detaches the next node and everything after it to the end of that path. Kept off here, not deleted.
+  const DT_ON_NODE = false;
+  const dtCtl = (dnd, lane) => { if (!DT_ON_NODE || !EMBED || dtLock) return null; const f = dtFlowRef.current;
     if (lane) { let arr; try { arr = childrenAt(f, lane); } catch (e) { return null; } if (!arr || !arr.length) return null;
       return { title:`Detach this branch’s steps (${dtCount(arr)})`, text:`The steps in ${dtPathLabel(lane, f)} move to the Detached stack. The branch stays, empty.`,
         run:()=>{ setDtOne(null); detachAt(lane, 0); }, hover:(on)=>setDtOne(c => on ? ((c && c.bp && pathKey(c.bp)===pathKey(lane)) ? c : { bp:lane }) : (c ? null : c)) }; }
@@ -11847,7 +11999,8 @@ function App() {
     const zk = pathKey(basePath)+":"+index, hot = EMBED && cutHover===zk;
     const dtArr = EMBED ? childrenAt(flowRef.current, basePath) : [];
     const dtBlocked = !!(dtArr[index] && dtArr[index].kind==="merge");
-    const dtN = EMBED ? dtCount(dtArr.slice(index)) : 0;
+    const dtSx = EMBED ? dtSplitAt(basePath, index, flowRef.current) : null;
+    const dtN = EMBED ? (dtSx ? dtCount(dtSx.items) : dtCount(dtArr.slice(index))) : 0;
     if (EMBED && placing) return dtDropBar(undefined, basePath, index, "Put it here", dbl, noRail, false);
     return (
     // FULL-WIDTH target: open on mousedown + stopPropagation so clicking THIS zone while another menu is open
@@ -11857,15 +12010,18 @@ function App() {
       {/* continuous connector line — full height, grows with the zone. DOUBLE = main path / parallel lane; SINGLE = a condition branch (user 2026-07-21). noRail = the LOOP body, where the box border is the one edge line. */}
       {noRail ? null : (dbl ? vLines(7, { top:0, bottom:0 }) : vSingle(8.2, { top:0, bottom:0 }))}
       {/* DETACH trash — outside the clipped height box below, so its tooltip is never cut off */}
-      {false && EMBED && dtN>0 && !dragging && (   /* moved onto each node's marker (user 2026-11-12) */
+      {EMBED && dtN>0 && !dragging && !dtLock && (   /* back on the gaps (user 2026-11-17) */
         <span role="button" tabIndex={-1} data-nf="dt-trash" data-blocked={dtBlocked ? "" : undefined} aria-label={dtBlocked ? "Can’t detach here" : "Detach "+dtSteps(dtN)}
           onMouseDown={(e)=>{ e.stopPropagation(); e.preventDefault(); }}
           onClick={(e)=>{ e.stopPropagation(); e.preventDefault(); if (!dtBlocked) detachAt(basePath, index); }}
-          onMouseEnter={()=>{ if (!dtBlocked) setCutHover(zk); }} onMouseLeave={()=>setCutHover(c=>c===zk ? null : c)}
+          onMouseEnter={()=>{ if (dtBlocked) return; setCutHover(zk); if (dtSx && dtSx.own) { const own = dtSx.own; setDtOne(c => c && c.key===zk ? c : { key:zk, ids:new Set([own.id]) }); } }}
+          onMouseLeave={()=>{ setCutHover(c=>c===zk ? null : c); setDtOne(c => c && c.key===zk ? null : c); }}
           className={"absolute flex items-center justify-center transition-opacity duration-200 " + (hot ? "opacity-100" : "opacity-0 group-hover/iz:opacity-100")}>
           <DtIc n="unlink" s={12} w={2}/>
           <span data-nf="dt-tip">{dtBlocked
             ? <><b>Can’t detach here</b><span>A Merge stays with the paths it joins. Detach from above them instead.</span></>
+            : dtSx
+              ? <><b>Detach {dtPathLabel(basePath, flowRef.current)} ({dtN})</b><span>The whole path{dtSx.own ? " with its Merge and the Merge’s branches" : ""} moves to the Detached stack. The other paths renumber.</span></>
             : (index===0 && basePath.length)
               // the gap right under a branch's header detaches that one branch's steps; the branch itself stays (user 2026-11-12)
               ? <><b>Detach this branch’s steps ({dtN})</b><span>The steps in {dtPathLabel(basePath, flowRef.current)} move to the Detached stack. The branch stays, empty. They won’t run until you attach them.</span></>
@@ -12906,7 +13062,7 @@ function App() {
     if (showLead) out.push(<InsertZone key="iz-lead" basePath={basePath} index={0} dbl={izDbl} noRail={izNoRail} label={izLabel} />);
     rendered.forEach((el, i) => {
       const simple = el && nodes[i] && !(nodes[i].kind==="branch" || nodes[i].kind==="merge" || nodes[i].kind==="loop");
-      const tagged = (EMBED && el && nodes[i]) ? <div key={"dtn-"+nodes[i].id} data-dtn={nodes[i].id} data-dt-prev={dtPrevIds && dtPrevIds.has(nodes[i].id) ? "" : undefined} data-dt-slot={nodes[i].id==="__dtslot" ? "" : undefined} data-nf={dtOneIds && dtOneIds.has(nodes[i].id) ? "cutset" : undefined} style={{ display:"contents" }}>{el}</div> : el;
+      const tagged = (EMBED && el && nodes[i]) ? <div key={"dtn-"+nodes[i].id} data-dtn={nodes[i].id} data-dt-prev={dtPrevIds && dtPrevIds.has(nodes[i].id) ? "" : undefined} data-dt-slot={nodes[i].id==="__dtslot" ? "" : undefined} data-nf={dtOneIds && dtOneIds.has(nodes[i].id) ? "cutset" : undefined} data-dt-gone={dtGone && dtGone.has(nodes[i].id) ? "" : undefined} style={{ display:"contents" }}>{el}</div> : el;
       put((ci>0 && i===ci-1 && simple) ? <div key="dt-src" data-nf="cutsrc">{tagged}</div> : tagged, i);
       if (i < rendered.length-1) put(<InsertZone key={"iz-"+i} basePath={basePath} index={i+1} dbl={izDbl} noRail={izNoRail} label={izLabel} />, i+1 === ci ? -1 : i+1);
     });
@@ -13150,7 +13306,9 @@ function App() {
                   innerRef={(el)=>setRowRef("T", el)}
                   onAddCond={(el)=>addAnotherTrigger(el)} addLabel="add trigger" addAccent="var(--c-when)" addActive={openSlot==="Tadd"}
                   focused={focusKey==="T"} onFocus={()=>setFocusKey("T")}>
-                  <Slot value={null} placeholder="when this happens…" tourCue={tourStep===0} open={openSlot==="Twhen"} innerRef={(el)=>setRowRef("Twhen", el)} onClick={(e)=>pickTriggerType(e.currentTarget)} />
+                  {trigPreview && !trigPreview.tid && openSlot==="Twhen"
+                    ? <span data-nf="trig-prev"><Template tpl={triggerView(trigPreview).tpl} vals={trigPreview.vals} onSlot={()=>{}} /></span>
+                    : <Slot value={null} placeholder="when this happens…" tourCue={tourStep===0} open={openSlot==="Twhen"} innerRef={(el)=>setRowRef("Twhen", el)} onClick={(e)=>pickTriggerType(e.currentTarget)} />}
                 </Station>
               : triggers.map((t,i)=>(
                   <Station key={t.id} marker={i===0 ? MARK.trigger : null} doubleRail dashRail={flow.length===0 && i===triggers.length-1} isFirst={i===0} dense={i>0}
@@ -13162,9 +13320,11 @@ function App() {
                     onAddCond={i===0 ? (el)=>addAnotherTrigger(el) : undefined} addLabel="add trigger" addAccent="var(--c-when)" addActive={openSlot==="Tadd"}
                     addDisabled={i===0 && (isPeriodicType(t.typeId) || !t.vals.module)} addDisabledTip={isPeriodicType(t.typeId) ? "Periodic workflows don't support multiple triggers" : "Pick a record first"}
                     focused={focusKey===`trig:${t.id}`} onFocus={()=>setFocusKey(`trig:${t.id}`)} onRemove={()=>removeTrigger(t.id)}>
-                    <Template tpl={triggerView(t).tpl} vals={t.vals}
+                    {trigPreview && trigPreview.tid===t.id
+                      ? <span data-nf="trig-prev"><Template tpl={triggerView(trigPreview).tpl} vals={trigPreview.vals} onSlot={()=>{}} /></span>
+                      : <Template tpl={triggerView(t).tpl} vals={t.vals}
                       openKey={openSlot && openSlot.startsWith(`trig:${t.id}:`) ? openSlot.slice(`trig:${t.id}:`.length) : null}
-                      onSlot={(key,e)=>pickTriggerSlot(t,key,e)} slotRef={(k,el)=>setTriggerSlotRef(t.id,k,el)} />
+                      onSlot={(key,e)=>pickTriggerSlot(t,key,e)} slotRef={(k,el)=>setTriggerSlotRef(t.id,k,el)} />}
                   </Station>
                 ))}
             {/* "add trigger" now lives inline on the first trigger row's right control cluster (Station onAddCond) */}

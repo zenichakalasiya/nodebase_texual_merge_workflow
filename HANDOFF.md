@@ -1,63 +1,72 @@
-# Handoff — 2026-11-15 18:05
+# Handoff — 2026-11-17
 
 ## Read first
 
 In `CLAUDE.md`, read:
-- **"Detached steps"**: its first paragraph is new, covering detaching from a node's own marker.
-- **"Rails"**: the pulse now splits into every path.
+- **"Detached steps"**: its first paragraph is rewritten. Detach is back on the gaps, and the split-path rules are new.
+- **"Triggers: field changes vs activity"**: a new bullet in the Linear functional edits.
 
-The work is all in `linear/index.html` and `linear/node-skin.css` (sections 66–69). **Version 2** was released on 2026-11-12 (git tag `v2`). This publish adds the changes made after it.
+The work is all in `linear/index.html` and `linear/node-skin.css` (sections 70–74).
 
 ## What we worked on this session
 
-Changes after Version 2:
-- Detaching moved from the gaps onto each node's own marker, so a single node or a single branch's steps can be detached.
-- The rail pulse splits at every branch.
-- The detach hover tint is darker.
-- The "Drop here" gap is slim (32px) everywhere.
-- Cards show a grab hand on hover.
+- **Detach is back on the gaps.** The icon on the connector detaches the next step and everything after it on that path. The whole run is highlighted from the icon's own point down. The per-node icons are off (`DT_ON_NODE = false`).
+- **Fly animation:** it moves only the visible part, scaled evenly into the card. This fixes the merge path flying in from the top.
+- **Split paths, following the v5.17 rules:**
+  - Adding a split as the 2nd step wraps the first flow into Split path 1.
+  - Deleting a path renumbers the others.
+  - With 2 paths, deleting one unwraps the split.
+- **Detaching a split path** takes the whole path, plus a Merge fed only by it and that Merge's branches. Shared Merges stay.
+- **Detail panel polish:**
+  - The resizer shows only when the flow is wider than the card. On hover, it outlines the card's left edge in blue.
+  - The shadow band under the cards is gone.
+  - Cards no longer shift when the ⋮ / › icons appear.
+- **Triggers (Request family):**
+  - "When record is updated" is split into "When a field changes" and "When there's activity on a record" (11 activities).
+  - Smart search highlights the matched words and previews the hovered sentence in the flow.
 
-## Completed
+## Completed and tested (Playwright, 0 console errors)
 
-- **Unlink icon on each node:** it sits right beside every node's marker (⠿ grip · unlink · marker, 8px apart).
-  - **Actions and other steps:** detaches only that node.
-  - **IF row:** the whole IF / Else.
-  - **BRANCH 1 row:** the whole Branching.
-  - **Loop:** the loop and its steps; the icon sits by its join on the main line.
-  - **Branch headers** (ELSE, BRANCH 2+, SPLIT PATH N, Otherwise, Merge success/timeout): that branch's steps; the branch stays.
-  - **Not shown:** on empty branches. The gap icon is gone.
-- **Hover:** tints just that node or branch, in a darker grey (line `#9aa9ba`, tint `#e7ecf2`).
-- **Rail pulse:** the main rail keeps glowing and, at each split, the glow turns along the elbow into every path, recursively.
-- **"Drop here" box:** 32px everywhere. This fixed the 53px box inside split paths above a Merge (the Station's padding wasn't capped).
-- **Cards:** a grab-hand cursor on hover; the grip icon was tried and removed.
+- **Gap detach:** works, with the full highlight, and the hover colour starts at the icon.
+- **Fly:** tested on a Merge timeout path, a long main path and a split path.
+- **Resizer:** hidden on small flows; on wide flows it shows the blue outline.
+- **Shadow and card size:** the shadow band is gone, and cards stay 90px tall on hover.
+- **`splitTakePath`:** unit-tested on 4 cases.
+- **Split paths in the UI:** detaching path 3 renumbers the others. Going from 2 paths to 1 unwraps the split and inlines Merge 1's success steps.
+- **Trigger search:** tested with reply, spam, priority, note, merge, status, task, incident, request, "reply incident", "priority problem" and "spam request".
+- **Hover preview and blanks:** the hovered sentence previews, picking opens the module blank, and switching the activity asks for the variant again.
 
-## In progress
+## Not tested
 
-Nothing mid-flight.
+- The hover preview when changing an existing trigger.
+- Detaching a split path that has its own Merge, in the browser (unit test only).
+- Reattaching a split + merge piece.
+- Dragging a piece into an empty branch.
 
-## Next steps
+## Next steps / open questions
 
+- **Waiting on the manager:** do Approval Status, Signature Status and Response / Resolution Escalation Level count as fields or as activity?
 - **Ask the user:**
-  - Should there be a way to detach just the IF branch's steps? (The IF row = the whole IF / Else.)
-  - Is losing "detach everything below here" OK?
-  - Should the pulse run all the time?
-- **Optional cleanup of dead code:**
-  - The gap trash code in InsertZone (`false &&`).
-  - `cutHover` for the gaps.
-  - `dtFold`, `placing`, `dtDropBar`.
-  - The Detach Popover code and skeletons 1/3/4.
-- **Older items:** the real Get records caps; Field Lab refresh; f(x) for the rich-text fields.
+  - Where should a removed Merge's Timeout steps go on unwrap? Today they are dropped.
+  - Should the step above a hovered gap keep its light-blue tint?
+  - Should the stack's spread-on-hover movement be removed?
+  - Should there be a way to detach just the IF branch's steps?
+  - Should the pulse always run?
+  - Should the cards' mini diagram use double lines?
+- **Cleanup:** remove dead code (`dtFold`, `placing`, `dtDropBar`, the Detach Popover code, skeletons 1/3/4, and the now-unused per-node detach).
+- **Older items:** the real Get records caps, a Field Lab refresh, and f(x) for the rich-text fields.
 
 ## Decisions made
 
-- **Detach lives on the node marker, not the gaps** (user: "currently you place detach icon only beside add icon, which is not right").
-- **Branch header detach = that branch's steps only;** the branch stays (user's earlier choice).
-- **The rail pulse splits and the main line continues** (user's correction after the "innermost only" version).
-- **Version 2 finals:** Skeleton 2, Detach 1 · Panel and Text field B. Their switches were removed.
+- **Detach lives on the gaps again** (the user asked to restore the old concept). It covers the whole flow after the gap, to the end of that path.
+- **Merge rules:**
+  - Deleting a path drops it from the Merge's list.
+  - Detaching a split path takes its own Merge and that Merge's branches.
+  - Going from 2 paths to 1 removes the Merge and keeps its success steps in the remaining path.
+- **Spam counts as a feature (activity).** The trigger work is for Request only for now.
 
 ## Gotchas & notes
 
-- **Hover state must stay stable:** keep the same object for the same target (`setDtOne(c => same ? c : new)`). Rows remount on every App render, so a new object each hover loops forever.
-- **Slot sizing:** caps must include padding (`box-sizing:border-box; height:24px; padding:0`).
-- **Lane header paths:** the lane path variables differ per header: `lanePath` (merge outcomes, branch and split lanes), `elPath` (Else) and `owPath` (Otherwise).
-- **Local server:** port 8777 may need restarting (`node server.js`).
+- **Hover state must stay stable:** keep the same object for the same target (`setDtOne(c => same ? c : new)`).
+- **Test page:** without `?embed=1` the Linear page starts empty and dark. That page is useful for testing the empty trigger picker.
+- **Local server:** port 8777 gets killed when memory is low; restart it with `node server.js`.
