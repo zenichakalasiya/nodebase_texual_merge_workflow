@@ -608,21 +608,30 @@ Functional edits made inside V8 (all in `linear/index.html`):
 - **Content (Send email)**: the reply toolbar sits inside the writing box via
   the `cbar` hook (`data-rt`, skin 43).
 - **Search highlight** in every list popup is yellow (`SEARCH_MARK`, `#FDE68A`).
-- **Triggers: "field changes" vs "activity"** (2026-11-17, Request family
-  only — Request / Incident / Service Request, `ACT_MODULES`). "When record is
-  updated" is split into **When a field changes** (`changed`, fields from
-  `triggerFieldsFor`) and **When there's activity on a record** (`activity`,
-  the `ACTIVITY` list: reply, note, collaboration, diagnosis, solution, AI
-  summary, task, merged, marked / unmarked as spam, converted — features,
-  read from the real product's request page). An activity sentence has
-  blanks act → variant (`subs`, e.g. reply by technician / requester / CC
-  user) → module. **Smart search** in the trigger picker
-  (`smartTriggerSearch`, the Popover's `moduleMorph`): typing a word lists the
-  full sentences with the word highlighted; a module word in the query
-  pre-fills the module; hovering a row previews its sentence in the flow
-  (`trigPreview`, `data-nf="trig-prev"`, skin 74); after picking, every blank
-  stays changeable. Approval / Signature status and escalation levels are
-  still listed as fields — **waiting on the manager** to say where they go.
+- **Record-update triggers** (Request family only for activity — Request /
+  Incident / Service Request, `ACT_MODULES`). Two designs behind the top bar's
+  **Trigger** switch (`#trigVerSel`, message `wf:'trigver'`, module flag
+  `TRIG_V2`; menus read it through `trigMenuFor`; existing triggers keep their type):
+  - **Trigger 1 · Two triggers** (default): **When a record's field changes**
+    (`changed`) and **When a record gets new activity** (`activity`). The
+    activity sentence is ONE fixed sentence, record first:
+    "When a [Request] gets [activity]" — each `ACTIVITY` id is the exact words
+    after "gets" (a reply from the requester / a technician / a CC user, a new
+    note / collaboration / diagnosis / solution, an AI summary, a new task,
+    a task removed, merged as the primary / a secondary request, marked /
+    unmarked as spam, converted to an Incident / a Service Request / another
+    service). Popup row = canvas words; record popup opens first.
+  - **Trigger 2 · One sentence**: one menu row **When a record gets an update**
+    (`updated`): "When a [Request] gets [what]"; the `what` list
+    (`updOptions`) has **Fields** then the activity groups. A field reads
+    "gets its [priority] changed from [any] to [a value]" (`vals.wk="f"`).
+  - **Smart search** (`smartTriggerSearch`, the Popover's `moduleMorph`):
+    typing a word lists the full sentences with the word highlighted; a module
+    word pre-fills the record; hovering previews the sentence in the flow
+    (`trigPreview`, `data-nf="trig-prev"`, skin 74). Approval / Signature
+    status and escalation levels are still fields — **waiting on the manager**.
+  - Sentence options were explored in the "Activity Trigger Sentence" claude.ai
+    artifact (record first, no colon, no technical words — the user's rules).
 - **Ask for approval** stage headings are tinted `#F6F9FC`.
 - **Request Signature** is a new step under Approval (template list is
   sample data).
@@ -635,26 +644,31 @@ Reference docs in the repo root (generated this project):
 - `OPERATORS.md`: Linear vs the real product's operators, side by side.
 - `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
 
-**Detached steps (Linear view, skin sections 47–73).** Detaching starts from
-a **gap** again (2026-11-17, the original concept): the unlink icon sits on
-the connector between two steps (InsertZone, `[data-iz=key] [data-nf=dt-trash]`)
-and detaches the next step **and everything after it to the end of that path**
-(`detachAt` → `dtFlyOut` → `detachAtNow`). Hovering it highlights that whole
-run (`cutHover` / `data-nf="cutset"`), and the connector is coloured from the
-icon's own point downward, never above it (skin 72). The per-node marker icons
-of 2026-11-15 are switched off (`DT_ON_NODE = false`; `dtCtl` returns null).
-The lift-off copy flies only the part visible in the window, scaled evenly
-into the card (`dtFlyOut`: box > scaler > inner), so merge paths no longer fly
-in from the top.
-**Split paths (v5.17 rules)**, all through `splitTakePath(f, sp, pi, mkId)`:
-adding a split as the 2nd step wraps the first flow into Split path 1;
-deleting a path renumbers the others and drops it from any Merge's
-`feeders`; with 2 paths, deleting one unwraps the split — the remaining path's
-steps, then the success steps of the Merges that stay, inline into the parent
-(a removed Merge's Timeout steps are dropped). The gap at the top of a split
-path detaches **the whole path** (`dtSplitAt` / `detachSplitNow`); a Merge fed
-only by that path, with its branches, goes with it into the piece; Merges
-shared with other paths stay. Split-path cards are named "Split path N".
+**Detached steps (Linear view, skin sections 47–75).** Two kinds of icon,
+both live (2026-11-18): a **gap icon** on the connector between two steps
+(InsertZone, `[data-iz=key] [data-nf=dt-trash]`) detaches the next step **and
+everything after it to the end of that path** (`detachAt` → `dtFlyOut` →
+`detachAtNow`; hover highlights the run from the icon's own point down, skin
+72); a **node / pill icon** beside a marker (`DT_ON_NODE = true`, `dtCtl`,
+21px left of the marker, grip 53px) detaches only that thing: a step → that
+step; IF row → whole IF / Else; BRANCH 1 row → whole Branching; **SPLIT PATH
+N pill → that whole path** (others renumber); **BRANCH N pill (2+) → that
+whole branch** (`detachBranchLane`, comes back as a one-branch Branching);
+ELSE / Otherwise / Merge success-timeout pills → their steps only. Merge rows
+have no icon. The lift-off copy flies only the visible part (`dtFlyOut`).
+**Split paths** (user rules): a split is ALWAYS the first node, straight out
+of the trigger — nothing sits above it (`EMBED_DEMO_DOC`'s assign + IF/Else
+is Split path 1). Once the flow is a split (+ its Merges) the main path has no
+gaps and only **"Add split path"** at the bottom (`splitRoot` / `topIsSplit`).
+All path removal goes through `splitTakePath(f, sp, pi, mkId)`: the others
+renumber, the path leaves its Merge's `feeders`, 2 → 1 paths unwraps the
+split; an emptied split path (its only step deleted or detached) is removed
+the same way (`pruneEmptyLanes`). A path's own Merge (fed only by it) goes
+with it into the piece. **Reattach** of a split piece (`isSplitPiece`) — or
+of ANY piece at the top of a split-rooted flow — only goes right after the
+trigger, as new split path(s) (`splitAttach`; list row "As a new split
+path"); a plain flow there is wrapped into Split path 1. A detached split
+path remembers its Merge (`piece.rejoin`) and rejoins it (`splitRejoin`).
 Hover state must stay referentially stable (same target → same object) or the
 remounting row loops. Pieces live in
 `doc.detached`, so undo/redo covers them. They never run and are never folded
@@ -666,7 +680,7 @@ reattached or deleted. Cards show no time; every card has a ⋮ menu
   with **Reattach** + delete icon at its top right; its left edge has a
   resizer (`startRsz`, max = the flow's natural width, double-click = fit /
   back) — shown only when the flow is wider than the card (`canRsz`); on
-  hover / drag the card's whole left outline turns blue (skin 71/73). Card
+  hover / drag the card's whole left outline turns light blue `#a9cdee` and the horizontal scrollbar hides (skin 71/73/75). Card
   ⋮ / › icons are absolutely placed so the card never shifts on hover (skin 73). Small flows keep a small card; long ones grow to the screen bottom
   (12px margin) then scroll both ways. **2 · Popover** — hover a card → a
   popover to its LEFT. The stack stays spread while a popover or ⋮ menu is
@@ -727,15 +741,19 @@ box (24px gap, padding included) everywhere; cards show a grab hand on hover
 **Loading skeletons** (`workflow-skeleton.css` / `.js`, markup in
 `workflow-canvas.html`; Node view `.nskel`, Linear view `.lskel`). The top
 bar's **Skeleton** button holds the skeleton on screen for review.
-**FINAL (Version 2, 2026-11-12): design 2 · Step by step** — `html.skel-v2`
+**Default (Version 2, 2026-11-12): design 2 · Step by step** — `html.skel-v2`
 is set in the page head from first paint and `SkelV2.set('2')` starts the
-build on load (Node: the blue line draws at a constant speed and each node
-lands as it arrives; Linear: the column is revealed top to bottom with a blue
-rail tip). The design switch is gone. Designs 1 (whole), 3 (trigger only) and
-4 (loader) still exist in the CSS/markup but nothing can select them. All
-grey except the blue line. No loading text (screen-reader label only).
+build on load. A design switch is back next to the Skeleton button
+(`#skelVerSel`, 2026-11-18) so the **loaders** can be reviewed: **4 · Run**
+(nodes light as the line reaches them), **5 · Packet** (a blue dot travels
+through, SVG `animateMotion` — use `L` not bare `V` paths, Chrome ignored a
+`V`-only path), **6 · Build** (steps pop in, the line joins them, all turn
+blue), **7 · Ring** (an arc spins around a tiny flow icon). `SkelV2.set(v)`
+sets `skel-v4` + `ld4…ld7`; each loader is an `.ldo.ldoN` svg in both views.
+Picking one holds it on screen. Designs 1 and 3 still exist but aren't
+listed. All grey except blue. No loading text (screen-reader label only).
 
-**Design switches: none left.** Version 2 (2026-11-12) finalised **Text field
+**Design switches:** Skeleton / loader and Trigger (above) are live review switches. Version 2 (2026-11-12) finalised **Text field
 B** (Editor in popup) and **Detach 1 · Panel** — their switches were removed;
 the top bar sends `textver:'B'` / `dtver:'1'` on frame ready, which are also
 the Linear view's own defaults. The **Popup** switch is hidden (V1 always).

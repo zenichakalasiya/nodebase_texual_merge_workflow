@@ -1653,10 +1653,15 @@ html.embed [data-nf="dt-nc"] .dt-go{ transform:none !important; transition:opaci
 html.embed [data-nf="dt-nc"]:not([data-detail]) .dt-body{ padding:2px 14px 32px; margin:0 -12px -30px; }
 html.embed [data-nf="dt-nc"][data-detail] .dt-body{ padding:2px 14px 32px; margin:0 -12px -30px; }
 html.embed [data-nf="dt-nc"][data-detail]:has(.dt-rsz:hover) .dt-ndcard, html.embed [data-nf="dt-nc"][data-detail][data-rsz] .dt-ndcard{
-  box-shadow:inset 2px 0 0 #3d8bd0, 0 8px 20px -10px rgba(29,42,62,.28); border-left-color:#3d8bd0; }
+  box-shadow:inset 2px 0 0 #a9cdee, 0 8px 20px -10px rgba(29,42,62,.28); border-left-color:#a9cdee; }   /* light blue, not the full accent (user 2026-11-18) */
 html.embed [data-nf="dt-nc"][data-detail] .dt-ndcard{ transition:box-shadow .15s ease, border-color .15s ease; }
 
 
 /* 74. Trigger hover preview (user 2026-11-17): while the trigger picker is open, the hovered option's full sentence (with its
    blanks) shows faded in the trigger row; it becomes real only on pick. */
 html.embed [data-nf="trig-prev"]{ opacity:.55; pointer-events:none; display:inline; }
+
+
+/* 75. Resizer hover (user 2026-11-18): the detail card's horizontal scrollbar hides while the resizer is hovered or dragged.
+   Made transparent (not removed) so its space stays and nothing below jumps. */
+html.embed [data-nf="dt-nc"][data-detail]:has(.dt-rsz:hover) .dt-flowbox, html.embed [data-nf="dt-nc"][data-detail][data-rsz] .dt-flowbox{ scrollbar-color:transparent transparent; }

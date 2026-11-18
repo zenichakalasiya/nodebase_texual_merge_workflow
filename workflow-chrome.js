@@ -182,6 +182,10 @@
         /* Detached steps FINALISED on 1 · Panel (user 2026-11-12, Version 2) — its switch is gone */
         /* Skeleton preview (user 2026-11-03): shows the open view's loading skeleton, for handover to dev */
         /* Loading skeleton FINALISED on 2 · Step by step (user 2026-11-12, Version 2) — its switch is gone; the Skeleton button still previews it */
+        /* Trigger design (user 2026-11-18): 1 = two triggers (field changes · gets activity) · 2 = one sentence for both — Linear only */
+        + `<label class="email-ver" id="trigVer" data-tip="Record-update trigger — design option"><select id="trigVerSel" aria-label="Trigger design option"><option value="1">Trigger 1 · Two triggers</option><option value="2">Trigger 2 · One sentence</option></select></label>`
+        /* Skeleton 4 · Loader brought back for review (user 2026-11-18) — Step by step stays the default */
+        + `<label class="email-ver skel-ver" id="skelVer" data-tip="Loading skeleton — design option"><select id="skelVerSel" aria-label="Loading skeleton design option"><option value="2">Skeleton 2 · Step by step</option><option value="4">Loader 4 · Run</option><option value="5">Loader 5 · Packet</option><option value="6">Loader 6 · Build</option><option value="7">Loader 7 · Ring</option></select></label>`
         + `<button class="btn-outline skel-btn" id="skelBtn" type="button" aria-pressed="false" data-tip="Preview the loading skeleton of this view">Skeleton</button>`
         + `<div class="enable-row"><span>Enabled</span>`
           + `<button class="switch on" id="enableSw" role="switch" aria-checked="true"><span>ON</span><i></i></button></div>`
@@ -507,6 +511,10 @@
     const syncSkel = () => skelBtn.setAttribute('aria-pressed', String(document.documentElement.classList.contains('skel-hold')));
     syncSkel();
     skelBtn.addEventListener('click', () => { document.documentElement.classList.toggle('skel-hold'); syncSkel(); window.SkelV2 && SkelV2.restart(); });
+    const tvSel = $('#trigVerSel');
+    tvSel.addEventListener('change', () => linearSend({ wf:'trigver', v: tvSel.value }));
+    const skSel = $('#skelVerSel');   // picking a design shows it straight away (held on screen)
+    skSel.addEventListener('change', () => { window.SkelV2 && SkelV2.set(skSel.value); document.documentElement.classList.add('skel-hold'); syncSkel(); window.SkelV2 && SkelV2.restart(); });
     /* Version 2 finals (user 2026-11-12): skeleton 2 · step by step, Text field B, Detach 1 · Panel — no switches */
     const pvSel = $('#popVerSel');
     pvSel.value = '1';   // Popup switch hidden (user 2026-11-05): V1 always
@@ -524,6 +532,7 @@
         linearSend({ wf:'textver', v: 'B' });
         linearSend({ wf:'popver', v: $('#popVerSel').value });
         linearSend({ wf:'dtver', v: '1' });
+        linearSend({ wf:'trigver', v: $('#trigVerSel').value });
         if(isLinear()) linearFrame.focus();
       } else if(m.wf === 'lock'){
         /* while locked, a click anywhere outside the Linear frame unpicks the piece (user 2026-11-12) */

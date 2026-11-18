@@ -109,7 +109,8 @@
 
   /* set(v): '1' = whole skeleton (as before) · '2' = step by step */
   window.SkelV2 = {
-    set(v){ root.classList.toggle('skel-v2', v === '2'); root.classList.toggle('skel-v3', v === '3'); root.classList.toggle('skel-v4', v === '4');
+    set(v){ const ld = +v >= 4; root.classList.toggle('skel-v2', v === '2'); root.classList.toggle('skel-v3', v === '3'); root.classList.toggle('skel-v4', ld);
+      ['4','5','6','7'].forEach(k => root.classList.toggle('ld' + k, v === k));   // loader options (user 2026-11-18)
       if(v === '2') cycle(); else stop(); },   // 3 · New workflow and 4 · Loader are CSS only
     restart(){ if(root.classList.contains('skel-v2')) cycle(); }
   };

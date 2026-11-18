@@ -1,72 +1,82 @@
-# Handoff — 2026-11-17
+# Handoff — 2026-11-18 15:43
 
 ## Read first
 
 In `CLAUDE.md`, read:
-- **"Detached steps"**: its first paragraph is rewritten. Detach is back on the gaps, and the split-path rules are new.
-- **"Triggers: field changes vs activity"**: a new bullet in the Linear functional edits.
+- **"Detached steps"**: rewritten. It covers the two kinds of detach icon and the split-path rules (a split always sits right after the trigger).
+- **"Record-update triggers"**: covers the new Trigger 1 / Trigger 2 switch.
+- **"Loading skeletons"**: covers the loader switch, options 4–7.
 
-The work is all in `linear/index.html` and `linear/node-skin.css` (sections 70–74).
+The work is in these files:
+- `linear/index.html`
+- `linear/node-skin.css` (sections 73–75)
+- `workflow-chrome.js` (the Trigger and Skeleton switches)
+- `workflow-canvas.html` + `workflow-skeleton.css` / `.js` (the loaders)
 
 ## What we worked on this session
 
-- **Detach is back on the gaps.** The icon on the connector detaches the next step and everything after it on that path. The whole run is highlighted from the icon's own point down. The per-node icons are off (`DT_ON_NODE = false`).
-- **Fly animation:** it moves only the visible part, scaled evenly into the card. This fixes the merge path flying in from the top.
-- **Split paths, following the v5.17 rules:**
-  - Adding a split as the 2nd step wraps the first flow into Split path 1.
-  - Deleting a path renumbers the others.
-  - With 2 paths, deleting one unwraps the split.
-- **Detaching a split path** takes the whole path, plus a Merge fed only by it and that Merge's branches. Shared Merges stay.
-- **Detail panel polish:**
-  - The resizer shows only when the flow is wider than the card. On hover, it outlines the card's left edge in blue.
-  - The shadow band under the cards is gone.
-  - Cards no longer shift when the ⋮ / › icons appear.
-- **Triggers (Request family):**
-  - "When record is updated" is split into "When a field changes" and "When there's activity on a record" (11 activities).
-  - Smart search highlights the matched words and previews the hovered sentence in the flow.
+- **Split-path and detach rules** in the Linear view, following the user's model.
+- **Trigger sentences** for record activity: researched in a claude.ai artifact, then built as two switchable designs.
+- **New loader options** for both views.
 
-## Completed and tested (Playwright, 0 console errors)
+## Completed
 
-- **Gap detach:** works, with the full highlight, and the hover colour starts at the icon.
-- **Fly:** tested on a Merge timeout path, a long main path and a split path.
-- **Resizer:** hidden on small flows; on wide flows it shows the blue outline.
-- **Shadow and card size:** the shadow band is gone, and cards stay 90px tall on hover.
-- **`splitTakePath`:** unit-tested on 4 cases.
-- **Split paths in the UI:** detaching path 3 renumbers the others. Going from 2 paths to 1 unwraps the split and inlines Merge 1's success steps.
-- **Trigger search:** tested with reply, spam, priority, note, merge, status, task, incident, request, "reply incident", "priority problem" and "spam request".
-- **Hover preview and blanks:** the hovered sentence previews, picking opens the module blank, and switching the activity asks for the variant again.
+- **Split paths:**
+  - A split is always the first node after the trigger.
+  - Once a flow has a split, the main path has no gaps; only "Add split path" remains.
+  - The demo's IF/Else flow is now Split path 1.
+  - Detaching or deleting a path's only step removes the path, and the others renumber.
+- **Reattach:**
+  - A split piece goes back only after the trigger, as new split path(s).
+  - Any piece reattached at the top of a split flow becomes a new split path ("As a new split path").
+  - A path that was detached from a Merge rejoins it.
+- **Detach icons:**
+  - Per-node and per-pill icons are back alongside the gap icons.
+  - The SPLIT PATH N pill detaches that path; the BRANCH N pill detaches that branch; the IF row detaches the whole IF/Else; the ELSE pill detaches its steps.
+  - The icon sits at least 8px from every marker.
+- **Detail panel:** the resizer outline is light blue, and the horizontal scrollbar hides while you hover or drag the resizer.
+- **Triggers:**
+  - **Trigger 1:** "When a [Request] gets [activity]". The popup rows are the exact words after "gets", including "a task removed". The record popup opens first.
+  - **Trigger 2:** one row, "When a record gets an update", covering both fields and activity.
+- **Loaders:** 4 · Run, 5 · Packet, 6 · Build and 7 · Ring, selectable from the Skeleton switch in both views.
+- **Testing:** all of the above was tested in the browser with Playwright, with 0 console errors.
 
-## Not tested
+## In progress
 
-- The hover preview when changing an existing trigger.
-- Detaching a split path that has its own Merge, in the browser (unit test only).
-- Reattaching a split + merge piece.
-- Dragging a piece into an empty branch.
+Nothing mid-flight. Awaiting the user's choices (below).
 
-## Next steps / open questions
+## Next steps
 
-- **Waiting on the manager:** do Approval Status, Signature Status and Response / Resolution Escalation Level count as fields or as activity?
 - **Ask the user:**
-  - Where should a removed Merge's Timeout steps go on unwrap? Today they are dropped.
-  - Should the step above a hovered gap keep its light-blue tint?
-  - Should the stack's spread-on-hover movement be removed?
-  - Should there be a way to detach just the IF branch's steps?
-  - Should the pulse always run?
-  - Should the cards' mini diagram use double lines?
-- **Cleanup:** remove dead code (`dtFold`, `placing`, `dtDropBar`, the Detach Popover code, skeletons 1/3/4, and the now-unused per-node detach).
-- **Older items:** the real Get records caps, a Field Lab refresh, and f(x) for the rich-text fields.
+  - Which loader to keep, or what to improve in it. They want to improve the loader.
+  - Whether Trigger 1 or Trigger 2 becomes final; then remove the switch.
+- **Waiting on the manager:** where Approval Status, Signature Status and Escalation level go (fields or activity).
+- **Not tested:**
+  - Drag and drop of split pieces.
+  - Undo after a split reattach.
+  - Hover highlight on the pill icons.
+  - Trigger 1 search after the rewrite.
+  - Trigger 2 hover preview.
+- **Older open items:**
+  - Merge Timeout steps are dropped when a split unwraps.
+  - Dead-code cleanup.
+  - The real Get records caps.
 
 ## Decisions made
 
-- **Detach lives on the gaps again** (the user asked to restore the old concept). It covers the whole flow after the gap, to the end of that path.
-- **Merge rules:**
-  - Deleting a path drops it from the Merge's list.
-  - Detaching a split path takes its own Merge and that Merge's branches.
-  - Going from 2 paths to 1 removes the Merge and keeps its success steps in the remaining path.
-- **Spam counts as a feature (activity).** The trigger work is for Request only for now.
+- **A split is always right after the trigger;** new steps go into a new split path (user's model).
+- **Merge membership:**
+  - Split path 1 (the old pre-split steps) does not join Merge 1 (user: "fine as it is").
+  - A reattached path rejoins its Merge (user: yes).
+- **Two detach icons:**
+  - A gap icon detaches everything below it.
+  - A node or pill icon detaches only that thing.
+  - The BRANCH N pill takes the whole branch; the ELSE pill takes its steps only (user's answers).
+- **Activity sentence rules:** the record comes first, there's no colon, and no technical words. The user picked "gets …" and "a task removed".
 
 ## Gotchas & notes
 
-- **Hover state must stay stable:** keep the same object for the same target (`setDtOne(c => same ? c : new)`).
-- **Test page:** without `?embed=1` the Linear page starts empty and dark. That page is useful for testing the empty trigger picker.
-- **Local server:** port 8777 gets killed when memory is low; restart it with `node server.js`.
+- **SVG motion paths:** Chrome ignored an `animateMotion` path that used only a `V` command; use `L`.
+- **Trigger 2 testing:** it can only be switched through the real top bar, because the Linear page listens to messages only when embedded. Test it via `/` → Linear, not `linear/index.html` directly.
+- **Field names are lowercase** in trigger sentences (`triggerFieldsFor` labels).
+- **Local server:** it gets killed when memory is low; restart it with `node server.js`.

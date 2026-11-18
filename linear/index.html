@@ -273,7 +273,7 @@ const CADENCE   = ["hourly","daily","weekly","monthly","on a specific date"];
 const WEEKDAYS  = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const DOM       = Array.from({length:28},(_,i)=>String(i+1)).concat(["last day"]);
 
-const PLACEHOLDER = { act:"activity", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often",
+const PLACEHOLDER = { act:"new activity", what:"an update", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often",
   weekday:"a weekday", dom:"a day", time:"a time", date:"a date" };
 
 const TRIGGER_TYPES = [
@@ -554,14 +554,15 @@ const EMBED_ACTIONS_DOC = {
 const EMBED_DEMO_DOC = {
   triggers: [{ id:"t1", typeId:"created", vals:{ module:"Incident" } }],
   flow: [
-    { id:"e_a1", kind:"action", action:"assign", arg:"the service desk" },
-    { id:"e_if", kind:"branch", ifelse:true, otherwise:null, paths:[
-      { id:"e_if1", combiner:"and", clauses:[{ field:"category", op:"is", value:"Hardware" }], children:[
-        { id:"e_cr", kind:"action", action:"create", arg:"Service Request" },
-        { id:"e_up", kind:"action", action:"update", fields:[] } ] },
-      { id:"e_if2", isElse:true, combiner:"and", clauses:[], children:[
-        { id:"e_em1", kind:"action", action:"send_email", arg:"the requester", data:{} } ] } ] },
     { id:"e_sp", kind:"branch", paths:[
+      { id:"e_sp0", children:[   // user 2026-11-18: nothing sits above a split — these steps are its own path
+        { id:"e_a1", kind:"action", action:"assign", arg:"the service desk" },
+        { id:"e_if", kind:"branch", ifelse:true, otherwise:null, paths:[
+          { id:"e_if1", combiner:"and", clauses:[{ field:"category", op:"is", value:"Hardware" }], children:[
+            { id:"e_cr", kind:"action", action:"create", arg:"Service Request" },
+            { id:"e_up", kind:"action", action:"update", fields:[] } ] },
+          { id:"e_if2", isElse:true, combiner:"and", clauses:[], children:[
+            { id:"e_em1", kind:"action", action:"send_email", arg:"the requester", data:{} } ] } ] } ] },
       { id:"e_spa", feeds:"e_m", children:[ { id:"e_em2", kind:"action", action:"send_email", arg:"the on-call team", data:{} } ] },
       { id:"e_spb", feeds:"e_m", children:[ { id:"e_sms", kind:"action", action:"send_sms", data:{} } ] },
       { id:"e_spc", feeds:"e_m", children:[ { id:"e_ann", kind:"action", action:"create_announcement" } ] } ] },
@@ -722,8 +723,8 @@ const USECASE_META = {
 const RECORD_EVENT_ITEMS = [
   { header:"Record events" },
   { id:"created", label:"When a record is created", icon:I.plus,   keywords:"create new add raise log open" },
-  { id:"changed", label:"When a field changes", icon:I.field,  keywords:"update updated change changes modify edit field value" },
-  { id:"activity", label:"When there's activity on a record", icon:I.bell, keywords:"activity reply note collaboration diagnosis solution task merge spam convert summary" },
+  { id:"changed", label:"When a record's field changes", icon:I.field,  keywords:"update updated change changes modify edit field value" },
+  { id:"activity", label:"When a record gets new activity", icon:I.bell, keywords:"activity reply note collaboration diagnosis solution task merge spam convert summary" },
   { id:"archived", label:"When a record is archived", icon:I.field, keywords:"archive delete remove retire close" },
 ];
 const TIME_ONCE = { id:"once", label:"Once", icon:I.cal, keywords:"once one time single run date schedule when specific" };
@@ -754,7 +755,7 @@ const TRIGGER_MENU_FLAT = [ ...RECORD_EVENT_ITEMS, { header:"Time based" }, TIME
 const TRIGGER_EVENTS = [
   { id:"created",  icon:I.plus,  tail:"is created",  verbs:["create","created","creates","new","add","added","raise","raised","log","logged","open","opened"] },
   { id:"changed",  icon:I.field, tail:"'s field changes", verbs:["update","updated","updates","change","changed","changes","modify","modified","edit","edited","field"] },
-  { id:"activity", icon:I.bell, tail:" has new activity", verbs:["activity"], only:["Request","Incident","Service Request"] },
+  { id:"activity", icon:I.bell, tail:" gets new activity", verbs:["activity"], only:["Request","Incident","Service Request"] },
   { id:"archived", icon:I.field, tail:"is archived", verbs:["archive","archived","archives","delete","deleted","remove","removed","retire","retired"] },
 ];
 // cohesive families whose members share a base word → an inline chooser, never extra rows. `min` = the
@@ -832,7 +833,8 @@ function moduleMorphFor(raw) {
   });
   const mq = modToks.join(" ").trim();
   if (!mq) return null;                                   // only an event word typed → let the normal filter handle it
-  const events = eventFilter ? TRIGGER_EVENTS.filter(e=>e.id===eventFilter) : TRIGGER_EVENTS;
+  const EVS = TRIG_V2 ? [...TRIGGER_EVENTS.filter(e => e.id!=="changed" && e.id!=="activity"), { id:"updated", icon:I.field, tail:" gets an update", verbs:[] }] : TRIGGER_EVENTS;
+  const events = eventFilter ? EVS.filter(e=>e.id===eventFilter || (TRIG_V2 && e.id==="updated" && (eventFilter==="changed" || eventFilter==="activity"))) : EVS;
   // resolve the ORDERED set of matching modules
   let modules;
   const fam = MODULE_FAMILIES.find(f => mq.length>=f.min && f.aliases.some(a => a.startsWith(mq)));
@@ -870,20 +872,35 @@ function moduleMorphFor(raw) {
 //    activity word is a blank (switch reply → note without starting over) and a variant, when it has one, is a 2nd blank.
 //    `id` is also the word shown in the sentence. @M = "a/an {module}".
 const ACT_MODULES = ["Request", "Incident", "Service Request"];
+// user 2026-11-18: ONE fixed sentence — "When a {record} gets {act}". `id` is the exact phrase after "gets" (popup row = canvas words).
 const ACTIVITY = [
-  { id:"reply",         grp:"Replies",               label:"A reply is sent",          tpl:"a {act} is sent by {sub} on @M", subs:["a technician","the requester","a CC user"], kw:"reply replies replied respond response conversation message email" },
-  { id:"note",          grp:"Notes & collaboration", label:"A note is added",          tpl:"a {act} is added to @M", kw:"note notes internal comment" },
-  { id:"collaboration", grp:"Notes & collaboration", label:"A collaboration is added", tpl:"a {act} is added to @M", kw:"collaboration collaborate collab" },
-  { id:"diagnosis",     grp:"Resolution",            label:"A diagnosis is added",     tpl:"a {act} is added to @M", kw:"diagnosis diagnose" },
-  { id:"solution",      grp:"Resolution",            label:"A solution is added",      tpl:"a {act} is added to @M", kw:"solution solve resolve fix" },
-  { id:"AI summary",    grp:"Resolution",            label:"An AI summary is generated", tpl:"an {act} is generated for @M", kw:"ai summary summarize summarise generated" },
-  { id:"task",          grp:"Tasks",                 label:"A task is added or deleted", tpl:"a {act} is {sub} on @M", subs:["added","deleted"], kw:"task tasks todo" },
-  { id:"merged",        grp:"Merge",                 label:"Merged with another request", tpl:"@M is {act} as the {sub} request", subs:["primary","secondary"], kw:"merge merged primary secondary" },
-  { id:"marked as spam",   grp:"Spam",               label:"Marked as spam",           tpl:"@M is {act}", kw:"spam junk" },
-  { id:"unmarked as spam", grp:"Spam",               label:"Unmarked as spam",         tpl:"@M is {act}", kw:"spam junk not unmark" },
-  { id:"converted",     grp:"Conversions",           label:"Converted to another type", tpl:"@M is {act} to {sub}", subs:["an Incident","a Service Request","another service"], kw:"convert converted conversion" },
+  { id:"a reply from the requester",      grp:"Replies",               kw:"reply replies replied respond response conversation message email requester" },
+  { id:"a reply from a technician",       grp:"Replies",               kw:"reply replies replied respond response conversation message email technician agent" },
+  { id:"a reply from a CC user",          grp:"Replies",               kw:"reply replies replied respond response conversation message email cc" },
+  { id:"a new note",                      grp:"Notes & collaboration", kw:"note notes internal comment" },
+  { id:"a new collaboration",             grp:"Notes & collaboration", kw:"collaboration collaborate collab" },
+  { id:"a new diagnosis",                 grp:"Resolution",            kw:"diagnosis diagnose" },
+  { id:"a new solution",                  grp:"Resolution",            kw:"solution solve resolve fix" },
+  { id:"an AI summary",                   grp:"Resolution",            kw:"ai summary summarize summarise generated" },
+  { id:"a new task",                      grp:"Tasks",                 kw:"task tasks todo add added" },
+  { id:"a task removed",                  grp:"Tasks",                 kw:"task tasks todo remove removed delete deleted" },
+  { id:"merged as the primary request",   grp:"Merge",                 kw:"merge merged primary" },
+  { id:"merged as a secondary request",   grp:"Merge",                 kw:"merge merged secondary" },
+  { id:"marked as spam",                  grp:"Spam",                  kw:"spam junk mark" },
+  { id:"unmarked as spam",                grp:"Spam",                  kw:"spam junk not unmark" },
+  { id:"converted to an Incident",        grp:"Conversions",           kw:"convert converted conversion incident" },
+  { id:"converted to a Service Request",  grp:"Conversions",           kw:"convert converted conversion service request" },
+  { id:"converted to another service",    grp:"Conversions",           kw:"convert converted conversion service" },
 ];
-const actOptions = () => { const out = []; let g = null; ACTIVITY.forEach(a => { if (a.grp !== g) { g = a.grp; out.push({ header:g }); } out.push({ id:a.id, label:a.label }); }); return out; };
+// user 2026-11-18: a reply's sender and a task's added / deleted are picked in this same list — one click, no 2nd popup
+const ACT_INLINE = {};   // (variants are their own rows now)
+const actOptions = () => { const out = []; let g = null; ACTIVITY.forEach(a => { if (a.grp !== g) { g = a.grp; out.push({ header:g }); } out.push({ id:a.id, label:a.id }); }); return out; };
+// ── V2 (user 2026-11-18): ONE trigger for fields AND activity — "When a {record} gets {what}"; a field reads
+//    "gets its {field} changed [from {from} to {to}]". Picked with the top bar's Trigger switch (window.__trigV2).
+let TRIG_V2 = false;
+const updOptions = (mod) => [{ header:"Fields" }, ...triggerFieldsFor(mod || "Request").map(f => ({ id:"f:"+f.id, label:f.label })),
+  ...(!mod || ACT_MODULES.includes(mod) ? actOptions() : [])];
+const trigMenuFor = (arr) => !TRIG_V2 ? arr : arr.flatMap(it => it.id==="changed" ? [{ id:"updated", label:"When a record gets an update", icon:I.field, keywords:"update updated change changes modify edit field value activity reply note task merge spam convert summary" }] : it.id==="activity" ? [] : [it]);
 // the sentence a trigger reads as (for search rows), with the placeholder word for any blank still open
 const trigSentence = (typeId, vals) => "When " + triggerView({ typeId, vals:vals||{} }).tpl.replace(/\{(\w+)\}/g, (_,k) => (vals && vals[k]) || PLACEHOLDER[k] || k);
 // yellow-mark every typed word inside a row label (user 2026-11-17: "highlight that word")
@@ -915,8 +932,11 @@ function smartTriggerSearch(raw) {
   const flds = triggerFieldsFor(mod || "Request").filter(f => words.every(w => (f.label + " " + f.id).toLowerCase().includes(w)))
     .map(f => { const vals = { field:f.id, ...(mod ? { module:mod } : {}) }, text = "When " + (mod ? moduleArticle(mod)+" "+mod : "a record") + "'s " + f.label + " changes";
       return { id:"s:fld:"+f.id, typeId:"changed", vals, icon:I.field, help:TRIGGER_HELP.changed, label:text, labelNode:markWords(text, hl) }; });
-  if (acts.length) rows.push({ header:"Activity on a record" }, ...acts);
-  if (flds.length) rows.push({ header:"A field changes" }, ...flds);
+  if (TRIG_V2) {   // one sentence: every hit is an "updated" trigger
+    acts.forEach(r => { r.typeId = "updated"; r.vals = { what:r.vals.act, ...(r.vals.module ? { module:r.vals.module } : {}) }; r.label = trigSentence("updated", r.vals); r.labelNode = markWords(r.label, hl); r.help = TRIGGER_HELP.updated; });
+    flds.forEach(r => { r.typeId = "updated"; r.vals = { what:r.vals.field, wk:"f", ...(r.vals.module ? { module:r.vals.module } : {}) }; r.label = trigSentence("updated", r.vals); r.labelNode = markWords(r.label, hl); r.help = TRIGGER_HELP.updated; }); }
+  if (acts.length) rows.push({ header: TRIG_V2 ? "Activity" : "A record gets new activity" }, ...acts);
+  if (flds.length) rows.push({ header: TRIG_V2 ? "Fields" : "A record's field changes" }, ...flds);
   if (!rows.length) return morph;
   if (morph) rows.push({ divider:true }, ...morph.rows);
   return { rows };
@@ -966,8 +986,14 @@ function triggerView(trigger) {
   }
   if (id==="activity") {   // user 2026-11-17 — Request only; the activity word and its variant are blanks
     const a = ACTIVITY.find(x => x.id===v.act), M = (v.module ? moduleArticle(v.module) : "a") + " {module}";
-    if (!a) return { tpl:"there's {act} on "+M, slots:[{key:"act",options:actOptions()},{key:"module",options:ACT_MODULES}] };
-    return { tpl:a.tpl.replace("@M", M), slots:[{key:"act",options:actOptions()}, ...(a.subs ? [{key:"sub",options:a.subs}] : []), {key:"module",options:ACT_MODULES}] };
+    return { tpl:M+" gets {act}", slots:[{key:"module",options:ACT_MODULES},{key:"act",options:actOptions()}] };   // one fixed sentence (user 2026-11-18)
+  }
+  if (id==="updated") {    // V2: fields + activity in one sentence (user 2026-11-18)
+    const M = (v.module ? moduleArticle(v.module) : "a") + " {module}", mods = TRIGGER_MODULES, opts = updOptions(v.module);
+    if (v.wk !== "f") return { tpl:M+" gets {what}", slots:[{key:"module",options:mods},{key:"what",options:opts}] };
+    const fld = triggerFieldsFor(v.module).find(f => f.id===v.what), dd = fld && fld.input==="dropdown", vals = (fld && fld.values) || [];
+    return { tpl:M+" gets its {what} changed" + (dd ? " from {from} to {to}" : ""),
+      slots:[{key:"module",options:mods},{key:"what",options:opts}, ...(dd ? [{key:"from",options:["any",...vals]},{key:"to",options:vals.filter(x=>x!==v.from)}] : [])] };
   }
   // time-based triggers (2026-07-10 rework): five clear cadences, each a PROPER sentence (replaces the old
   // "date is reached" + nested "every time period" cadence picker). Once has a date AND time.
@@ -3155,8 +3181,9 @@ const ACTION_HELP = {
 const TRIG_HELP = (title, body, eg) => ({ title, color:"var(--c-when)", bg:"var(--c-when-bg)", graphic:G.trigger, body, eg });
 const TRIGGER_HELP = {
   created:      TRIG_HELP("Record created", "Runs the moment a new record of the chosen type is created.", "Like — a new Incident is logged, or a Service Request is raised."),
-  changed:      TRIG_HELP("A field changes", "Runs when a field of the record changes — optionally only when it moves from one value to another.", "Like — status goes from Open to Resolved."),
-  activity:     TRIG_HELP("Activity on a record", "Runs when something is added or done on a request — a reply, a note, a task, a merge, spam…", "Like — the requester replies to an Incident."),
+  changed:      TRIG_HELP("A record's field changes", "Runs when a field of the record changes — optionally only when it moves from one value to another.", "Like — status goes from Open to Resolved."),
+  activity:     TRIG_HELP("A record gets new activity", "Runs when something is added or done on a request — a reply, a note, a task, a merge, spam…", "Like — an Incident gets a reply from the requester."),
+  updated:      TRIG_HELP("A record gets an update", "Runs when a field of the record changes, or when something is added or done on it — a reply, a note, a task, spam…", "Like — a Request gets its Priority changed to High, or gets a new note."),
   archived:     TRIG_HELP("Record archived", "Runs when a record is archived (soft-deleted / moved out of active use).", "Like — an old asset is retired."),
   __period:TRIG_HELP("Every time period", "Runs on a repeating schedule — pick hourly, daily, weekly, or monthly.", "Like — every Monday at 9am."),
   once:    TRIG_HELP("Once", "Runs one time, at a specific date and time.", "Like — a one-off cleanup on the 31st at 9am."),
@@ -3786,6 +3813,29 @@ const splitTakePath = (f, sp, pi, mkId) => {
   const moved = own ? [{ ...split, id:mkId(), paths:[P] }, own] : null;
   return { flow: treeSetLevel(f, lvl, level), moved, path:P, own };
 };
+// SPLIT PATH reattach (user 2026-11-18): a piece holding a split always goes RIGHT AFTER THE TRIGGER (a split is always the
+// first node). Whatever is already in the workflow joins it as split paths:
+//  · the workflow already starts with a split → the piece's paths are added to it (numbered after the existing ones) and the
+//    piece's Merges sit after the existing Merges (renumbered after them);
+//  · plain steps → they are wrapped into Split path 1 and the piece's paths follow (the v5.17 rule);  · empty → as it is.
+const isSplitPiece = (items) => !!(items && items[0] && isSplitBranch(items[0]));
+const isSplitRoot = (f) => !!(f && f[0] && isSplitBranch(f[0]));
+// a plain piece reattached at the top of a split-rooted flow → wrapped as one more split path (user 2026-11-18)
+const asSplitPiece = (items, mkId) => isSplitPiece(items) ? items : [{ id:mkId(), kind:"branch", otherwise:null, paths:[{ id:mkId(), children:items }] }];
+// the new split path joins Merge `mid` again (if that Merge is still there) — user 2026-11-18
+const splitRejoin = (f, pathId, mid) => { if (!mid || !f[0] || !isSplitBranch(f[0])) return f; const mi = f.findIndex(m => m.id===mid && m.kind==="merge"); if (mi < 0) return f;
+  return f.map((n, k) => k===0 ? { ...n, paths:n.paths.map(p => p.id===pathId ? { ...p, feeds:mid } : p) } : k===mi ? { ...n, feeders:[...(n.feeders||[]).filter(x => x!==pathId), pathId] } : n); };
+const splitAttach = (f, items, mkId) => {
+  const S = items[0], extra = items.slice(1), pMerges = extra.filter(n => n.kind === "merge"), pRest = extra.filter(n => n.kind !== "merge");
+  let j = 1; const head = f[0];
+  if (isSplitBranch(head)) { const merges = []; while (f[j] && f[j].kind === "merge") { merges.push(f[j]); j++; }
+    let num = merges.reduce((m, x) => Math.max(m, x.num || 0), 0);
+    return [{ ...head, paths:[...(head.paths||[]), ...(S.paths||[])] }, ...merges, ...pMerges.map(m => ({ ...m, num:++num })), ...f.slice(j), ...pRest]; }
+  return [{ ...S, paths:[...(f.length ? [{ id:mkId(), children:f }] : []), ...(S.paths||[])] }, ...pMerges.map((m, k) => ({ ...m, num:k+1 })), ...pRest];
+};
+// the ids a split piece shows as "new" in the preview: its paths' steps and its Merges (the split itself may be the existing one)
+const splitPieceIds = (items) => { const ids = new Set(); const walk = (ns) => (ns||[]).forEach(n => { ids.add(n.id); (n.paths||[]).forEach(p => walk(p.children)); if (n.success) walk(n.success.children); if (n.otherwise) walk(n.otherwise.children); if (n.kind === "loop") walk(n.children); });
+  (items[0].paths||[]).forEach(p => { ids.add(p.id); walk(p.children); }); walk(items.slice(1)); return ids; };
 const treeFindPath = (nodes, id, base=[]) => {
   for (let i=0;i<nodes.length;i++) {
     const p=[...base,i];
@@ -7149,9 +7199,11 @@ function App() {
   const [dtPrev, setDtPrev] = useState(null);   // { pid, bp, index, scroll, slot } — slot: while dragging, an empty "Put it here" gap
   const dtPrevP = (EMBED && dtPrev) ? (doc.detached||[]).find(x=>x.id===dtPrev.pid) : null;
   const dtIns = dtPrevP ? (dtPrev.slot ? [{ id:"__dtslot", kind:"action", action:null, arg:null }] : dtPrevP.items) : null;
-  const dtShown = dtPrevP ? (()=>{ try { const arr = childrenAt(doc.flow, dtPrev.bp), at = Math.min(dtPrev.index, arr.length);
+  const dtSplitPrev = !!(dtPrevP && !dtPrev.slot && (isSplitPiece(dtPrevP.items) || (!dtPrev.bp.length && isSplitRoot(doc.flow))));
+  const dtPrevItems = dtSplitPrev ? asSplitPiece(dtPrevP.items, () => "__dtnew_" + dtPrevP.id) : null;
+  const dtShown = dtSplitPrev ? splitRejoin(splitAttach(doc.flow, dtPrevItems, () => "__dtwrap"), dtPrevItems[0].paths[dtPrevItems[0].paths.length-1].id, isSplitPiece(dtPrevP.items) ? null : dtPrevP.rejoin) : dtPrevP ? (()=>{ try { const arr = childrenAt(doc.flow, dtPrev.bp), at = Math.min(dtPrev.index, arr.length);
     return treeSetLevel(doc.flow, dtPrev.bp, [...arr.slice(0, at), ...dtIns, ...arr.slice(at)]); } catch (e) { return doc.flow; } })() : doc.flow;
-  const dtPrevIds = dtIns ? new Set(dtIns.map(n=>n.id)) : null;
+  const dtPrevIds = dtSplitPrev ? splitPieceIds(dtPrevItems) : dtIns ? new Set(dtIns.map(n=>n.id)) : null;
   const dtFlowRef = useRef(doc.flow); dtFlowRef.current = doc.flow;
   const triggers = doc.triggers, flow = dtShown;
   const flowRef = useRef(flow); flowRef.current = flow; // always-current flow → deferred callbacks (rAF/popovers) never read a stale closure
@@ -7367,6 +7419,7 @@ function App() {
       else if (m.wf === "pickver" && ["1","2"].includes(m.v)) setPickVer(m.v);
       else if (m.wf === "textver" && ["A","B","C","D"].includes(m.v)) setTextVer(m.v);
       else if (m.wf === "dtver" && ["1","2"].includes(m.v)) setDtVer(m.v);
+      else if (m.wf === "trigver" && ["1","2"].includes(m.v)) { TRIG_V2 = m.v==="2"; setPop(null); setOpenSlot(null); setTrigVer(m.v); }   // Trigger design: 1 two triggers · 2 one sentence (user 2026-11-18)
       else if (m.wf === "dtcancel" && dtCancel.current) dtCancel.current();   // a click outside the Linear view unpicks a picked piece (user 2026-11-12)   // Detach design: 1 Panel · 2 Popover (user 2026-11-05)
       else if (m.wf === "popver" && ["1","2"].includes(m.v)) { setPop(null); setOpenSlot(null); setPopVer(m.v); }
       else if (m.wf === "selpanel" && ["white","tinted"].includes(m.v)) document.documentElement.dataset.selpanel = m.v;   // Selected-side look (user 2026-10-21)
@@ -7392,6 +7445,7 @@ function App() {
   // (e.g. the removed "do this…" opener) whose 0×0 rect would leave a popover unable to position.
   const isVisibleEl = (el) => { if(!el || !el.getBoundingClientRect) return false; const r = el.getBoundingClientRect(); return r.width>0 || r.height>0; };
   const firstVisibleEl = (...els) => els.find(isVisibleEl) || null;
+  const [trigVer, setTrigVer] = useState("1");   // re-render when the Trigger switch flips (TRIG_V2 is read by the menus)
   const [trigPreview, setTrigPreview] = useState(null);   // the hovered trigger sentence, shown in the trigger row (user 2026-11-17)
   const close = () => { dropPreviewGhost(); setPop(null); setTrigPreview(null); setOpenSlot(null); setBranchMenuPath(null); setSmartPreview(null); setSplitPreviewKey(null); if (replaceRef.current) replaceRef.current = null; };
   // The Publish split-button's chevron menu (Save & publish · Save only · [Unpublish]). Each option opens the
@@ -7774,8 +7828,8 @@ function App() {
       .map(it => it.id ? { ...it, help:TRIGGER_HELP[it.id] } : it);
     return {
     anchor,
-    items: withHelp(TRIGGER_MENU),
-    flat: withHelp(TRIGGER_MENU_FLAT),     // search expands the "Every time period" drill → typing "daily" lands it
+    items: withHelp(trigMenuFor(TRIGGER_MENU)),
+    flat: withHelp(trigMenuFor(TRIGGER_MENU_FLAT)),     // search expands the "Every time period" drill → typing "daily" lands it
     wide:true, back, title: back ? "Add trigger" : (replaceId ? "Change trigger" : null), help: NODE_HELP.when,
     // dynamic MODULE SEARCH: typing a module name morphs the generic event rows + pre-fills the module slot.
     moduleMorph: smartTriggerSearch, searchPlaceholder:"Search a trigger — e.g. reply, priority, Incident",
@@ -7819,6 +7873,10 @@ function App() {
   const changeTriggerType = (tid, anchor) => { setFocusKey(`trig:${tid}`); setOpenSlot(null); setPop(triggerMenuConfig(anchor, null, tid)); };
 
   const updateTrigger = (tid, key, val) => { if (key==="act") guidingRef.current = tid;   // a new activity → its variant is asked next
+    if (key==="what") { guidingRef.current = tid; const f = typeof val==="string" && val.startsWith("f:");   // V2: a field asks from / to next
+      setTriggers(ts=>ts.map(t=>t.id===tid?{...t, vals:{ ...t.vals, what: f ? val.slice(2) : val, wk: f ? "f" : undefined, from:undefined, to:undefined }}:t)); return; }
+    if (key==="act" && typeof val==="string" && val.includes("|")) { const [act, sub] = val.split("|");   // reply / task row = activity + its variant
+      setTriggers(ts=>ts.map(t=>t.id===tid?{...t, vals:{...t.vals, act, sub}}:t)); return; }
     setTriggers(ts=>ts.map(t=>t.id===tid?{...t, vals:{...t.vals,[key]:val, ...(key==="act" && t.vals.act!==val ? { sub:undefined } : {})}}:t)); };
   const removeTrigger = (tid) => setTriggers(ts=>ts.filter(t=>t.id!==tid));
 
@@ -8326,7 +8384,7 @@ function App() {
     if (slot.options==="__date") return open(el, [], setter, "Pick a date", {inputType:"date", back});
     if (slot.options==="__time") return open(el, [], setter, "Pick a time", {inputType:"time", back});
     open(el, slot.options.map(o=>typeof o==="string"?{id:o,label:o}:o), setter, PLACEHOLDER[key]||key,
-      {selected:t.vals[key], back});
+      {selected: key==="what" && t.vals.wk==="f" ? "f:"+t.vals.what : t.vals[key], back});
   };
 
   // INVARIANT: adjacent inline conditions are always ONE group. After a structural removal,
@@ -9959,6 +10017,7 @@ function App() {
     if (!lane) return nodes;
     const empty = !(lane.clauses && lane.clauses.length) && !(lane.children && lane.children.length);
     if (!empty) return nodes;
+    if (isSplitBranch(bnode)) return splitTakePath(nodes, branchPath, pi, nid).flow;   // user 2026-11-18: same rules as removing the path
     const paths = bnode.paths.filter((_,k)=>k!==pi);
     const parent = branchPath.slice(0,-1), idx = branchPath[branchPath.length-1];
     const siblings = childrenAt(nodes, parent);
@@ -10779,10 +10838,12 @@ function App() {
   const dtView = (p) => { const f = p.items[0];
     return { id:p.id, at:p.at, from:p.from, kind:dtKindOf(f), title:dtCap(dtLine(f)), steps:dtCount(p.items),
       summary: ["It will ", ...dtChainR(p.items), "."], canvas:dtCanvasOf(p.items),
-      notes: dtEndOnly(p.items) ? ["It contains a split path, so it can only go at the end of a path."] : [] }; };
+      notes: isSplitPiece(p.items) ? ["It's a split path, so it always goes right after the trigger — the steps already there become split paths beside it."] : dtEndOnly(p.items) ? ["It contains a split path, so it can only go at the end of a path."] : [] }; };
   // can piece `pid` go into the gap `index` of the path at `bp`? → { ok, why }
   const dtCanDrop = (pid, bp, index) => { const p = detached.find(x=>x.id===pid); if (!p) return { ok:false, why:"" };
     const arr = childrenAt(dtFlowRef.current, bp), prev = arr[index-1], next = arr[index];
+    if (isSplitPiece(p.items)) return (!bp.length && index===0) ? { ok:true, why:"" } : { ok:false, why:"a split path always goes right after the trigger" };
+    if (!bp.length && isSplitRoot(dtFlowRef.current)) return index===0 ? { ok:true, why:"" } : { ok:false, why:"steps here go in a new split path" };
     if (prev && isSplitBranch(prev)) return { ok:false, why:"only a Merge can follow a split" };
     if (next && next.kind==="merge") return { ok:false, why:"a Merge has to follow its paths" };
     if (index < arr.length && dtEndOnly(p.items)) return { ok:false, why:"it holds a split, so only the end of a path" };
@@ -10827,12 +10888,13 @@ function App() {
   // which split path a gap under a SPLIT PATH header belongs to (null = an ordinary gap)
   const dtSplitAt = (bp, index, f) => { if (index !== 0 || !bp.length) return null; const seg = bp[bp.length-1];
     if (!isBranchSeg(seg) || seg.path === undefined) return null; const sp = bp.slice(0, -1), n = nodeAt(f, sp);
-    if (!isSplitBranch(n)) return null; const r = splitTakePath(f, sp, seg.path, () => "x");
+    if (!isSplitBranch(n)) return null; const r = splitTakePath(f, sp, seg.path, () => "x"); if (!r.path) return null;   // a previewed path isn't in the real flow yet
     return { sp, pi:seg.path, items: r.moved || (r.path.children||[]), own:r.own }; };
   const detachSplitNow = (bp) => { const f0 = dtFlowRef.current, seg = bp[bp.length-1], sp = bp.slice(0, -1);
     const r = splitTakePath(f0, sp, seg.path, nid), items = r.moved || ((r.path && r.path.children) || []); if (!items.length) return;
     const id = "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2,5); dtFly.current = null;
-    const piece = { id, at:Date.now(), from:dtPathLabel(bp, f0), above:null, items };
+    const sibs = childrenAt(f0, sp.slice(0, -1)), mj = sibs.find(m => m.kind==="merge" && ((m.feeders||[]).includes(r.path.id) || r.path.feeds===m.id));
+    const piece = { id, at:Date.now(), from:dtPathLabel(bp, f0), above:null, items, rejoin: (!r.moved && mj) ? mj.id : null };
     commit(prev => ({ ...prev, flow: splitTakePath(prev.flow, sp, seg.path, nid).flow, detached:[piece, ...(prev.detached||[])] }));
     const ids = new Set(); const walk = (ns)=> (ns||[]).forEach(n=>{ ids.add(n.id); walk(branchKids(n)); }); walk(items);
     if (drawer!=null && ids.has(drawer)) setDrawer(null);
@@ -10857,6 +10919,9 @@ function App() {
   };
   const attachAt = (pid, bp, index) => { const p = detached.find(x=>x.id===pid); if (!p) return;
     const where = dtPathLabel(bp, dtFlowRef.current);
+    if (isSplitPiece(p.items) || (!bp.length && isSplitRoot(dtFlowRef.current))) { const it = asSplitPiece(p.items, nid), np = it[0].paths[it[0].paths.length-1].id;
+      commit(prev => ({ ...prev, flow: splitRejoin(splitAttach(prev.flow, it, nid), np, isSplitPiece(p.items) ? null : p.rejoin), detached:(prev.detached||[]).filter(x=>x.id!==pid) }));
+      setPlacing(null); dtFlash(`Attached ${dtSteps(dtCount(p.items))} right after the trigger, as split paths`, true); return; }
     commit(prev => { const arr = childrenAt(prev.flow, bp), at = Math.min(index, arr.length);
       return { ...prev, flow: treeSetLevel(prev.flow, bp, [...arr.slice(0, at), ...p.items, ...arr.slice(at)]), detached:(prev.detached||[]).filter(x=>x.id!==pid) }; });
     setPlacing(null); dtFlash(`Attached ${dtSteps(dtCount(p.items))} to ${where}`, true); };
@@ -10905,7 +10970,7 @@ function App() {
   const dtTargets = (pid) => { const out = [], f = dtFlowRef.current;
     const walk = (arr, bp, depth, pk) => {
       const where = dtPathLabel(bp, f), r0 = dtCanDrop(pid, bp, 0), sk = pathKey(bp)+":0", lt = dtLaneTag(bp, f);
-      out.push({ pid, key:sk, pk, bp, index:0, depth, start:true, tag:lt.t, tone:lt.tone, lname:lt.n, label: bp.length ? "Start of "+where : "Start of the workflow", where: bp.length ? "first step of "+where : "first step, right after the trigger", ok:r0.ok, why:r0.why, firstId:arr[0] && arr[0].id });
+      out.push({ pid, key:sk, pk, bp, index:0, depth, start:true, tag:lt.t, tone:lt.tone, lname:lt.n, label: bp.length ? "Start of "+where : isSplitRoot(f) ? "As a new split path" : "Start of the workflow", where: bp.length ? "first step of "+where : isSplitRoot(f) ? "beside the other split paths, right after the trigger" : "first step, right after the trigger", ok:r0.ok, why:r0.why, firstId:arr[0] && arr[0].id });
       arr.forEach((n, i) => { const r = dtCanDrop(pid, bp, i+1), k = dtKindOf(n), block = !!dtLanes(n), p = [...bp, i], key = pathKey(bp)+":"+(i+1);
         out.push({ pid, key, pk: bp.length ? sk : null, bp, index:i+1, depth, kind:k, block, label:dtCap(dtLine(n)), where:(block ? "after the whole "+DT_TYPE[k].k+" · " : "")+"in "+where, ok:r.ok, why:r.why, nodeId:n.id });
         if (n.kind==="branch" || n.kind==="merge") { (n.paths||[]).forEach((pp, k2)=>walk(pp.children||[], [...p, { path:k2 }], depth+1, key));
@@ -10977,16 +11042,35 @@ function App() {
     const id = "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
     dtFly.current = null;
     const piece = { id, at:Date.now(), from:dtPathLabel(bp, f0), above: i>0 ? dtCap(dtLine(arr[i-1])) : null, items:[node] };
-    commit(prev => { const a = childrenAt(prev.flow, bp); return { ...prev, flow: treeSetLevel(prev.flow, bp, [...a.slice(0, i), ...a.slice(i+1)]), detached:[piece, ...(prev.detached||[])] }; });
+    commit(prev => { const a = childrenAt(prev.flow, bp); return { ...prev, flow: pruneEmptyLanes(treeSetLevel(prev.flow, bp, [...a.slice(0, i), ...a.slice(i+1)]), [...bp, i]), detached:[piece, ...(prev.detached||[])] }; });
     const ids = new Set(); const walk = (ns) => (ns||[]).forEach(n => { ids.add(n.id); walk(branchKids(n)); }); walk([node]);
     if (drawer!=null && ids.has(drawer)) setDrawer(null);
     setCutHover(null); setTrayFolded(false); dtFlash(`Detached ${dtSteps(dtCount([node]))} · it won’t run until you attach it`, true); };
+  const detachBranchLane = (lane) => { const f0 = dtFlowRef.current, bpth = lane.slice(0, -1), pi = lane[lane.length-1].path, br = nodeAt(f0, bpth);
+    if (!br || !(br.paths||[])[pi]) return; const L = br.paths[pi];
+    const id = "dt" + Date.now().toString(36) + Math.random().toString(36).slice(2,5); dtFly.current = null;
+    const items = [{ ...br, id:nid(), paths:[L], otherwise:null }];
+    const piece = { id, at:Date.now(), from:dtPathLabel(lane, f0), above:null, items };
+    commit(prev => ({ ...prev, flow: treeUpdate(prev.flow, bpth, { paths:(nodeAt(prev.flow, bpth).paths||[]).filter((_, k) => k!==pi) }), detached:[piece, ...(prev.detached||[])] }));
+    const ids = new Set(); const walk = (ns)=> (ns||[]).forEach(n=>{ ids.add(n.id); walk(branchKids(n)); }); walk(L.children);
+    if (drawer!=null && ids.has(drawer)) setDrawer(null);
+    setCutHover(null); setDtOne(null); setTrayFolded(false);
+    dtFlash(`Detached Branch ${pi+1} · it won’t run until you attach it`, true); };
   // what a row's unlink icon does (null = no icon on that row)
   // the per-node unlink icon was tried and dropped (user 2026-11-17): detach lives on the CONNECTOR gaps again — a gap's icon
   // detaches the next node and everything after it to the end of that path. Kept off here, not deleted.
-  const DT_ON_NODE = false;
+  const DT_ON_NODE = true;   // back ON next to the gap icons (user 2026-11-18): a node / pill icon = only that; a gap icon = everything below
   const dtCtl = (dnd, lane) => { if (!DT_ON_NODE || !EMBED || dtLock) return null; const f = dtFlowRef.current;
-    if (lane) { let arr; try { arr = childrenAt(f, lane); } catch (e) { return null; } if (!arr || !arr.length) return null;
+    if (lane) { let arr; try { arr = childrenAt(f, lane); } catch (e) { return null; }
+      const seg = lane[lane.length-1], par = (isBranchSeg(seg) && seg.path!==undefined) ? nodeAt(f, lane.slice(0, -1)) : null;
+      if (par && isSplitBranch(par)) { const sx = dtSplitAt(lane, 0, f); if (!sx || !sx.items.length) return null;
+        const ids = new Set([...(arr||[]).map(n => n.id), ...(sx.own ? [sx.own.id] : [])]), hk = "sp:" + pathKey(lane);
+        return { title:`Detach Split path ${seg.path+1} (${dtCount(sx.items)})`, text:`The whole path${sx.own ? " with its Merge and the Merge’s branches" : ""} moves to the Detached stack. The other paths renumber.`,
+          run:()=>{ setDtOne(null); detachAt(lane, 0); }, hover:(on)=>setDtOne(c => on ? ((c && c.key===hk) ? c : { key:hk, ids }) : (c ? null : c)) }; }
+      if (par && par.kind==="branch" && !isIfElse(par) && !isSplitBranch(par)) { const hk = "br:" + pathKey(lane), ids = new Set((arr||[]).map(n => n.id));
+        return { title:`Detach Branch ${seg.path+1}${(arr||[]).length ? " ("+dtCount(arr)+")" : ""}`, text:"This whole branch — its condition and steps — moves to the Detached stack. The other branches renumber.",
+          run:()=>{ setDtOne(null); detachBranchLane(lane); }, hover:(on)=>setDtOne(c => on ? ((c && c.key===hk) ? c : { key:hk, ids }) : (c ? null : c)) }; }
+      if (!arr || !arr.length) return null;
       return { title:`Detach this branch’s steps (${dtCount(arr)})`, text:`The steps in ${dtPathLabel(lane, f)} move to the Detached stack. The branch stays, empty.`,
         run:()=>{ setDtOne(null); detachAt(lane, 0); }, hover:(on)=>setDtOne(c => on ? ((c && c.bp && pathKey(c.bp)===pathKey(lane)) ? c : { bp:lane }) : (c ? null : c)) }; }
     if (!dnd || !dnd.path || dnd.attr !== "data-dragid") return null;
@@ -11389,12 +11473,12 @@ function App() {
           onMouseDown={(e)=>{ e.stopPropagation(); e.preventDefault(); }} onPointerDown={(e)=>e.stopPropagation()}
           onClick={(e)=>{ e.stopPropagation(); e.preventDefault(); if (!d.blocked) d.run(); }}
           onMouseEnter={()=>d.hover(true)} onMouseLeave={()=>d.hover(false)}
-          className="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ left:"-15px", top:`${mc}px` }}>
+          className="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ left:"-21px", top:`${mc}px` }}>   {/* -21: ≥8px clear of the widest (Branching) marker — user 2026-11-18 */}
           <DtIc n="unlink" s={12} w={2}/>
           <span data-nf="dt-tip"><b>{d.title}</b><span>{d.text}</span></span>
         </span>); })()}
       {dnd && !dnd.locked && <span data-tip="Drag to move" onPointerDown={(e)=>dnd.gripDown(dnd.id, e)} className="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-grab active:cursor-grabbing text-[var(--faint)] hover:text-[var(--text)]"
-        style={{ left: (EMBED && dtCtl(dnd, dtLane)) ? "-47px" : "-22px", top:`${mc}px`, transform:"translateY(-50%)", touchAction:"none" }}>
+        style={{ left: (EMBED && dtCtl(dnd, dtLane)) ? "-53px" : "-22px", top:`${mc}px`, transform:"translateY(-50%)", touchAction:"none" }}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
       </span>}
       <div onClick={onClick} className={"relative flex items-start gap-4 transition-opacity " + (onClick ? "cursor-pointer" : "")} style={dim?{opacity:0.5}:undefined}>
@@ -13050,7 +13134,8 @@ function App() {
     if (opts.only!=null) return rendered.filter(Boolean);
     const izDbl = isTrunk || !!opts.dbl;
     const izLabel = isTrunk ? "Add step in the main path" : "Add step in this branch";
-    const showLead = nodes.length>0 && !opts.headless && (isTrunk ? hasTrigger : true);
+    const splitRoot = isTrunk && !!nodes[0] && isSplitBranch(nodes[0]);   // user 2026-11-18: no "Add step" gap above / between a split and its Merges
+    const showLead = nodes.length>0 && !opts.headless && (isTrunk ? hasTrigger : true) && !splitRoot;
     const out = [];
     const izNoRail = !!opts.noRail;
     // DETACH hover (user 2026-11-05): everything from the hovered gap down sits in ONE cut-set wrapper (tinted red), and the
@@ -13064,7 +13149,7 @@ function App() {
       const simple = el && nodes[i] && !(nodes[i].kind==="branch" || nodes[i].kind==="merge" || nodes[i].kind==="loop");
       const tagged = (EMBED && el && nodes[i]) ? <div key={"dtn-"+nodes[i].id} data-dtn={nodes[i].id} data-dt-prev={dtPrevIds && dtPrevIds.has(nodes[i].id) ? "" : undefined} data-dt-slot={nodes[i].id==="__dtslot" ? "" : undefined} data-nf={dtOneIds && dtOneIds.has(nodes[i].id) ? "cutset" : undefined} data-dt-gone={dtGone && dtGone.has(nodes[i].id) ? "" : undefined} style={{ display:"contents" }}>{el}</div> : el;
       put((ci>0 && i===ci-1 && simple) ? <div key="dt-src" data-nf="cutsrc">{tagged}</div> : tagged, i);
-      if (i < rendered.length-1) put(<InsertZone key={"iz-"+i} basePath={basePath} index={i+1} dbl={izDbl} noRail={izNoRail} label={izLabel} />, i+1 === ci ? -1 : i+1);
+      if (i < rendered.length-1 && !splitRoot) put(<InsertZone key={"iz-"+i} basePath={basePath} index={i+1} dbl={izDbl} noRail={izNoRail} label={izLabel} />, i+1 === ci ? -1 : i+1);
     });
     if (cutEls.length) out.push(<div key="dt-cut" data-nf="cutset">{cutEls}</div>);
     if (EMBED && placing) {
@@ -13332,7 +13417,7 @@ function App() {
             {/* trunk flow + terminal "End" cap (once the workflow has an action) */}
             {(() => {
               const openerShown = flow.length===0; // "do this…" opener shows only while the flow is empty
-              const topIsSplit = flow.length===1 && flow[0] && isSplitBranch(flow[0]); // a top-level split owns the bottom → "Add split path"; there is no main path after a split
+              const topIsSplit = !!flow[0] && isSplitBranch(flow[0]) && flow.slice(1).every(n => n.kind==="merge");   // its Merges too (user 2026-11-18) // a top-level split owns the bottom → "Add split path"; there is no main path after a split
               const showEnd = hasTrigger && flow.length>0 && !topIsSplit; // any node added → "Add step" + End cap (unless the flow is a split)
               return (<>
                 {renderFlow(flow, [], { last: (showEnd||topIsSplit) ? false : !openerShown })}
@@ -14817,7 +14902,7 @@ function App() {
                 onDelete={dtDelete} onFold={dtFold} targetsFor={dtTargets} onHoverTarget={dtHighlight} onPick={dtPick} onDrag={dtDrag} dragged={dtDragged} />}
               {pl && <div data-nf="dt-banner" role="status" style={{ transform:`translateX(calc(-50% - ${off/2}px))` }}>
                 <div className="dt-bt"><b>Where should “{dtShort(dtCap(dtLine(pl.items[0])))}” go?</b>
-                  <small>Click a blue spot in the list.{dtEndOnly(pl.items) ? " It holds a split path, so only the ends of paths are open." : ""} Esc cancels.</small></div>
+                  <small>Click a blue spot in the list.{isSplitPiece(pl.items) ? " It's a split path, so it goes right after the trigger." : dtEndOnly(pl.items) ? " It holds a split path, so only the ends of paths are open." : ""} Esc cancels.</small></div>
                 <button type="button" className="dt-btno" onClick={()=>setPlacing(null)}>Cancel</button></div>}
               {dtToast && <div data-nf="dt-toast" role="status" style={{ transform:`translateX(calc(-50% - ${off/2}px))` }}>
                 <span>{dtToast.msg}</span>{dtToast.undoable && <button type="button" onClick={()=>{ undo(); setDtToast(null); }}>Undo</button>}</div>}

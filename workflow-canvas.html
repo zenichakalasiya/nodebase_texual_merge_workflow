@@ -363,13 +363,36 @@ document.documentElement.classList.add('skel-v2');</script>
       </div>
       <!-- Skeleton 4 · Loader (user 2026-11-05): the rail runs top to bottom and each step lights up as the blue line reaches it -->
       <div class="ls-load" aria-hidden="true">
-        <svg viewBox="0 0 96 78" width="104" height="84">
+        <svg class="ldo ldo4" viewBox="0 0 96 78" width="104" height="84">
           <path class="ld-ln" d="M9 15 V31"/><path class="ld-ln" d="M9 46 V63"/>
           <path class="ld-run r1" pathLength="100" d="M9 15 V31"/>
           <path class="ld-run r2" pathLength="100" d="M9 46 V63"/>
           <g class="ld-nd n1"><circle class="bx" cx="9" cy="9" r="6"/><rect class="b" x="24" y="5.5" width="58" height="7" rx="3.5"/></g>
           <g class="ld-nd n2"><path class="bx" d="M9 31.5 L15.5 38.5 L9 45.5 L2.5 38.5 Z" stroke-linejoin="round"/><rect class="b" x="24" y="35" width="44" height="7" rx="3.5"/></g>
           <g class="ld-nd n3"><circle class="bx" cx="9" cy="69" r="5.5"/><rect class="b" x="24" y="65.5" width="66" height="7" rx="3.5"/></g>
+        </svg>
+        <!-- Loader 5 · Packet (user 2026-11-18): a blue dot travels down the rail; each step lights as it passes -->
+        <svg class="ldo ldo5" viewBox="0 0 96 78" width="104" height="84">
+          <path class="ld-ln" d="M9 15 V31"/><path class="ld-ln" d="M9 46 V63"/>
+          <g class="ld-nd p1"><circle class="bx" cx="9" cy="9" r="6"/><rect class="b" x="24" y="5.5" width="58" height="7" rx="3.5"/></g>
+          <g class="ld-nd p2"><path class="bx" d="M9 31.5 L15.5 38.5 L9 45.5 L2.5 38.5 Z" stroke-linejoin="round"/><rect class="b" x="24" y="35" width="44" height="7" rx="3.5"/></g>
+          <g class="ld-nd p3"><circle class="bx" cx="9" cy="69" r="5.5"/><rect class="b" x="24" y="65.5" width="66" height="7" rx="3.5"/></g>
+          <circle class="ld-pk" r="3"><animateMotion dur="2.4s" repeatCount="indefinite" path="M9 9 L9 69" keyPoints="0;1;1" keyTimes="0;0.8;1" calcMode="linear"/><animate attributeName="opacity" dur="2.4s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.05;0.78;0.84;1"/></circle>
+        </svg>
+        <!-- Loader 6 · Build: the steps appear one by one and the rail joins them, then the whole flow turns blue -->
+        <svg class="ldo ldo6" viewBox="0 0 96 78" width="104" height="84">
+          <path class="ld-run b1" pathLength="100" d="M9 15 V31"/><path class="ld-run b2" pathLength="100" d="M9 46 V63"/>
+          <g class="ld-nd ldb q1"><circle class="bx" cx="9" cy="9" r="6"/><rect class="b" x="24" y="5.5" width="58" height="7" rx="3.5"/></g>
+          <g class="ld-nd ldb q2"><path class="bx" d="M9 31.5 L15.5 38.5 L9 45.5 L2.5 38.5 Z" stroke-linejoin="round"/><rect class="b" x="24" y="35" width="44" height="7" rx="3.5"/></g>
+          <g class="ld-nd ldb q3"><circle class="bx" cx="9" cy="69" r="5.5"/><rect class="b" x="24" y="65.5" width="66" height="7" rx="3.5"/></g>
+        </svg>
+        <!-- Loader 7 · Ring: a ring turns around a tiny rail whose steps light in turn -->
+        <svg class="ldo ldo7" viewBox="0 0 64 64" width="72" height="72">
+          <circle class="ld-trk" cx="32" cy="32" r="27"/><circle class="ld-arc" cx="32" cy="32" r="27" pathLength="100"/>
+          <path class="ld-ln" d="M25 26 V29.5 M25 34.5 V38"/>
+          <g class="ld-nd g1"><circle class="bx" cx="25" cy="23" r="2.6"/><rect class="b" x="30" y="21.5" width="13" height="3" rx="1.5"/></g>
+          <g class="ld-nd g2"><circle class="bx" cx="25" cy="32" r="2.6"/><rect class="b" x="30" y="30.5" width="9" height="3" rx="1.5"/></g>
+          <g class="ld-nd g3"><circle class="bx" cx="25" cy="41" r="2.6"/><rect class="b" x="30" y="39.5" width="15" height="3" rx="1.5"/></g>
         </svg>
       </div>
       <div class="ls-bar" aria-hidden="true"><span class="sk" style="width:56px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:20px"></span><span class="sk" style="width:46px"></span></div>
@@ -446,7 +469,7 @@ document.documentElement.classList.add('skel-v2');</script>
         </div>
         <!-- Skeleton 4 · Loader (user 2026-11-05): a small workflow that runs — the nodes light up as a blue line flows through -->
         <div class="ns-load" aria-hidden="true">
-          <svg viewBox="0 0 108 56" width="124" height="64">
+          <svg class="ldo ldo4" viewBox="0 0 108 56" width="124" height="64">
             <path class="ld-ln" d="M22 28 H44"/>
             <path class="ld-ln" d="M62 28 H67 Q74 28 74 21 V16 Q74 9 81 9 H88"/>
             <path class="ld-ln" d="M62 28 H67 Q74 28 74 35 V40 Q74 47 81 47 H88"/>
@@ -456,6 +479,34 @@ document.documentElement.classList.add('skel-v2');</script>
             <g class="ld-nd n1"><rect class="bx" x="4" y="19" width="18" height="18" rx="5"/></g>
             <g class="ld-nd n2"><path class="bx" d="M53 18.5 L62 28 L53 37.5 L44 28 Z" stroke-linejoin="round"/></g>
             <g class="ld-nd n3"><rect class="bx" x="88" y="1.5" width="15" height="15" rx="4.5"/><rect class="bx" x="88" y="39.5" width="15" height="15" rx="4.5"/></g>
+          </svg>
+          <!-- Loader 5 · Packet (user 2026-11-18): a blue dot runs through the flow and splits at the IF; each node lights as it passes -->
+          <svg class="ldo ldo5" viewBox="0 0 108 56" width="124" height="64">
+            <path class="ld-ln" d="M22 28 H44"/>
+            <path class="ld-ln" d="M62 28 H67 Q74 28 74 21 V16 Q74 9 81 9 H88"/>
+            <path class="ld-ln" d="M62 28 H67 Q74 28 74 35 V40 Q74 47 81 47 H88"/>
+            <g class="ld-nd p1"><rect class="bx" x="4" y="19" width="18" height="18" rx="5"/></g>
+            <g class="ld-nd p2"><path class="bx" d="M53 18.5 L62 28 L53 37.5 L44 28 Z" stroke-linejoin="round"/></g>
+            <g class="ld-nd p3"><rect class="bx" x="88" y="1.5" width="15" height="15" rx="4.5"/><rect class="bx" x="88" y="39.5" width="15" height="15" rx="4.5"/></g>
+            <circle class="ld-pk" r="3"><animateMotion dur="2.4s" repeatCount="indefinite" path="M13 28 H67 Q74 28 74 21 V16 Q74 9 81 9 H95.5" keyPoints="0;1;1" keyTimes="0;0.8;1" calcMode="linear"/><animate attributeName="opacity" dur="2.4s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.05;0.78;0.84;1"/></circle>
+            <circle class="ld-pk" r="3"><animateMotion dur="2.4s" repeatCount="indefinite" path="M13 28 H67 Q74 28 74 35 V40 Q74 47 81 47 H95.5" keyPoints="0;1;1" keyTimes="0;0.8;1" calcMode="linear"/><animate attributeName="opacity" dur="2.4s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.05;0.78;0.84;1"/></circle>
+          </svg>
+          <!-- Loader 6 · Build: the nodes appear one by one and the line joins them, then the whole flow turns blue -->
+          <svg class="ldo ldo6" viewBox="0 0 108 56" width="124" height="64">
+            <path class="ld-run b1" pathLength="100" d="M22 28 H44"/>
+            <path class="ld-run b2" pathLength="100" d="M62 28 H67 Q74 28 74 21 V16 Q74 9 81 9 H88"/>
+            <path class="ld-run b2" pathLength="100" d="M62 28 H67 Q74 28 74 35 V40 Q74 47 81 47 H88"/>
+            <g class="ld-nd ldb q1"><rect class="bx" x="4" y="19" width="18" height="18" rx="5"/></g>
+            <g class="ld-nd ldb q2"><path class="bx" d="M53 18.5 L62 28 L53 37.5 L44 28 Z" stroke-linejoin="round"/></g>
+            <g class="ld-nd ldb q3"><rect class="bx" x="88" y="1.5" width="15" height="15" rx="4.5"/><rect class="bx" x="88" y="39.5" width="15" height="15" rx="4.5"/></g>
+          </svg>
+          <!-- Loader 7 · Ring: a ring turns around a tiny flow whose nodes light in turn -->
+          <svg class="ldo ldo7" viewBox="0 0 64 64" width="72" height="72">
+            <circle class="ld-trk" cx="32" cy="32" r="27"/><circle class="ld-arc" cx="32" cy="32" r="27" pathLength="100"/>
+            <path class="ld-ln" d="M25 32 H29 M35.5 32 H37.5 Q39 32 39 30 V27.5 Q39 26 40.5 26 H41 M37.5 32 Q39 32 39 34 V36.5 Q39 38 40.5 38 H41"/>
+            <g class="ld-nd g1"><rect class="bx" x="18.5" y="28.5" width="7" height="7" rx="2"/></g>
+            <g class="ld-nd g2"><path class="bx" d="M32.2 28.3 L35.9 32 L32.2 35.7 L28.5 32 Z" stroke-linejoin="round"/></g>
+            <g class="ld-nd g3"><rect class="bx" x="41" y="23.2" width="5.6" height="5.6" rx="1.6"/><rect class="bx" x="41" y="35.2" width="5.6" height="5.6" rx="1.6"/></g>
           </svg>
         </div>
       </div>
