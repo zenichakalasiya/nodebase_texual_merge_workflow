@@ -608,8 +608,10 @@ Functional edits made inside V8 (all in `linear/index.html`):
 - **Content (Send email)**: the reply toolbar sits inside the writing box via
   the `cbar` hook (`data-rt`, skin 43).
 - **Search highlight** in every list popup is yellow (`SEARCH_MARK`, `#FDE68A`).
-- **Record-update triggers** (Request family only for activity — Request /
-  Incident / Service Request, `ACT_MODULES`). Two designs behind the top bar's
+- **Record-update triggers** (activity covers every module that has it —
+  `ACTIVITY` entries carry `mods`; `ACT_MODULES` = ITSM + assets + Asset
+  Movement + User + User Leave; the activity list is filtered by the picked
+  record, and changing the record drops an activity it lacks). Two designs behind the top bar's
   **Trigger** switch (`#trigVerSel`, message `wf:'trigver'`, module flag
   `TRIG_V2`; menus read it through `trigMenuFor`; existing triggers keep their type):
   - **Trigger 1 · Two triggers** (default): **When a record's field changes**
@@ -618,7 +620,9 @@ Functional edits made inside V8 (all in `linear/index.html`):
     "When a [Request] gets [activity]" — each `ACTIVITY` id is the exact words
     after "gets" (a reply from the requester / a technician / a CC user, a new
     note / collaboration / diagnosis / solution, an AI summary, a new task,
-    a task removed, merged as the primary / a secondary request, marked /
+    one of its tasks deleted, Problem analysis / Change & Release plan
+    updates, asset "scanned", User sign-in / access, User Leave applied /
+    edited / cancelled, merged as the primary / a secondary request, marked /
     unmarked as spam, converted to an Incident / a Service Request / another
     service). Popup row = canvas words; record popup opens first.
   - **Trigger 2 · One sentence**: one menu row **When a record gets an update**
@@ -632,6 +636,24 @@ Functional edits made inside V8 (all in `linear/index.html`):
     status and escalation levels are still fields — **waiting on the manager**.
   - Sentence options were explored in the "Activity Trigger Sentence" claude.ai
     artifact (record first, no colon, no technical words — the user's rules).
+  - Record sentences use the right article ("an Incident", `moduleArticle`).
+    Trigger menu icons: `I.fieldEdit` / `I.activity` / `I.archive`.
+- **Periodic triggers read "RUNS for [records] …"** (user 2026-11-20, the
+  manager's final "Runs for" format from the periodic claude.ai artifact).
+  `triggerView`: once / hourly / daily / weekly / monthly all start with
+  `for {prec}` (`PERIODIC_RECS`, display-only — the periodic Get still
+  supplies the record), asked first. The pill reads **Runs** for a periodic
+  trigger and while one is previewed; hovering "Once", "Every time period"
+  (`__period` → "for {prec} {cadence}") and each cadence previews the
+  sentence. Day of the month (`__dom`, `DOM` = 1–31 + last day) opens an
+  even 7-column grid (`DOM_GRID_ITEMS`, the Popover's `chips` + `grid`
+  item, `data-nf="dom-grid"`) with a 29th–31st note. NOT yet in the
+  builder (only on the artifact): months, interval, cron, start date
+  ("starting from"), several weekdays, weekends / weekdays labels.
+- **Help card** (station "?" hover) sits IN the flow and pushes the rows
+  below down (`data-nf="st-helpflow"`), never over them. Popups prefer
+  below → beside (`placePos` `beside`) → above, never over the top bar.
+  Send email's empty To / Subject read "not set".
 - **Ask for approval** stage headings are tinted `#F6F9FC`.
 - **Request Signature** is a new step under Approval (template list is
   sample data).

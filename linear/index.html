@@ -135,6 +135,11 @@
   .canvas-layer{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle at 1px 1px,var(--grain) 1px,transparent 0);background-size:22px 22px}
   .canvas-glow{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(ellipse 60% 55% at 50% 48%,var(--canvas-glow),transparent 60%)}
   .solid-ico svg path,.solid-ico svg rect{ fill:currentColor; stroke:none; }
+  .solid-ico svg[data-line] path,.solid-ico svg[data-line] circle{ fill:none; stroke:currentColor; }   /* line icons stay lines in solid tiles */
+  /* a step badge's help card sits IN the flow under its row (pushes the rows below down) instead of floating over them */
+  [data-nf="st-helppop"]{ display:none !important; }
+  [data-nf="st-helpflow"]{ display:none; }
+  [data-nf="st"]:has(> div > div > span.group\/help:hover) > [data-nf="st-helpflow"]{ display:block; }
   .slot{ display:inline; text-decoration-line:underline; text-decoration-style:dashed; text-decoration-thickness:1.5px; text-underline-offset:5px; text-decoration-skip-ink:none; text-decoration-color:var(--faint); }
   .slot:hover, .slot:focus, .slot:focus-visible{ text-decoration-style:solid; outline:none; }
   /* clause sentence as a continuous INLINE flow: field/op/value read as one wrapping run, so wrapped lines (incl.
@@ -271,9 +276,13 @@ const TFIELDS = [
 ];
 const CADENCE   = ["hourly","daily","weekly","monthly","on a specific date"];
 const WEEKDAYS  = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const DOM       = Array.from({length:28},(_,i)=>String(i+1)).concat(["last day"]);
+const DOM       = Array.from({length:31},(_,i)=>String(i+1)).concat(["last day"]);
+// periodic "Runs for {prec}" — the records a scheduled workflow runs for (user 2026-11-20)
+const DOM_GRID_ITEMS = (sel) => [{ chips:DOM.map(d=>({id:d,label:d})), grid:true, sel },
+  { header:"29th–31st: months without that date are skipped (Feb has a 29th only in leap years)." }];
+const PERIODIC_RECS = ["Requests","Incidents","Service Requests","Problems","Changes","Releases","Hardware Assets","Software Assets","CIs","Users","Tasks"];
 
-const PLACEHOLDER = { act:"new activity", what:"an update", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often",
+const PLACEHOLDER = { act:"new activity", what:"an update", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often", prec:"records",
   weekday:"a weekday", dom:"a day", time:"a time", date:"a date" };
 
 const TRIGGER_TYPES = [
@@ -292,8 +301,12 @@ const I = {
   bolt:    sv(<path d="M13 2L5 13h5l-1 9 9-12h-5l1-8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>),
   play:    sv(<path d="M8 5l11 7-11 7V5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/>),
   diamond: sv(<path d="M12 3l9 9-9 9-9-9 9-9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/>),
-  merge:   sv(<path d="M6 3v3a6 6 0 006 6 6 6 0 006-6V3M12 12v9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>),
-  loop:    sv(<path d="M21 12a9 9 0 11-2.5-6.2M21 3v4h-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>),
+  merge:   <svg data-line="" width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="2"/><circle cx="18" cy="5" r="2.2" stroke="currentColor" strokeWidth="2"/><path d="M6 7.2c0 4.3 6 5 6 9.3V21M18 7.2c0 4.3-6 5-6 9.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  loop:    <svg data-line="" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M20 4v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 20v-5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  // trigger-type icons (user 2026-11-19): a field being edited · activity on the record · archive box
+  fieldEdit: sv(<><path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M13.5 6.5l4 4" stroke="currentColor" strokeWidth="1.8"/></>),
+  activity:  sv(<><path d="M4 5h16v11H10l-5 4V5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M8 9.5h8M8 12.5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></>),
+  archive:   sv(<><rect x="3" y="4" width="18" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.8"/><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></>),
   hourglass: sv(<path d="M7 3h10M7 21h10M8 3v3l4 4 4-4V3M8 21v-3l4-4 4 4v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>),
   records: sv(<path d="M4 8l8-4 8 4-8 4-8-4zM4 12l8 4 8-4M4 16l8 4 8-4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>),
   trash: sv(<><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></>),
@@ -723,9 +736,9 @@ const USECASE_META = {
 const RECORD_EVENT_ITEMS = [
   { header:"Record events" },
   { id:"created", label:"When a record is created", icon:I.plus,   keywords:"create new add raise log open" },
-  { id:"changed", label:"When a record's field changes", icon:I.field,  keywords:"update updated change changes modify edit field value" },
-  { id:"activity", label:"When a record gets new activity", icon:I.bell, keywords:"activity reply note collaboration diagnosis solution task merge spam convert summary" },
-  { id:"archived", label:"When a record is archived", icon:I.field, keywords:"archive delete remove retire close" },
+  { id:"changed", label:"When a record's field changes", icon:I.fieldEdit,  keywords:"update updated change changes modify edit field value" },
+  { id:"activity", label:"When a record gets new activity", icon:I.activity, keywords:"activity reply note collaboration diagnosis solution task merge spam convert summary" },
+  { id:"archived", label:"When a record is archived", icon:I.archive, keywords:"archive delete remove retire close" },
 ];
 const TIME_ONCE = { id:"once", label:"Once", icon:I.cal, keywords:"once one time single run date schedule when specific" };
 // the "Every time period" cadences — a DRILL-IN sub-menu when browsing (user 2026-07-10: "just show Once or Every
@@ -754,9 +767,9 @@ const TRIGGER_MENU_FLAT = [ ...RECORD_EVENT_ITEMS, { header:"Time based" }, TIME
 // Service Request) an inline chooser fills the SLOT instead of multiplying rows.
 const TRIGGER_EVENTS = [
   { id:"created",  icon:I.plus,  tail:"is created",  verbs:["create","created","creates","new","add","added","raise","raised","log","logged","open","opened"] },
-  { id:"changed",  icon:I.field, tail:"'s field changes", verbs:["update","updated","updates","change","changed","changes","modify","modified","edit","edited","field"] },
-  { id:"activity", icon:I.bell, tail:" gets new activity", verbs:["activity"], only:["Request","Incident","Service Request"] },
-  { id:"archived", icon:I.field, tail:"is archived", verbs:["archive","archived","archives","delete","deleted","remove","removed","retire","retired"] },
+  { id:"changed",  icon:I.fieldEdit, tail:"'s field changes", verbs:["update","updated","updates","change","changed","changes","modify","modified","edit","edited","field"] },
+  { id:"activity", icon:I.activity, tail:" gets new activity", verbs:["activity"], get only(){ return ACT_MODULES; } },   // read later (ACT_MODULES is defined further down)
+  { id:"archived", icon:I.archive, tail:"is archived", verbs:["archive","archived","archives","delete","deleted","remove","removed","retire","retired"] },
 ];
 // cohesive families whose members share a base word → an inline chooser, never extra rows. `min` = the
 // shortest prefix that fires it (asset can fire at "as"; request waits for "req" so "re" still finds Release).
@@ -833,7 +846,7 @@ function moduleMorphFor(raw) {
   });
   const mq = modToks.join(" ").trim();
   if (!mq) return null;                                   // only an event word typed → let the normal filter handle it
-  const EVS = TRIG_V2 ? [...TRIGGER_EVENTS.filter(e => e.id!=="changed" && e.id!=="activity"), { id:"updated", icon:I.field, tail:" gets an update", verbs:[] }] : TRIGGER_EVENTS;
+  const EVS = TRIG_V2 ? [...TRIGGER_EVENTS.filter(e => e.id!=="changed" && e.id!=="activity"), { id:"updated", icon:I.fieldEdit, tail:" gets an update", verbs:[] }] : TRIGGER_EVENTS;
   const events = eventFilter ? EVS.filter(e=>e.id===eventFilter || (TRIG_V2 && e.id==="updated" && (eventFilter==="changed" || eventFilter==="activity"))) : EVS;
   // resolve the ORDERED set of matching modules
   let modules;
@@ -871,36 +884,65 @@ function moduleMorphFor(raw) {
 //    opposed to a field whose value changes ("When a field changes"). Each activity is its own readable sentence; the
 //    activity word is a blank (switch reply → note without starting over) and a variant, when it has one, is a 2nd blank.
 //    `id` is also the word shown in the sentence. @M = "a/an {module}".
-const ACT_MODULES = ["Request", "Incident", "Service Request"];
+// ALL modules (user 2026-11-19). `mods` = the trigger records that have it. User Leave exists only here (it has no fields,
+// created or archived triggers in the real product), so it isn't added to RECORD_MODULES.
+const RQ = ["Request","Incident","Service Request"], ITSM_M = [...RQ,"Problem","Change","Release"], ASSET_M = ["Hardware Asset","Software Asset","Non-IT Asset"];
 // user 2026-11-18: ONE fixed sentence — "When a {record} gets {act}". `id` is the exact phrase after "gets" (popup row = canvas words).
 const ACTIVITY = [
-  { id:"a reply from the requester",      grp:"Replies",               kw:"reply replies replied respond response conversation message email requester" },
-  { id:"a reply from a technician",       grp:"Replies",               kw:"reply replies replied respond response conversation message email technician agent" },
-  { id:"a reply from a CC user",          grp:"Replies",               kw:"reply replies replied respond response conversation message email cc" },
-  { id:"a new note",                      grp:"Notes & collaboration", kw:"note notes internal comment" },
-  { id:"a new collaboration",             grp:"Notes & collaboration", kw:"collaboration collaborate collab" },
-  { id:"a new diagnosis",                 grp:"Resolution",            kw:"diagnosis diagnose" },
-  { id:"a new solution",                  grp:"Resolution",            kw:"solution solve resolve fix" },
-  { id:"an AI summary",                   grp:"Resolution",            kw:"ai summary summarize summarise generated" },
-  { id:"a new task",                      grp:"Tasks",                 kw:"task tasks todo add added" },
-  { id:"a task removed",                  grp:"Tasks",                 kw:"task tasks todo remove removed delete deleted" },
-  { id:"merged as the primary request",   grp:"Merge",                 kw:"merge merged primary" },
-  { id:"merged as a secondary request",   grp:"Merge",                 kw:"merge merged secondary" },
-  { id:"marked as spam",                  grp:"Spam",                  kw:"spam junk mark" },
-  { id:"unmarked as spam",                grp:"Spam",                  kw:"spam junk not unmark" },
-  { id:"converted to an Incident",        grp:"Conversions",           kw:"convert converted conversion incident" },
-  { id:"converted to a Service Request",  grp:"Conversions",           kw:"convert converted conversion service request" },
-  { id:"converted to another service",    grp:"Conversions",           kw:"convert converted conversion service" },
+  { id:"a reply from the requester",      grp:"Replies",               mods:RQ, kw:"reply replies replied respond response conversation message email requester" },
+  { id:"a reply from a technician",       grp:"Replies",               mods:RQ, kw:"reply replies replied respond response conversation message email technician agent" },
+  { id:"a reply from a CC user",          grp:"Replies",               mods:RQ, kw:"reply replies replied respond response conversation message email cc" },
+  { id:"a new note",                      grp:"Notes & collaboration", mods:[...ITSM_M, ...ASSET_M, "Asset Movement"], kw:"note notes internal comment remark" },
+  { id:"a new collaboration",             grp:"Notes & collaboration", mods:ITSM_M, kw:"collaboration collaborate collab discussion" },
+  { id:"a new diagnosis",                 grp:"Resolution",            mods:RQ, kw:"diagnosis diagnose" },
+  { id:"a new solution",                  grp:"Resolution",            mods:[...RQ,"Problem"], kw:"solution solve resolve fix" },
+  { id:"an AI summary",                   grp:"Resolution",            mods:RQ, kw:"ai summary summarize summarise generated" },
+  { id:"its root cause updated",          grp:"Analysis",              mods:["Problem"], kw:"root cause rca analysis" },
+  { id:"its symptoms updated",            grp:"Analysis",              mods:["Problem"], kw:"symptom symptoms analysis" },
+  { id:"its impact analysis updated",     grp:"Analysis",              mods:["Problem"], kw:"impact analysis investigation" },
+  { id:"its workaround updated",          grp:"Analysis",              mods:["Problem"], kw:"workaround work around temporary fix" },
+  { id:"its build plan updated",          grp:"Planning",              mods:["Release"], kw:"build plan" },
+  { id:"its test plan updated",           grp:"Planning",              mods:["Release"], kw:"test plan qa testing" },
+  { id:"its rollout plan updated",        grp:"Planning",              mods:["Change","Release"], kw:"rollout plan deploy" },
+  { id:"its backout plan updated",        grp:"Planning",              mods:["Change","Release"], kw:"backout rollback plan revert" },
+  { id:"its impact plan updated",         grp:"Planning",              mods:["Change","Release"], kw:"impact plan planning" },
+  { id:"a new task",                      grp:"Tasks",                 mods:ITSM_M, kw:"task tasks todo add added" },
+  { id:"one of its tasks deleted",        grp:"Tasks",                 mods:ITSM_M, kw:"task tasks todo remove removed delete deleted" },   // user 2026-11-19 (was "a task removed")
+  { id:"merged as the primary request",   grp:"Merge",                 mods:RQ, kw:"merge merged primary" },
+  { id:"merged as a secondary request",   grp:"Merge",                 mods:RQ, kw:"merge merged secondary" },
+  { id:"marked as spam",                  grp:"Spam",                  mods:RQ, kw:"spam junk mark" },
+  { id:"unmarked as spam",                grp:"Spam",                  mods:RQ, kw:"spam junk not unmark" },
+  { id:"converted to an Incident",        grp:"Conversions",           mods:RQ, kw:"convert converted conversion incident" },
+  { id:"converted to a Service Request",  grp:"Conversions",           mods:RQ, kw:"convert converted conversion service request" },
+  { id:"converted to another service",    grp:"Conversions",           mods:RQ, kw:"convert converted conversion service" },
+  { id:"scanned",                         grp:"Scans",                 mods:ASSET_M, kw:"scan scanned barcode qr code" },
+  { id:"logged in",                       grp:"Sign-in",               mods:["User"], kw:"login log in sign in signin" },
+  { id:"logged out",                      grp:"Sign-in",               mods:["User"], kw:"logout log out sign out signout" },
+  { id:"blocked",                         grp:"Access",                mods:["User"], kw:"block blocked lock locked" },
+  { id:"unblocked",                       grp:"Access",                mods:["User"], kw:"unblock unblocked unlock" },
+  { id:"restored",                        grp:"Access",                mods:["User"], kw:"restore restored" },
+  { id:"allowed to log in",               grp:"Access",                mods:["User"], kw:"allow login access" },
+  { id:"allowed to delegate approvals and mark leave", grp:"Access",   mods:["User"], kw:"delegate delegation approval leave" },
+  { id:"allowed to delegate approvals and mark leave for their team", grp:"Access", mods:["User"], kw:"delegate delegation approval leave team" },
+  { id:"marked as a verified user",       grp:"Marked as",             mods:["User"], kw:"verified verify" },
+  { id:"marked as a VIP user",            grp:"Marked as",             mods:["User"], kw:"vip important" },
+  { id:"converted to a technician",       grp:"Conversions",           mods:["User"], kw:"convert technician agent" },
+  { id:"converted to a requester",        grp:"Conversions",           mods:["User"], kw:"convert requester" },
+  { id:"applied",                         grp:"Leave",                 mods:["User Leave"], kw:"leave apply applied vacation holiday time off absence" },
+  { id:"edited",                          grp:"Leave",                 mods:["User Leave"], kw:"leave edit edited vacation holiday" },
+  { id:"cancelled",                       grp:"Leave",                 mods:["User Leave"], kw:"leave cancel cancelled canceled vacation holiday" },
 ];
+// records that have at least one activity, in the trigger's own order (CMDB and Task have none)
+const ACT_MODULES = [...ITSM_M, ...ASSET_M, "Asset Movement", "User", "User Leave"];
 // user 2026-11-18: a reply's sender and a task's added / deleted are picked in this same list — one click, no 2nd popup
 const ACT_INLINE = {};   // (variants are their own rows now)
-const actOptions = () => { const out = []; let g = null; ACTIVITY.forEach(a => { if (a.grp !== g) { g = a.grp; out.push({ header:g }); } out.push({ id:a.id, label:a.id }); }); return out; };
+const actOptions = (mod) => { const out = []; let g = null; ACTIVITY.filter(a => !mod || a.mods.includes(mod)).forEach(a => { if (a.grp !== g) { g = a.grp; out.push({ header:g }); } out.push({ id:a.id, label:a.id }); }); return out; };
 // ── V2 (user 2026-11-18): ONE trigger for fields AND activity — "When a {record} gets {what}"; a field reads
 //    "gets its {field} changed [from {from} to {to}]". Picked with the top bar's Trigger switch (window.__trigV2).
 let TRIG_V2 = false;
 const updOptions = (mod) => [{ header:"Fields" }, ...triggerFieldsFor(mod || "Request").map(f => ({ id:"f:"+f.id, label:f.label })),
-  ...(!mod || ACT_MODULES.includes(mod) ? actOptions() : [])];
-const trigMenuFor = (arr) => !TRIG_V2 ? arr : arr.flatMap(it => it.id==="changed" ? [{ id:"updated", label:"When a record gets an update", icon:I.field, keywords:"update updated change changes modify edit field value activity reply note task merge spam convert summary" }] : it.id==="activity" ? [] : [it]);
+  ...actOptions(mod)];
+const trigMenuFor = (arr) => !TRIG_V2 ? arr : arr.flatMap(it => it.id==="changed" ? [{ id:"updated", label:"When a record gets an update", icon:I.fieldEdit, keywords:"update updated change changes modify edit field value activity reply note task merge spam convert summary" }] : it.id==="activity" ? [] : [it]);
 // the sentence a trigger reads as (for search rows), with the placeholder word for any blank still open
 const trigSentence = (typeId, vals) => "When " + triggerView({ typeId, vals:vals||{} }).tpl.replace(/\{(\w+)\}/g, (_,k) => (vals && vals[k]) || PLACEHOLDER[k] || k);
 // yellow-mark every typed word inside a row label (user 2026-11-17: "highlight that word")
@@ -926,12 +968,12 @@ function smartTriggerSearch(raw) {
   if (modToks.length) { const c = TRIGGER_MODULES.filter(m => modToks.every(t => m.toLowerCase().split(" ").some(w => w.startsWith(t))));
     mod = c.find(m => m.toLowerCase()===modToks.join(" ")) || (c.includes("Request") ? "Request" : c[0]) || null; }
   const rows = [], hl = all.filter(t => t.length >= 2 && !["an","is","on","to","by","the","of","when"].includes(t));
-  const acts = []; if (!mod || ACT_MODULES.includes(mod)) ACTIVITY.forEach(a => (a.subs || [null]).forEach(sub => {
-    const vals = { act:a.id, ...(sub ? { sub } : {}), ...(mod ? { module:mod } : {}) }, text = trigSentence("activity", vals);
-    if (words.every(w => (a.kw + " " + text).toLowerCase().includes(w))) acts.push({ id:"s:act:"+a.id+":"+(sub||""), typeId:"activity", vals, icon:I.bell, help:TRIGGER_HELP.activity, label:text, labelNode:markWords(text, hl) }); }));
+  const acts = []; ACTIVITY.filter(a => !mod || a.mods.includes(mod)).forEach(a => (a.subs || [null]).forEach(sub => {
+    const only1 = a.mods.length===1 ? a.mods[0] : null, vals = { act:a.id, ...(sub ? { sub } : {}), ...(mod ? { module:mod } : only1 ? { module:only1 } : {}) }, text = trigSentence("activity", vals);
+    if (words.every(w => (a.kw + " " + text).toLowerCase().includes(w))) acts.push({ id:"s:act:"+a.id+":"+(sub||""), typeId:"activity", vals, icon:I.activity, help:TRIGGER_HELP.activity, label:text, labelNode:markWords(text, hl) }); }));
   const flds = triggerFieldsFor(mod || "Request").filter(f => words.every(w => (f.label + " " + f.id).toLowerCase().includes(w)))
     .map(f => { const vals = { field:f.id, ...(mod ? { module:mod } : {}) }, text = "When " + (mod ? moduleArticle(mod)+" "+mod : "a record") + "'s " + f.label + " changes";
-      return { id:"s:fld:"+f.id, typeId:"changed", vals, icon:I.field, help:TRIGGER_HELP.changed, label:text, labelNode:markWords(text, hl) }; });
+      return { id:"s:fld:"+f.id, typeId:"changed", vals, icon:I.fieldEdit, help:TRIGGER_HELP.changed, label:text, labelNode:markWords(text, hl) }; });
   if (TRIG_V2) {   // one sentence: every hit is an "updated" trigger
     acts.forEach(r => { r.typeId = "updated"; r.vals = { what:r.vals.act, ...(r.vals.module ? { module:r.vals.module } : {}) }; r.label = trigSentence("updated", r.vals); r.labelNode = markWords(r.label, hl); r.help = TRIGGER_HELP.updated; });
     flds.forEach(r => { r.typeId = "updated"; r.vals = { what:r.vals.field, wk:"f", ...(r.vals.module ? { module:r.vals.module } : {}) }; r.label = trigSentence("updated", r.vals); r.labelNode = markWords(r.label, hl); r.help = TRIGGER_HELP.updated; }); }
@@ -970,38 +1012,43 @@ function triggerFieldsFor(module){
 // options is an array, or "__date" / "__time" for native inputs.
 function triggerView(trigger) {
   const v = trigger.vals, id = trigger.typeId;
-  if (id==="created")  return { tpl:"a {module} is created",  slots:[{key:"module",options:TRIGGER_MODULES}] };
-  if (id==="archived") return { tpl:"a {module} is archived", slots:[{key:"module",options:TRIGGER_MODULES}] };
+  const AM = (v.module ? moduleArticle(v.module) : "a") + " {module}";   // "an Incident", "a Problem" (user 2026-11-19)
+  if (id==="created")  return { tpl:AM+" is created",  slots:[{key:"module",options:TRIGGER_MODULES}] };
+  if (id==="archived") return { tpl:AM+" is archived", slots:[{key:"module",options:TRIGGER_MODULES}] };
   if (id==="changed") {
     const fields = triggerFieldsFor(v.module);      // module-aware field list (SR → SR fields; service catalog excluded — it's a condition/Get field)
     const fld = fields.find(f=>f.id===v.field);
     if (fld && fld.input==="dropdown") {            // dropdown → offer the from→to value chain
       const vals = fld.values || [];
-      return { tpl:"a {module}'s {field} changes from {from} to {to}",
+      return { tpl:AM+"'s {field} changes from {from} to {to}",
         slots:[{key:"module",options:TRIGGER_MODULES},{key:"field",options:fields},
                {key:"from",options:["any",...vals]},{key:"to",options:vals.filter(x=>x!==v.from)}] };
     }
-    return { tpl:"a {module}'s {field} changes",      // text / date / number / etc. → just "changes" (user 2026-11-17: was "is updated")
+    return { tpl:AM+"'s {field} changes",      // text / date / number / etc. → just "changes" (user 2026-11-17: was "is updated")
       slots:[{key:"module",options:TRIGGER_MODULES},{key:"field",options:fields}] };
   }
   if (id==="activity") {   // user 2026-11-17 — Request only; the activity word and its variant are blanks
     const a = ACTIVITY.find(x => x.id===v.act), M = (v.module ? moduleArticle(v.module) : "a") + " {module}";
-    return { tpl:M+" gets {act}", slots:[{key:"module",options:ACT_MODULES},{key:"act",options:actOptions()}] };   // one fixed sentence (user 2026-11-18)
+    const actHas = ACTIVITY.find(x => x.id===v.act);   // records that have the picked activity
+    return { tpl:M+" gets {act}", slots:[{key:"module",options:actHas ? ACT_MODULES.filter(m => actHas.mods.includes(m)) : ACT_MODULES},{key:"act",options:actOptions(v.module)}] };   // the list = what that record has   // one fixed sentence (user 2026-11-18)
   }
   if (id==="updated") {    // V2: fields + activity in one sentence (user 2026-11-18)
     const M = (v.module ? moduleArticle(v.module) : "a") + " {module}", mods = TRIGGER_MODULES, opts = updOptions(v.module);
-    if (v.wk !== "f") return { tpl:M+" gets {what}", slots:[{key:"module",options:mods},{key:"what",options:opts}] };
+    const wAct = v.wk !== "f" && ACTIVITY.find(x => x.id===v.what);
+    if (v.wk !== "f") return { tpl:M+" gets {what}", slots:[{key:"module",options:wAct ? mods.filter(m => wAct.mods.includes(m)) : mods},{key:"what",options:opts}] };
     const fld = triggerFieldsFor(v.module).find(f => f.id===v.what), dd = fld && fld.input==="dropdown", vals = (fld && fld.values) || [];
     return { tpl:M+" gets its {what} changed" + (dd ? " from {from} to {to}" : ""),
       slots:[{key:"module",options:mods},{key:"what",options:opts}, ...(dd ? [{key:"from",options:["any",...vals]},{key:"to",options:vals.filter(x=>x!==v.from)}] : [])] };
   }
   // time-based triggers (2026-07-10 rework): five clear cadences, each a PROPER sentence (replaces the old
   // "date is reached" + nested "every time period" cadence picker). Once has a date AND time.
-  if (id==="once")    return { tpl:"Once on {date} at {time}",              slots:[{key:"date",options:"__date"},{key:"time",options:"__time"}] };
-  if (id==="hourly")  return { tpl:"Every hour",                            slots:[] };
-  if (id==="daily")   return { tpl:"Every day at {time}",                   slots:[{key:"time",options:"__time"}] };
-  if (id==="weekly")  return { tpl:"Every week on {weekday} at {time}",     slots:[{key:"weekday",options:WEEKDAYS},{key:"time",options:"__time"}] };
-  if (id==="monthly") return { tpl:"Every month on day {dom} at {time}",    slots:[{key:"dom",options:DOM},{key:"time",options:"__time"}] };
+  const PR = {key:"prec",options:PERIODIC_RECS};   // record first, then the schedule (user 2026-11-20)
+  if (id==="once")    return { tpl:"for {prec} once on {date} at {time}",              slots:[PR,{key:"date",options:"__date"},{key:"time",options:"__time"}] };
+  if (id==="hourly")  return { tpl:"for {prec} every hour",                            slots:[PR] };
+  if (id==="daily")   return { tpl:"for {prec} every day at {time}",                   slots:[PR,{key:"time",options:"__time"}] };
+  if (id==="weekly")  return { tpl:"for {prec} every week on {weekday} at {time}",     slots:[PR,{key:"weekday",options:WEEKDAYS},{key:"time",options:"__time"}] };
+  if (id==="monthly") return { tpl:"for {prec} every month on day {dom} at {time}",    slots:[PR,{key:"dom",options:"__dom"},{key:"time",options:"__time"}] };
+  if (id==="__period") return { tpl:"for {prec} {cadence}",                            slots:[PR,{key:"cadence",options:CADENCE}] };   // hover preview of "Every time period"
   // LEGACY (no longer creatable from the menu, kept so old seeded docs still render): date_reached + periodically
   if (id==="date_reached") return { tpl:"{date} is reached", slots:[{key:"date",options:"__date"}] };
   // periodically — chain depends on the cadence
@@ -3182,7 +3229,7 @@ const TRIG_HELP = (title, body, eg) => ({ title, color:"var(--c-when)", bg:"var(
 const TRIGGER_HELP = {
   created:      TRIG_HELP("Record created", "Runs the moment a new record of the chosen type is created.", "Like — a new Incident is logged, or a Service Request is raised."),
   changed:      TRIG_HELP("A record's field changes", "Runs when a field of the record changes — optionally only when it moves from one value to another.", "Like — status goes from Open to Resolved."),
-  activity:     TRIG_HELP("A record gets new activity", "Runs when something is added or done on a request — a reply, a note, a task, a merge, spam…", "Like — an Incident gets a reply from the requester."),
+  activity:     TRIG_HELP("A record gets new activity", "Runs when something is added or done on a record — a reply, a note, a task, a plan, a sign-in…", "Like — an Incident gets a reply from the requester."),
   updated:      TRIG_HELP("A record gets an update", "Runs when a field of the record changes, or when something is added or done on it — a reply, a note, a task, spam…", "Like — a Request gets its Priority changed to High, or gets a new note."),
   archived:     TRIG_HELP("Record archived", "Runs when a record is archived (soft-deleted / moved out of active use).", "Like — an old asset is retired."),
   __period:TRIG_HELP("Every time period", "Runs on a repeating schedule — pick hourly, daily, weekly, or monthly.", "Like — every Monday at 9am."),
@@ -5875,18 +5922,21 @@ function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, on
     let top = raw.below, up = false;
     if (onSide && popV2()) { up = true; top = raw.aTop - 4; const roomB = vh - M - top;
       if (h > roomB) { if (roomB >= 260) { maxH = roomB; h = roomB; } else top = Math.max(M, vh - M - h); } }
+    let beside = null;
     if (!up && top + h > vh - M) { const above = raw.aTop - GAP - h;
-      if (above >= M) top = above;
+      // user 2026-11-19: no room below → open BESIDE the blank (right of it) before flipping up over the steps above
+      const wEst = ref.current ? ref.current.offsetWidth : (sW || (wide ? 340 : 256)), bx = raw.left + raw.width + GAP;
+      if (!onSide && raw.width < 420 && bx + wEst <= vw - M) { beside = bx; top = Math.max(M, Math.min(raw.aTop - 8, vh - M - h)); }
+      else if (above >= M) top = above;
       else { // fits NEITHER side: never cover the anchor (user 2026-10-21 — the Dynamic list sat over a 2-line Subject).
-        // Open on the roomier side and cap the height there; the popover scrolls inside.
+        // Open on the roomier side and cap the height there; the popover scrolls inside (never over the row, never off the top).
         const roomB = vh - M - raw.below, roomA = raw.aTop - GAP - M;
-        if (Math.max(roomA, roomB) >= 220) { if (roomB >= roomA) { maxH = roomB; h = roomB; } else { maxH = roomA; h = roomA; top = raw.aTop - GAP - h; } }
-        else top = Math.max(M, vh - M - h); } }
+        if (roomB >= roomA) { maxH = Math.max(120, roomB); h = maxH; } else { maxH = Math.max(120, roomA); h = maxH; top = raw.aTop - GAP - h; } } }
     top = Math.max(M, Math.min(top, vh - M - h));
     // horizontal: shift by offsetX (used to slide the preview menus aside so the live preview stays visible), then
     // clamp so the popover stays fully on screen (left & right)
     const lx = (sW && w > raw.width) ? raw.left + raw.width - w : raw.left;   // wider than a narrow value cell → grow leftward
-    let left = Math.max(M, Math.min(lx + (offsetX||0), vw - w - M));
+    let left = beside != null ? beside : Math.max(M, Math.min(lx + (offsetX||0), vw - w - M));
     const hh = helpRef.current ? helpRef.current.offsetHeight : 0;
     let helpTop = raw.aTop;
     if (hh && helpTop + hh > vh - M) helpTop = Math.max(M, vh - M - hh);
@@ -6290,6 +6340,15 @@ function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, on
       {filtered.map((i,k)=>{
         // horizontal CHIP row (Popular shortcuts): small neutral pills, one compact line — costs ~36px
         // instead of a rows section. Not keyboard-selectable; clicking a chip picks like a normal item.
+        if (i.chips && i.grid) return (
+          <div key={"ch"+k} data-nf="dom-grid" className="grid gap-1.5 px-2.5 pt-1.5 pb-1" style={{gridTemplateColumns:"repeat(7, minmax(0, 1fr))"}}>
+            {i.chips.map(c=>(
+              <button key={c.id} onClick={()=>{ if(!onPick(c)) onClose(); }} aria-pressed={i.sel===c.id}
+                className={"h-8 rounded-md text-[length:var(--fs-12)] font-medium transition-colors hover:bg-[var(--pop-hover)] " + (c.id.length>2 ? "col-span-3" : "")}
+                style={{border:"1px solid " + (i.sel===c.id ? "var(--accent)" : "var(--border)"), color: i.sel===c.id ? "var(--accent)" : "var(--ink-mid)", background: i.sel===c.id ? "var(--accent-bg, #eaf3fb)" : undefined}}>
+                {c.label}
+              </button>))}
+          </div>);
         if (i.chips) return (
           <div key={"ch"+k} className="flex items-center flex-wrap gap-1.5 px-2.5 pt-1.5 pb-2">
             {i.label && <span className="text-[length:var(--fs-105)] mr-0.5" style={{color:"var(--faint)"}}>{i.label}</span>}
@@ -7809,6 +7868,7 @@ function App() {
   const cadenceMenuConfig = (anchor, replaceId, back) => ({
     anchor, wide:true, back, title:"Every time period", help:{ ...NODE_HELP.when, title:"Every time period" },
     items: PERIOD_CADENCES.map(it => ({ ...it, help:TRIGGER_HELP[it.id] })),
+    onActive:(i)=>{ if (!i || !i.id) return; setTrigPreview(p => p && p.typeId===i.id ? p : { tid:replaceId||null, typeId:i.id, vals:{} }); },
     onPick:(i)=> commitTrigger(i.id, {}, replaceId),
   });
   // the trigger menus' shared footer
@@ -7834,7 +7894,7 @@ function App() {
     // dynamic MODULE SEARCH: typing a module name morphs the generic event rows + pre-fills the module slot.
     moduleMorph: smartTriggerSearch, searchPlaceholder:"Search a trigger — e.g. reply, priority, Incident",
     // hover / arrow → the trigger row previews the full sentence with its blanks (user 2026-11-17)
-    onActive:(i)=>{ if (!i || i.drill || !(i.typeId || i.id)) return; const typeId = i.typeId || i.id, vals = i.vals || (i.module ? { module:i.module } : {});
+    onActive:(i)=>{ if (!i || !(i.typeId || i.id)) return; const typeId = i.typeId || i.id, vals = i.vals || (i.module ? { module:i.module } : {});
       setTrigPreview(p => p && p.typeId===typeId && JSON.stringify(p.vals)===JSON.stringify(vals) ? p : { tid:replaceId||null, typeId, vals }); },
     selected: replaceId ? (triggers.find(t=>t.id===replaceId)||{}).typeId : undefined,
     onPick:(i)=>{
@@ -7873,6 +7933,9 @@ function App() {
   const changeTriggerType = (tid, anchor) => { setFocusKey(`trig:${tid}`); setOpenSlot(null); setPop(triggerMenuConfig(anchor, null, tid)); };
 
   const updateTrigger = (tid, key, val) => { if (key==="act") guidingRef.current = tid;   // a new activity → its variant is asked next
+    if (key==="module") { const t0 = triggers.find(t => t.id===tid);
+      if (t0 && t0.typeId==="activity" && t0.vals.act && !ACTIVITY.some(a => a.id===t0.vals.act && a.mods.includes(val))) {
+        guidingRef.current = tid; setTriggers(ts=>ts.map(t=>t.id===tid?{...t, vals:{...t.vals, module:val, act:undefined}}:t)); return; } }
     if (key==="what") { guidingRef.current = tid; const f = typeof val==="string" && val.startsWith("f:");   // V2: a field asks from / to next
       setTriggers(ts=>ts.map(t=>t.id===tid?{...t, vals:{ ...t.vals, what: f ? val.slice(2) : val, wk: f ? "f" : undefined, from:undefined, to:undefined }}:t)); return; }
     if (key==="act" && typeof val==="string" && val.includes("|")) { const [act, sub] = val.split("|");   // reply / task row = activity + its variant
@@ -7896,6 +7959,7 @@ function App() {
       const back = ()=>changeTriggerType(tid, el);
       if (next.options==="__date") return open(el, [], setter, "Pick a date", {inputType:"date", back});
       if (next.options==="__time") return open(el, [], setter, "Pick a time", {inputType:"time", back});
+      if (next.options==="__dom") return open(el, DOM_GRID_ITEMS(t.vals.dom), setter, "Day of the month", {back, noSearch:true});
       return open(el, next.options.map(o=>typeof o==="string"?{id:o,label:o}:o), setter, PLACEHOLDER[next.key]||next.key, { back });
     }
     // this trigger is complete — auto-open the "do this…" menu (normal guided build). During the TOUR the
@@ -8383,6 +8447,8 @@ function App() {
     const back = ()=>changeTriggerType(t.id, el);
     if (slot.options==="__date") return open(el, [], setter, "Pick a date", {inputType:"date", back});
     if (slot.options==="__time") return open(el, [], setter, "Pick a time", {inputType:"time", back});
+    // day of the month = an EVEN 7-column grid of equal boxes (user 2026-11-20), + a note for 29–31
+    if (slot.options==="__dom") return open(el, DOM_GRID_ITEMS(t.vals.dom), setter, "Day of the month", {back, noSearch:true});
     open(el, slot.options.map(o=>typeof o==="string"?{id:o,label:o}:o), setter, PLACEHOLDER[key]||key,
       {selected: key==="what" && t.vals.wk==="f" ? "f:"+t.vals.what : t.vals[key], back});
   };
@@ -11441,7 +11507,7 @@ function App() {
     // setFocusKey re-renders App, and App-scoped components remount their whole subtree — a mousedown-
     // triggered remount destroys the pressed element BETWEEN mousedown and mouseup, so the browser never
     // fires the click. With focus on click, the press completes first and the re-render follows.
-    <div ref={innerRef} className={"relative group" + (dnd && !dnd.locked ? " cursor-grab" : "")} onClick={onFocus} {...dragAttrs}
+    <div ref={innerRef} data-nf="st" className={"relative group" + (dnd && !dnd.locked ? " cursor-grab" : "")} onClick={onFocus} {...dragAttrs}
       onPointerDown={dnd && !dnd.locked ? (e)=>dnd.bodyDown(dnd.id, e) : undefined}
       style={{paddingLeft:padLeft, paddingRight:padRight, paddingTop:`${pt}px`, paddingBottom:`${pb}px`, ...(dnd&&dnd.dragging?{opacity:0.35}:{})}}>
       {/* drop indicator — sits INSIDE the opened gap: a rail-aligned node dot + a tapering accent bar, so the
@@ -11485,7 +11551,7 @@ function App() {
         <div className={"flex-1 min-w-0 text-[length:var(--fs-175)]" + (wideContent ? " flex items-start gap-1" : "")} style={{lineHeight:`${HEAD}px`, wordSpacing:"2px"}}>
           {head && <span className={"relative group/help inline-flex items-center align-top mr-2.5" + (wideContent ? " shrink-0" : "")} style={{height:`${HEAD}px`}}>
             <Badge color={headColor||"var(--faint)"} bg={headBg||"var(--panel2)"} className={"inline-flex items-center " + (help ? "cursor-help" : "")}>{head}</Badge>
-            {help && <div className="absolute z-30 left-0 top-full mt-2 w-72 p-3.5 rounded-xl opacity-0 pointer-events-none group-hover/help:opacity-100 transition-opacity"
+            {help && <div data-nf="st-helppop" className="absolute z-30 left-0 top-full mt-2 w-72 p-3.5 rounded-xl opacity-0 pointer-events-none group-hover/help:opacity-100 transition-opacity"
               style={{background:"var(--pop-bg)", border:"1px solid var(--border2)", boxShadow:"var(--shadow-sm)"}}>
               <HelpCard help={help} />
             </div>}
@@ -11545,6 +11611,8 @@ function App() {
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"/></svg>
           <span className="text-[length:var(--fs-105)] font-medium whitespace-nowrap">Add step</span>
         </button>}
+      {help && head && <div data-nf="st-helpflow" className="relative pointer-events-none" style={{ paddingTop:"10px", paddingBottom:"6px" }}>
+        <div className="w-72 p-3.5 rounded-xl" style={{background:"var(--pop-bg)", border:"1px solid var(--border2)", boxShadow:"var(--shadow-sm)"}}><HelpCard help={help} /></div></div>}
     </div>
     );
   };
@@ -12310,7 +12378,7 @@ function App() {
                 const toTxt = to.map(v=> typeof v==="string" ? v : valueDisplay(v, true)).join(", ");
                 const subjSrc = node.action==="send_sms" ? data.message : data.subject;
                 const subj = typeof subjSrc==="string" ? phPretty(subjSrc).trim() : "";
-                return (toTxt || subj) ? { to: toTxt || "…", subject: subj || "…" } : null; })() : null;
+                return (toTxt || subj) ? { to: toTxt || "not set", subject: subj || "not set", toMissing: !toTxt, subjMissing: !subj } : null; })() : null;   // user 2026-11-19: never a cut-off "…"
               // full hover tooltip: every field-change as a bullet (update/create), or the whole overview (spec forms).
               const cardTip = spec ? cardSummary : (cardChangesFull && cardChangesFull.length ? cardChangesFull.map(c=>"• "+c).join("\n") : null);
               // when not configured: ONE line, just the prompt (no subtext)
@@ -12339,10 +12407,10 @@ function App() {
                       {/* full value on hover when a line is cut off (user 2026-10-08) — themed, wrapping tooltip */}
                       <Tooltip wrap truncOnly label={"To: "+emailLines.to}>
                         <span className="block text-[length:var(--fs-13)] leading-tight truncate" style={{color:"var(--text)"}}>
-                          <span style={{color:"var(--muted)"}}>To: </span>{emailLines.to}</span></Tooltip>
+                          <span style={{color:"var(--muted)"}}>To: </span><span style={emailLines.toMissing ? {color:"var(--faint)", fontStyle:"italic"} : undefined}>{emailLines.to}</span></span></Tooltip>
                       <Tooltip wrap truncOnly label={(node.action==="send_sms"?"Message: ":"Subject: ")+emailLines.subject}>
                         <span className="block mt-1 text-[length:var(--fs-13)] leading-tight truncate" style={{color:"var(--text)"}}>
-                          <span style={{color:"var(--muted)"}}>{node.action==="send_sms"?"Message: ":"Subject: "}</span>{emailLines.subject}</span></Tooltip>
+                          <span style={{color:"var(--muted)"}}>{node.action==="send_sms"?"Message: ":"Subject: "}</span><span style={emailLines.subjMissing ? {color:"var(--faint)", fontStyle:"italic"} : undefined}>{emailLines.subject}</span></span></Tooltip>
                     </>) : (
                     /* configured summary: the full text on hover — always when the tip carries MORE than the line ("+N more"
                        field lists), otherwise only when the line is truncated */
@@ -13387,7 +13455,7 @@ function App() {
 
             {/* WHEN — multiple triggers, OR'd */}
             {!hasTrigger
-              ? <Station marker={MARK.trigger} isFirst head="When" headColor="var(--c-when)" headBg="var(--c-when-bg)" hoverBg="var(--c-when-h)" help={NODE_HELP.when} gapBottom={0}
+              ? <Station marker={MARK.trigger} isFirst head={trigPreview && !trigPreview.tid && openSlot==="Twhen" && isPeriodicType(trigPreview.typeId) ? "Runs" : "When"} headColor="var(--c-when)" headBg="var(--c-when-bg)" hoverBg="var(--c-when-h)" help={NODE_HELP.when} gapBottom={0}
                   innerRef={(el)=>setRowRef("T", el)}
                   onAddCond={(el)=>addAnotherTrigger(el)} addLabel="add trigger" addAccent="var(--c-when)" addActive={openSlot==="Tadd"}
                   focused={focusKey==="T"} onFocus={()=>setFocusKey("T")}>
@@ -13399,7 +13467,7 @@ function App() {
                   <Station key={t.id} marker={i===0 ? MARK.trigger : null} doubleRail dashRail={flow.length===0 && i===triggers.length-1} isFirst={i===0} dense={i>0}
                     gapBottom={i < triggers.length-1 ? 4 : 0}
                     bgLeft={i===0 ? "16px" : "34px"} bgRight="16px" padLeft={i===0 ? "34px" : "50px"} padRight="28px"
-                    head={i===0?"When":"Or"} headColor="var(--c-when)" headBg="var(--c-when-bg)" hoverBg="var(--c-when-h)" help={NODE_HELP.when}
+                    head={i>0 ? "Or" : isPeriodicType(trigPreview && trigPreview.tid===t.id ? trigPreview.typeId : t.typeId) ? "Runs" : "When"} headColor="var(--c-when)" headBg="var(--c-when-bg)" hoverBg="var(--c-when-h)" help={NODE_HELP.when}
                     innerRef={(el)=>setRowRef(`trig:${t.id}`, el)} removeLabel="Clear trigger" onHead={(el)=>changeTriggerType(t.id, el)}
                     dnd={triggers.length>1 ? trigDnd(t.id) : undefined}
                     onAddCond={i===0 ? (el)=>addAnotherTrigger(el) : undefined} addLabel="add trigger" addAccent="var(--c-when)" addActive={openSlot==="Tadd"}

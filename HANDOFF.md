@@ -1,82 +1,73 @@
-# Handoff — 2026-11-18 15:43
+# Handoff — 2026-11-20 14:14
 
 ## Read first
 
-In `CLAUDE.md`, read:
-- **"Detached steps"**: rewritten. It covers the two kinds of detach icon and the split-path rules (a split always sits right after the trigger).
-- **"Record-update triggers"**: covers the new Trigger 1 / Trigger 2 switch.
-- **"Loading skeletons"**: covers the loader switch, options 4–7.
+In `CLAUDE.md`, read under "Linear view":
+- **"Record-update triggers"**: activity now covers every module.
+- **"Periodic triggers read RUNS for…"**: new this session.
+- **"Help card"**: placement rules for the help card and popups.
 
-The work is in these files:
-- `linear/index.html`
-- `linear/node-skin.css` (sections 73–75)
-- `workflow-chrome.js` (the Trigger and Skeleton switches)
-- `workflow-canvas.html` + `workflow-skeleton.css` / `.js` (the loaders)
+All builder work is in `linear/index.html`.
 
 ## What we worked on this session
 
-- **Split-path and detach rules** in the Linear view, following the user's model.
-- **Trigger sentences** for record activity: researched in a claude.ai artifact, then built as two switchable designs.
-- **New loader options** for both views.
+- Triggers for all modules, researched on the internal demo server (address in the user's memory, not in this repo).
+- A set of claude.ai artifacts used as research and review pages for the manager.
+- The finalised periodic sentence, built into the Linear view.
 
 ## Completed
 
-- **Split paths:**
-  - A split is always the first node after the trigger.
-  - Once a flow has a split, the main path has no gaps; only "Add split path" remains.
-  - The demo's IF/Else flow is now Split path 1.
-  - Detaching or deleting a path's only step removes the path, and the others renumber.
-- **Reattach:**
-  - A split piece goes back only after the trigger, as new split path(s).
-  - Any piece reattached at the top of a split flow becomes a new split path ("As a new split path").
-  - A path that was detached from a Merge rejoins it.
-- **Detach icons:**
-  - Per-node and per-pill icons are back alongside the gap icons.
-  - The SPLIT PATH N pill detaches that path; the BRANCH N pill detaches that branch; the IF row detaches the whole IF/Else; the ELSE pill detaches its steps.
-  - The icon sits at least 8px from every marker.
-- **Detail panel:** the resizer outline is light blue, and the horizontal scrollbar hides while you hover or drag the resizer.
-- **Triggers:**
-  - **Trigger 1:** "When a [Request] gets [activity]". The popup rows are the exact words after "gets", including "a task removed". The record popup opens first.
-  - **Trigger 2:** one row, "When a record gets an update", covering both fields and activity.
-- **Loaders:** 4 · Run, 5 · Packet, 6 · Build and 7 · Ring, selectable from the Skeleton switch in both views.
-- **Testing:** all of the above was tested in the browser with Playwright, with 0 console errors.
+- **Activity trigger for all modules:** "When a [record] gets [activity]", 43 activities, each listed only for the records that have it. "One of its tasks deleted" replaced "a task removed". Searching a word that only one module has fills that module in.
+- **Six Linear-view fixes:**
+  - "an Incident" instead of "a Incident".
+  - The help card pushes the rows below it down instead of covering them.
+  - Popups open below or beside their blank, never over the steps above or the top bar.
+  - New Merge / Loop icons, and new trigger-menu icons for field changes, activity and archived.
+  - Send email's empty To / Subject read "not set".
+  - The detach icon has a gap from the marker.
+- **Periodic trigger:** "RUNS for [records] once on… / every day at… / every week on… / every month on day…". The records are asked first. Hovering Once, Every time period or a cadence previews the sentence. Day of the month is an even 1–31 grid plus "last day".
+- **Artifacts (claude.ai):**
+  - Periodic trigger sentences (Nq5n3xFomZRB6wzAJnqhXT). "Runs for" is final; 10 formats are in the Rejected tab. It has:
+    - the empty state, the trigger popup and hover previews;
+    - add / change / clear trigger;
+    - weekends / weekdays and "month (all)";
+    - the 29th–31st notes;
+    - field labels in every popup;
+    - "starting from" before the start date.
+  - Trigger attributes by module, activity variations, smart trigger search, and node fields vs. the Linear sentences.
 
 ## In progress
 
-Nothing mid-flight. Awaiting the user's choices (below).
+Nothing mid-flight. The question below is waiting on the user.
 
 ## Next steps
 
-- **Ask the user:**
-  - Which loader to keep, or what to improve in it. They want to improve the loader.
-  - Whether Trigger 1 or Trigger 2 becomes final; then remove the switch.
-- **Waiting on the manager:** where Approval Status, Signature Status and Escalation level go (fields or activity).
-- **Not tested:**
-  - Drag and drop of split pieces.
-  - Undo after a split reattach.
-  - Hover highlight on the pill icons.
-  - Trigger 1 search after the rewrite.
-  - Trigger 2 hover preview.
-- **Older open items:**
-  - Merge Timeout steps are dropped when a split unwraps.
-  - Dead-code cleanup.
-  - The real Get records caps.
+- **Waiting on the user:** should "When a record's field changes" become "changed" or "is changed"? Asked, not answered yet. If yes, change the menu row, the canvas template (`triggerView` "changed") and the artifact.
+- **Bring the rest of the periodic schedule into the builder:**
+  - months multi-select;
+  - interval;
+  - cron (in a card under the sentence);
+  - start date ("starting from");
+  - several weekdays, with the weekends / weekdays labels;
+  - the 29th–31st note per month.
+- **Decide** whether "for [records]" should drive the periodic Get step. Today it's display-only.
+- **Node-fields fixes** suggested from the artifact, waiting on the user:
+  - Merge business hours;
+  - Wait model and max wait;
+  - required rows for Create Problem / Change / Release / Task;
+  - Update action fields.
+- **Still open:**
+  - the loader choice;
+  - Trigger 1 vs Trigger 2;
+  - where Approval / Signature / escalation go (waiting on the manager).
 
 ## Decisions made
 
-- **A split is always right after the trigger;** new steps go into a new split path (user's model).
-- **Merge membership:**
-  - Split path 1 (the old pre-split steps) does not join Merge 1 (user: "fine as it is").
-  - A reattached path rejoins its Merge (user: yes).
-- **Two detach icons:**
-  - A gap icon detaches everything below it.
-  - A node or pill icon detaches only that thing.
-  - The BRANCH N pill takes the whole branch; the ELSE pill takes its steps only (user's answers).
-- **Activity sentence rules:** the record comes first, there's no colon, and no technical words. The user picked "gets …" and "a task removed".
+- **Periodic format:** the manager chose "Runs for". "Schedule · For" was rejected.
+- **Interval puts the time after the start date** ("starting from [date] at [time]"). The real product's Interval has one Start At date-time that sets the first run. Daily, Weekly and Monthly have a separate time of day.
+- **`prec` is its own key** for the periodic records, so it doesn't change which records the steps can use (`recordsInScope`).
 
 ## Gotchas & notes
 
-- **SVG motion paths:** Chrome ignored an `animateMotion` path that used only a `V` command; use `L`.
-- **Trigger 2 testing:** it can only be switched through the real top bar, because the Linear page listens to messages only when embedded. Test it via `/` → Linear, not `linear/index.html` directly.
-- **Field names are lowercase** in trigger sentences (`triggerFieldsFor` labels).
-- **Local server:** it gets killed when memory is low; restart it with `node server.js`.
+- The Popover's new `chips` + `grid` item type: any trigger slot whose `options` is a string sentinel (`__date`, `__time`, `__dom`) needs a branch in BOTH `pickTriggerSlot` and `advanceTrigger`. Missing it crashes with `next.options.map`.
+- The local server gets killed for low memory. Restart it with `! node server.js`.
