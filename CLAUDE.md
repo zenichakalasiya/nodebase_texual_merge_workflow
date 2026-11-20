@@ -640,16 +640,27 @@ Functional edits made inside V8 (all in `linear/index.html`):
     Trigger menu icons: `I.fieldEdit` / `I.activity` / `I.archive`.
 - **Periodic triggers read "RUNS for [records] …"** (user 2026-11-20, the
   manager's final "Runs for" format from the periodic claude.ai artifact).
-  `triggerView`: once / hourly / daily / weekly / monthly all start with
   `for {prec}` (`PERIODIC_RECS`, display-only — the periodic Get still
-  supplies the record), asked first. The pill reads **Runs** for a periodic
-  trigger and while one is previewed; hovering "Once", "Every time period"
-  (`__period` → "for {prec} {cadence}") and each cadence previews the
-  sentence. Day of the month (`__dom`, `DOM` = 1–31 + last day) opens an
-  even 7-column grid (`DOM_GRID_ITEMS`, the Popover's `chips` + `grid`
-  item, `data-nf="dom-grid"`) with a 29th–31st note. NOT yet in the
-  builder (only on the artifact): months, interval, cron, start date
-  ("starting from"), several weekdays, weekends / weekdays labels.
+  supplies the record) is asked first. **Once** = "for {prec} once on {date}
+  at {time}". **Every time period** is NOT a drill any more: it makes a
+  `__period` trigger whose `{sched}` blank (`SCHED_OPTS`: Daily / Weekly /
+  Monthly / Interval / Custom (cron); id = the sentence words) switches the
+  rest — "every day at {time}", "every week on {weekday} at {time}", "every
+  month on day {dom} at {time}", "every {iv} starting from {date} at {time}"
+  (interval's time = the first run, like the real product's one Start At),
+  "on a custom schedule {cron}". Changing it re-guides its blanks. Search
+  still finds Hourly/Daily/… (`PERIOD_FLAT`, Hourly = interval 1 hour). The
+  special blanks open through `openTrigBlank()` (used by both
+  `pickTriggerSlot` and `advanceTrigger` — add new sentinels there), with
+  field-named titles (`TRIG_TITLE`); interval reuses the Popover's
+  `duration` picker; day of the month = an even 7-column grid
+  (`DOM_GRID_ITEMS`, `data-nf="dom-grid"`). The pill reads **Runs** for a
+  periodic trigger and while one is previewed. Legacy hourly/daily/weekly/
+  monthly types still render. NOT yet in the builder (only on the artifact):
+  months, several weekdays, weekends/weekdays labels, start date on
+  daily/weekly/monthly, the cron generator link + card.
+- The field-change trigger reads **"When a record's field changed"** (was
+  "changes"), menu + canvas + search.
 - **Help card** (station "?" hover) sits IN the flow and pushes the rows
   below down (`data-nf="st-helpflow"`), never over them. Popups prefer
   below → beside (`placePos` `beside`) → above, never over the top bar.

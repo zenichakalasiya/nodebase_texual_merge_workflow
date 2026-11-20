@@ -282,7 +282,7 @@ const DOM_GRID_ITEMS = (sel) => [{ chips:DOM.map(d=>({id:d,label:d})), grid:true
   { header:"29th–31st: months without that date are skipped (Feb has a 29th only in leap years)." }];
 const PERIODIC_RECS = ["Requests","Incidents","Service Requests","Problems","Changes","Releases","Hardware Assets","Software Assets","CIs","Users","Tasks"];
 
-const PLACEHOLDER = { act:"new activity", what:"an update", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often", prec:"records",
+const PLACEHOLDER = { sched:"how often", iv:"how often", cron:"cron expression", act:"new activity", what:"an update", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often", prec:"records",
   weekday:"a weekday", dom:"a day", time:"a time", date:"a date" };
 
 const TRIGGER_TYPES = [
@@ -736,7 +736,7 @@ const USECASE_META = {
 const RECORD_EVENT_ITEMS = [
   { header:"Record events" },
   { id:"created", label:"When a record is created", icon:I.plus,   keywords:"create new add raise log open" },
-  { id:"changed", label:"When a record's field changes", icon:I.fieldEdit,  keywords:"update updated change changes modify edit field value" },
+  { id:"changed", label:"When a record's field changed", icon:I.fieldEdit,  keywords:"update updated change changes modify edit field value" },
   { id:"activity", label:"When a record gets new activity", icon:I.activity, keywords:"activity reply note collaboration diagnosis solution task merge spam convert summary" },
   { id:"archived", label:"When a record is archived", icon:I.archive, keywords:"archive delete remove retire close" },
 ];
@@ -752,8 +752,23 @@ const PERIOD_CADENCES = [
 // BROWSE = Record events + Time based(Once, Every time period ▸ drill). FLAT (search) expands the drill so typing
 // "daily"/"weekly" jumps straight to the cadence.
 const TRIGGER_MENU = [ ...RECORD_EVENT_ITEMS, { header:"Time based" }, TIME_ONCE,
-  { id:"__period", label:"Every time period", icon:I.repeat, drill:true, keywords:"periodic period schedule recurring repeat hourly daily weekly monthly every cron interval" } ];
-const TRIGGER_MENU_FLAT = [ ...RECORD_EVENT_ITEMS, { header:"Time based" }, TIME_ONCE, ...PERIOD_CADENCES ];
+  { id:"__period", label:"Every time period", icon:I.repeat, keywords:"periodic period schedule recurring repeat hourly daily weekly monthly every cron interval" } ];
+// the schedule blank's choices: the id is the sentence words, the label is the menu row (Daily → "every day")
+const SCHED_OPTS = [
+  { id:"every day",   label:"Daily" },
+  { id:"every week",  label:"Weekly" },
+  { id:"every month", label:"Monthly" },
+  { id:"every",       label:"Interval",      sub:"every N minutes / hours / days" },
+  { id:"on a custom schedule", label:"Custom (cron)", sub:"a cron expression" } ];
+// search still finds each schedule by name; picking one makes the same __period trigger, schedule pre-filled
+const PERIOD_FLAT = [
+  { id:"p:hourly",  typeId:"__period", vals:{ sched:"every", iv:"1 hour" }, label:"Hourly",  icon:I.repeat, keywords:"hourly every hour periodic schedule recurring repeat" },
+  { id:"p:daily",   typeId:"__period", vals:{ sched:"every day" },   label:"Daily",   icon:I.repeat, keywords:"daily every day periodic schedule recurring repeat" },
+  { id:"p:weekly",  typeId:"__period", vals:{ sched:"every week" },  label:"Weekly",  icon:I.repeat, keywords:"weekly every week periodic schedule recurring repeat monday" },
+  { id:"p:monthly", typeId:"__period", vals:{ sched:"every month" }, label:"Monthly", icon:I.repeat, keywords:"monthly every month periodic schedule recurring repeat" },
+  { id:"p:interval",typeId:"__period", vals:{ sched:"every" },       label:"Interval",icon:I.repeat, keywords:"interval every minutes hours days periodic repeat" },
+  { id:"p:cron",    typeId:"__period", vals:{ sched:"on a custom schedule" }, label:"Custom (cron)", icon:I.repeat, keywords:"cron custom expression schedule" } ];
+const TRIGGER_MENU_FLAT = [ ...RECORD_EVENT_ITEMS, { header:"Time based" }, TIME_ONCE, ...PERIOD_FLAT ];
 
 // ── Dynamic MODULE SEARCH in the trigger picker (2026-07-10) ────────────────────
 // The trigger picker is the MERGED model: you pick a generic EVENT ("When a record
@@ -767,7 +782,7 @@ const TRIGGER_MENU_FLAT = [ ...RECORD_EVENT_ITEMS, { header:"Time based" }, TIME
 // Service Request) an inline chooser fills the SLOT instead of multiplying rows.
 const TRIGGER_EVENTS = [
   { id:"created",  icon:I.plus,  tail:"is created",  verbs:["create","created","creates","new","add","added","raise","raised","log","logged","open","opened"] },
-  { id:"changed",  icon:I.fieldEdit, tail:"'s field changes", verbs:["update","updated","updates","change","changed","changes","modify","modified","edit","edited","field"] },
+  { id:"changed",  icon:I.fieldEdit, tail:"'s field changed", verbs:["update","updated","updates","change","changed","changes","modify","modified","edit","edited","field"] },
   { id:"activity", icon:I.activity, tail:" gets new activity", verbs:["activity"], get only(){ return ACT_MODULES; } },   // read later (ACT_MODULES is defined further down)
   { id:"archived", icon:I.archive, tail:"is archived", verbs:["archive","archived","archives","delete","deleted","remove","removed","retire","retired"] },
 ];
@@ -972,13 +987,13 @@ function smartTriggerSearch(raw) {
     const only1 = a.mods.length===1 ? a.mods[0] : null, vals = { act:a.id, ...(sub ? { sub } : {}), ...(mod ? { module:mod } : only1 ? { module:only1 } : {}) }, text = trigSentence("activity", vals);
     if (words.every(w => (a.kw + " " + text).toLowerCase().includes(w))) acts.push({ id:"s:act:"+a.id+":"+(sub||""), typeId:"activity", vals, icon:I.activity, help:TRIGGER_HELP.activity, label:text, labelNode:markWords(text, hl) }); }));
   const flds = triggerFieldsFor(mod || "Request").filter(f => words.every(w => (f.label + " " + f.id).toLowerCase().includes(w)))
-    .map(f => { const vals = { field:f.id, ...(mod ? { module:mod } : {}) }, text = "When " + (mod ? moduleArticle(mod)+" "+mod : "a record") + "'s " + f.label + " changes";
+    .map(f => { const vals = { field:f.id, ...(mod ? { module:mod } : {}) }, text = "When " + (mod ? moduleArticle(mod)+" "+mod : "a record") + "'s " + f.label + " changed";
       return { id:"s:fld:"+f.id, typeId:"changed", vals, icon:I.fieldEdit, help:TRIGGER_HELP.changed, label:text, labelNode:markWords(text, hl) }; });
   if (TRIG_V2) {   // one sentence: every hit is an "updated" trigger
     acts.forEach(r => { r.typeId = "updated"; r.vals = { what:r.vals.act, ...(r.vals.module ? { module:r.vals.module } : {}) }; r.label = trigSentence("updated", r.vals); r.labelNode = markWords(r.label, hl); r.help = TRIGGER_HELP.updated; });
     flds.forEach(r => { r.typeId = "updated"; r.vals = { what:r.vals.field, wk:"f", ...(r.vals.module ? { module:r.vals.module } : {}) }; r.label = trigSentence("updated", r.vals); r.labelNode = markWords(r.label, hl); r.help = TRIGGER_HELP.updated; }); }
   if (acts.length) rows.push({ header: TRIG_V2 ? "Activity" : "A record gets new activity" }, ...acts);
-  if (flds.length) rows.push({ header: TRIG_V2 ? "Fields" : "A record's field changes" }, ...flds);
+  if (flds.length) rows.push({ header: TRIG_V2 ? "Fields" : "A record's field changed" }, ...flds);
   if (!rows.length) return morph;
   if (morph) rows.push({ divider:true }, ...morph.rows);
   return { rows };
@@ -1020,11 +1035,11 @@ function triggerView(trigger) {
     const fld = fields.find(f=>f.id===v.field);
     if (fld && fld.input==="dropdown") {            // dropdown → offer the from→to value chain
       const vals = fld.values || [];
-      return { tpl:AM+"'s {field} changes from {from} to {to}",
+      return { tpl:AM+"'s {field} changed from {from} to {to}",
         slots:[{key:"module",options:TRIGGER_MODULES},{key:"field",options:fields},
                {key:"from",options:["any",...vals]},{key:"to",options:vals.filter(x=>x!==v.from)}] };
     }
-    return { tpl:AM+"'s {field} changes",      // text / date / number / etc. → just "changes" (user 2026-11-17: was "is updated")
+    return { tpl:AM+"'s {field} changed",      // text / date / number / etc. → just "changed" (user 2026-11-20; was "changes", before that "is updated")
       slots:[{key:"module",options:TRIGGER_MODULES},{key:"field",options:fields}] };
   }
   if (id==="activity") {   // user 2026-11-17 — Request only; the activity word and its variant are blanks
@@ -1048,7 +1063,14 @@ function triggerView(trigger) {
   if (id==="daily")   return { tpl:"for {prec} every day at {time}",                   slots:[PR,{key:"time",options:"__time"}] };
   if (id==="weekly")  return { tpl:"for {prec} every week on {weekday} at {time}",     slots:[PR,{key:"weekday",options:WEEKDAYS},{key:"time",options:"__time"}] };
   if (id==="monthly") return { tpl:"for {prec} every month on day {dom} at {time}",    slots:[PR,{key:"dom",options:"__dom"},{key:"time",options:"__time"}] };
-  if (id==="__period") return { tpl:"for {prec} {cadence}",                            slots:[PR,{key:"cadence",options:CADENCE}] };   // hover preview of "Every time period"
+  if (id==="__period") { const S = {key:"sched",options:SCHED_OPTS}, T = {key:"time",options:"__time"}, sc = v.sched;
+    if (sc==="every day")   return { tpl:"for {prec} {sched} at {time}",                 slots:[PR,S,T] };
+    if (sc==="every week")  return { tpl:"for {prec} {sched} on {weekday} at {time}",    slots:[PR,S,{key:"weekday",options:WEEKDAYS},T] };
+    if (sc==="every month") return { tpl:"for {prec} {sched} on day {dom} at {time}",    slots:[PR,S,{key:"dom",options:"__dom"},T] };
+    // interval has no time of day — its time is when the FIRST run happens (= the real product's one Start At)
+    if (sc==="every")       return { tpl:"for {prec} {sched} {iv} starting from {date} at {time}", slots:[PR,S,{key:"iv",options:"__iv"},{key:"date",options:"__date"},T] };
+    if (sc==="on a custom schedule") return { tpl:"for {prec} {sched} {cron}",           slots:[PR,S,{key:"cron",options:"__cron"}] };
+    return { tpl:"for {prec} {sched}", slots:[PR,S] }; }
   // LEGACY (no longer creatable from the menu, kept so old seeded docs still render): date_reached + periodically
   if (id==="date_reached") return { tpl:"{date} is reached", slots:[{key:"date",options:"__date"}] };
   // periodically — chain depends on the cadence
@@ -3228,11 +3250,11 @@ const ACTION_HELP = {
 const TRIG_HELP = (title, body, eg) => ({ title, color:"var(--c-when)", bg:"var(--c-when-bg)", graphic:G.trigger, body, eg });
 const TRIGGER_HELP = {
   created:      TRIG_HELP("Record created", "Runs the moment a new record of the chosen type is created.", "Like — a new Incident is logged, or a Service Request is raised."),
-  changed:      TRIG_HELP("A record's field changes", "Runs when a field of the record changes — optionally only when it moves from one value to another.", "Like — status goes from Open to Resolved."),
+  changed:      TRIG_HELP("A record's field changed", "Runs when a field of the record changes — optionally only when it moves from one value to another.", "Like — status goes from Open to Resolved."),
   activity:     TRIG_HELP("A record gets new activity", "Runs when something is added or done on a record — a reply, a note, a task, a plan, a sign-in…", "Like — an Incident gets a reply from the requester."),
   updated:      TRIG_HELP("A record gets an update", "Runs when a field of the record changes, or when something is added or done on it — a reply, a note, a task, spam…", "Like — a Request gets its Priority changed to High, or gets a new note."),
   archived:     TRIG_HELP("Record archived", "Runs when a record is archived (soft-deleted / moved out of active use).", "Like — an old asset is retired."),
-  __period:TRIG_HELP("Every time period", "Runs on a repeating schedule — pick hourly, daily, weekly, or monthly.", "Like — every Monday at 9am."),
+  __period:TRIG_HELP("Every time period", "Runs on a repeating schedule — daily, weekly, monthly, every N minutes / hours / days, or a custom (cron) schedule.", "Like — every Monday at 9am."),
   once:    TRIG_HELP("Once", "Runs one time, at a specific date and time.", "Like — a one-off cleanup on the 31st at 9am."),
   hourly:  TRIG_HELP("Hourly", "Runs every hour, around the clock.", "Like — re-check open tickets each hour."),
   daily:   TRIG_HELP("Daily", "Runs once a day, at a time you set.", "Like — every day at 9am."),
@@ -7885,7 +7907,7 @@ function App() {
     // is creating the FIRST trigger → full menu, periodic allowed.
     const restrict = (back && triggers.length>0) || (replaceId && triggers.length>1);
     const withHelp = (arr) => (restrict ? arr.filter(it => it.id ? !isPeriodicType(it.id) : it.header!=="Time based") : arr)
-      .map(it => it.id ? { ...it, help:TRIGGER_HELP[it.id] } : it);
+      .map(it => it.id ? { ...it, help:TRIGGER_HELP[it.id] || TRIGGER_HELP[(it.id||"").replace(/^p:/,"")] || TRIGGER_HELP[it.typeId] } : it);
     return {
     anchor,
     items: withHelp(trigMenuFor(TRIGGER_MENU)),
@@ -7919,7 +7941,7 @@ function App() {
     return {
       anchor, wide:true, title:"Add trigger", back:()=>close(), source:{ label:"Record", value:mod },
       searchPlaceholder:`Search a field — e.g. ${eg}`,
-      items:[ { header:"A field changes" }, ...fields.map(f => used.has(f.id) ? { id:f.id, label:f.label, disabled:true, hint:"Already a trigger" } : { id:f.id, label:f.label }) ],
+      items:[ { header:"A field changed" }, ...fields.map(f => used.has(f.id) ? { id:f.id, label:f.label, disabled:true, hint:"Already a trigger" } : { id:f.id, label:f.label }) ],
       onPick:(i)=>{ commitTrigger("changed", { module:mod, field:i.id }); },
       footer: GEN_AI_FOOTER,
     };
@@ -7932,7 +7954,7 @@ function App() {
   // re-open the picker on an EXISTING trigger to swap its type in place (keeps the row; resets its slots, then re-advances)
   const changeTriggerType = (tid, anchor) => { setFocusKey(`trig:${tid}`); setOpenSlot(null); setPop(triggerMenuConfig(anchor, null, tid)); };
 
-  const updateTrigger = (tid, key, val) => { if (key==="act") guidingRef.current = tid;   // a new activity → its variant is asked next
+  const updateTrigger = (tid, key, val) => { if (key==="act" || key==="sched") guidingRef.current = tid;   // a new schedule → its own blanks are asked next   // a new activity → its variant is asked next
     if (key==="module") { const t0 = triggers.find(t => t.id===tid);
       if (t0 && t0.typeId==="activity" && t0.vals.act && !ACTIVITY.some(a => a.id===t0.vals.act && a.mods.includes(val))) {
         guidingRef.current = tid; setTriggers(ts=>ts.map(t=>t.id===tid?{...t, vals:{...t.vals, module:val, act:undefined}}:t)); return; } }
@@ -7945,6 +7967,20 @@ function App() {
 
   // Guided chain: open the next empty slot of trigger `tid`; when all are filled, open the action menu.
   // Each pick just sets the value — the [triggers] effect re-runs this, so it works for mouse AND keyboard.
+  const TRIG_TITLE = { prec:"Records", sched:"Schedule", weekday:"Day", dom:"Day of the month", time:"Time", date:"Start date", iv:"Interval", cron:"Cron expression" };
+  const trigTitle = (t, key) => t.typeId==="once" && key==="date" ? "Run date" : t.typeId==="__period" && t.vals.sched==="every" && key==="time" ? "Start time" : (isPeriodicType(t.typeId) && TRIG_TITLE[key]) || null;
+  const openTrigBlank = (el, t, slot, setter, back) => {
+    const title = trigTitle(t, slot.key);
+    if (slot.options==="__date") return open(el, [], setter, title || "Pick a date", {inputType:"date", back});
+    if (slot.options==="__time") return open(el, [], setter, title || "Pick a time", {inputType:"time", back});
+    if (slot.options==="__dom")  return open(el, DOM_GRID_ITEMS(t.vals.dom), setter, title, {back, noSearch:true});
+    if (slot.options==="__iv") { const m = String(t.vals.iv||"").match(/^(\d+) (\w+?)s?$/);
+      return open(el, [], (i)=>{ const n = i.id.amount, u = i.id.unit; updateTrigger(t.id, "iv", n + " " + (n===1 ? u.replace(/s$/,"") : u)); }, title,
+        { back, duration:{ title:"Interval · repeat every", units:["minutes","hours","days"], unit: m ? m[2]+"s" : "minutes", amount: m ? +m[1] : null } }); }
+    if (slot.options==="__cron") return open(el, [], setter, title, {inputType:"text", back});
+    return open(el, slot.options.map(o=>typeof o==="string"?{id:o,label:o}:o), setter, title || PLACEHOLDER[slot.key] || slot.key,
+      {selected: slot.key==="what" && t.vals.wk==="f" ? "f:"+t.vals.what : t.vals[slot.key], back});
+  };
   const advanceTrigger = (tid) => {
     const t = triggers.find(x=>x.id===tid);
     if (!t) { guidingRef.current = null; return; }
@@ -7957,10 +7993,7 @@ function App() {
       // EVERY auto-advanced trigger slot backs to the trigger-TYPE menu ("oops, wrong trigger" at any
       // point of the guided chain — record, cadence, weekday, time, date, all of them)
       const back = ()=>changeTriggerType(tid, el);
-      if (next.options==="__date") return open(el, [], setter, "Pick a date", {inputType:"date", back});
-      if (next.options==="__time") return open(el, [], setter, "Pick a time", {inputType:"time", back});
-      if (next.options==="__dom") return open(el, DOM_GRID_ITEMS(t.vals.dom), setter, "Day of the month", {back, noSearch:true});
-      return open(el, next.options.map(o=>typeof o==="string"?{id:o,label:o}:o), setter, PLACEHOLDER[next.key]||next.key, { back });
+      return openTrigBlank(el, t, next, setter, back);
     }
     // this trigger is complete — auto-open the "do this…" menu (normal guided build). During the TOUR the
     // tour's advance effect opens it instead (sequenced AFTER the step advances to condition), so we skip the
@@ -8445,12 +8478,7 @@ function App() {
     // go back to the origin" — record, cadence, weekday, time, field, from/to, date… all of them).
     // Same replace-in-place menu as the ⟳ header button, which stays too.
     const back = ()=>changeTriggerType(t.id, el);
-    if (slot.options==="__date") return open(el, [], setter, "Pick a date", {inputType:"date", back});
-    if (slot.options==="__time") return open(el, [], setter, "Pick a time", {inputType:"time", back});
-    // day of the month = an EVEN 7-column grid of equal boxes (user 2026-11-20), + a note for 29–31
-    if (slot.options==="__dom") return open(el, DOM_GRID_ITEMS(t.vals.dom), setter, "Day of the month", {back, noSearch:true});
-    open(el, slot.options.map(o=>typeof o==="string"?{id:o,label:o}:o), setter, PLACEHOLDER[key]||key,
-      {selected: key==="what" && t.vals.wk==="f" ? "f:"+t.vals.what : t.vals[key], back});
+    openTrigBlank(el, t, slot, setter, back);   // day of the month = an even 7-column grid (user 2026-11-20)
   };
 
   // INVARIANT: adjacent inline conditions are always ONE group. After a structural removal,

@@ -38,15 +38,14 @@ All builder work is in `linear/index.html`.
 
 ## In progress
 
-Nothing mid-flight. The question below is waiting on the user.
+Nothing mid-flight.
 
 ## Next steps
 
-- **Waiting on the user:** should "When a record's field changes" become "changed" or "is changed"? Asked, not answered yet. If yes, change the menu row, the canvas template (`triggerView` "changed") and the artifact.
+- Done: the field trigger now reads "When a record's field changed"; "Every time period" asks Records → Schedule (Daily / Weekly / Monthly / Interval / Custom cron), like the artifact.
 - **Bring the rest of the periodic schedule into the builder:**
   - months multi-select;
-  - interval;
-  - cron (in a card under the sentence);
+  - the cron generator link + card under the sentence;
   - start date ("starting from");
   - several weekdays, with the weekends / weekdays labels;
   - the 29th–31st note per month.
