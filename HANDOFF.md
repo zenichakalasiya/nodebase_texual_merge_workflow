@@ -1,40 +1,51 @@
-# Handoff — 2026-11-20 14:14
+# Handoff — 2026-11-20 17:47
 
 ## Read first
 
 In `CLAUDE.md`, read under "Linear view":
-- **"Record-update triggers"**: activity now covers every module.
-- **"Periodic triggers read RUNS for…"**: new this session.
-- **"Help card"**: placement rules for the help card and popups.
+- **"Periodic triggers read RUNS for…"**: the full periodic schedule now matches the claude.ai artifact.
+- **"Detached steps"**: rewritten. It covers the two Detach versions, the rail-only icons and the new Merge rule.
+- **"Design switches"**: the defaults.
 
-All builder work is in `linear/index.html`.
+All builder work is in:
+- `linear/index.html`
+- `linear/node-skin.css` (new section 76)
+- `workflow-chrome.js` (the new Detach switch)
 
 ## What we worked on this session
 
-- Triggers for all modules, researched on the internal demo server (address in the user's memory, not in this repo).
-- A set of claude.ai artifacts used as research and review pages for the manager.
-- The finalised periodic sentence, built into the Linear view.
+- Brought the periodic trigger into the Linear builder, the same as the manager-approved artifact.
+- Reworked detaching to follow the real product's "delete a connection" model.
 
 ## Completed
 
-- **Activity trigger for all modules:** "When a [record] gets [activity]", 43 activities, each listed only for the records that have it. "One of its tasks deleted" replaced "a task removed". Searching a word that only one module has fills that module in.
-- **Six Linear-view fixes:**
-  - "an Incident" instead of "a Incident".
-  - The help card pushes the rows below it down instead of covering them.
-  - Popups open below or beside their blank, never over the steps above or the top bar.
-  - New Merge / Loop icons, and new trigger-menu icons for field changes, activity and archived.
-  - Send email's empty To / Subject read "not set".
-  - The detach icon has a gap from the marker.
-- **Periodic trigger:** "RUNS for [records] once on… / every day at… / every week on… / every month on day…". The records are asked first. Hovering Once, Every time period or a cadence previews the sentence. Day of the month is an even 1–31 grid plus "last day".
-- **Artifacts (claude.ai):**
-  - Periodic trigger sentences (Nq5n3xFomZRB6wzAJnqhXT). "Runs for" is final; 10 formats are in the Rejected tab. It has:
-    - the empty state, the trigger popup and hover previews;
-    - add / change / clear trigger;
-    - weekends / weekdays and "month (all)";
-    - the 29th–31st notes;
-    - field labels in every popup;
-    - "starting from" before the start date.
-  - Trigger attributes by module, activity variations, smart trigger search, and node fields vs. the Linear sentences.
+**Periodic trigger:**
+- "RUNS for [records] …". Once → date and time. Every time period → Schedule list (Daily / Weekly / Monthly / Interval / Custom (cron)).
+- Several weekdays, with the weekdays / weekends labels and "+N" with a hover list.
+- Months picker, with "month (all)" when all 12 are picked.
+- Day of the month: A date (even grid) or A weekday ("the last Friday").
+- "starting from [date]" on every repeating schedule.
+- The 29th–31st note, shown under the sentence and in the popup.
+- Cron in a card under the sentence, with a plain reading and the crontab.guru link.
+- Field labels with * in every popup.
+- The trigger sentence never wraps.
+- Popups follow their blank when the page scrolls.
+
+**Triggers:**
+- "When a record's field changed" (was "changes").
+- Trigger 1 and Skeleton 2 stay the defaults.
+
+**Detach:**
+- New top bar switch.
+  - **Detach 2 · Container only** is the default: no icons in the flow, plus 3 sample pieces "from Node view".
+  - **Detach 1 · On rails** is kept for reference. Icons sit only on connectors: the gaps next to Add step, and each split path's horizontal connector.
+- No per-step / IF / Branch / Else icons. A single branch can't be detached on its own.
+- A split path always takes the Merge it feeds. The other paths that fed it stay, unjoined.
+- Hovering a split path's icon highlights the path, its "Go to this merge" card and the Merge.
+
+**Research:** in the real product's node builder, deleting a connector only removes the line. The node and everything after it stay in place, unconnected. The disconnected node's "Select Source Node" is cleared and turns red as required. Drag from an output to an input reconnects.
+
+**Periodic artifact (claude.ai):** final "Runs for", the empty state, the trigger popup with hover previews, add / change / clear trigger, field labels, and "starting from".
 
 ## In progress
 
@@ -42,15 +53,10 @@ Nothing mid-flight.
 
 ## Next steps
 
-- Done: the field trigger now reads "When a record's field changed"; "Every time period" asks Records → Schedule (Daily / Weekly / Monthly / Interval / Custom cron), like the artifact.
-- **Bring the rest of the periodic schedule into the builder:**
-  - months multi-select;
-  - the cron generator link + card under the sentence;
-  - start date ("starting from");
-  - several weekdays, with the weekends / weekdays labels;
-  - the 29th–31st note per month.
-- **Decide** whether "for [records]" should drive the periodic Get step. Today it's display-only.
-- **Node-fields fixes** suggested from the artifact, waiting on the user:
+- **Optional:** in Linear, flag a reattached piece's first record blank as "needs picking again", matching the real product clearing the source. Offered, not answered.
+- **Node view:** connector delete still removes the steps instead of disconnecting them. The user said to ignore the Node view for now. Step 2 of the plan (disconnect, keep in place, send pieces to the Linear container) is deferred.
+- **Reattaching a split piece that carries its own Merge:** not checked visually.
+- **Node-fields fixes** from the earlier artifact, still waiting on the user:
   - Merge business hours;
   - Wait model and max wait;
   - required rows for Create Problem / Change / Release / Task;
@@ -62,11 +68,16 @@ Nothing mid-flight.
 
 ## Decisions made
 
-- **Periodic format:** the manager chose "Runs for". "Schedule · For" was rejected.
-- **Interval puts the time after the start date** ("starting from [date] at [time]"). The real product's Interval has one Start At date-time that sets the first run. Daily, Weekly and Monthly have a separate time of day.
-- **`prec` is its own key** for the periodic records, so it doesn't change which records the steps can use (`recordsInScope`).
+- **Detaching = removing a connection.** In Linear the piece goes to the container. In the Node view it would stay on the canvas.
+- **Detach 2 (container only) is the default.** Linear has no detach icons because detaching belongs to the Node view.
+- **One branch of a Branching can never be detached;** the Branching goes whole.
+- **A split path takes its Merge** even when other paths feed it ("Path + Merge only").
+- **The two views keep separate workflows.** The Node → Linear link was deferred.
+- **The trigger row never wraps,** even past 900px (the user's choice over widening the canvas).
 
 ## Gotchas & notes
 
-- The Popover's new `chips` + `grid` item type: any trigger slot whose `options` is a string sentinel (`__date`, `__time`, `__dom`) needs a branch in BOTH `pickTriggerSlot` and `advanceTrigger`. Missing it crashes with `next.options.map`.
-- The local server gets killed for low memory. Restart it with `! node server.js`.
+- **Trigger popup anchoring:** popups opened through `openTrigBlank` use `anchorKey` (`data-anchor` on the blank). If you open one with a raw element, it freezes on scroll, because the sentence re-renders.
+- **New sentinels:** a new trigger blank sentinel must be handled in `openTrigBlank` only. Both `pickTriggerSlot` and `advanceTrigger` call it.
+- **Shell quoting:** heredoc and `node -e` patches with backticks or `$` get mangled by bash. Write the patch to a file first.
+- **Server:** it gets killed for low memory. Restart it with `! node server.js`.

@@ -638,27 +638,40 @@ Functional edits made inside V8 (all in `linear/index.html`):
     artifact (record first, no colon, no technical words — the user's rules).
   - Record sentences use the right article ("an Incident", `moduleArticle`).
     Trigger menu icons: `I.fieldEdit` / `I.activity` / `I.archive`.
-- **Periodic triggers read "RUNS for [records] …"** (user 2026-11-20, the
-  manager's final "Runs for" format from the periodic claude.ai artifact).
-  `for {prec}` (`PERIODIC_RECS`, display-only — the periodic Get still
-  supplies the record) is asked first. **Once** = "for {prec} once on {date}
-  at {time}". **Every time period** is NOT a drill any more: it makes a
-  `__period` trigger whose `{sched}` blank (`SCHED_OPTS`: Daily / Weekly /
-  Monthly / Interval / Custom (cron); id = the sentence words) switches the
-  rest — "every day at {time}", "every week on {weekday} at {time}", "every
-  month on day {dom} at {time}", "every {iv} starting from {date} at {time}"
-  (interval's time = the first run, like the real product's one Start At),
-  "on a custom schedule {cron}". Changing it re-guides its blanks. Search
-  still finds Hourly/Daily/… (`PERIOD_FLAT`, Hourly = interval 1 hour). The
-  special blanks open through `openTrigBlank()` (used by both
-  `pickTriggerSlot` and `advanceTrigger` — add new sentinels there), with
-  field-named titles (`TRIG_TITLE`); interval reuses the Popover's
-  `duration` picker; day of the month = an even 7-column grid
-  (`DOM_GRID_ITEMS`, `data-nf="dom-grid"`). The pill reads **Runs** for a
-  periodic trigger and while one is previewed. Legacy hourly/daily/weekly/
-  monthly types still render. NOT yet in the builder (only on the artifact):
-  months, several weekdays, weekends/weekdays labels, start date on
-  daily/weekly/monthly, the cron generator link + card.
+- **Periodic triggers read "RUNS for [records] …"** (user 2026-11-20 — the
+  manager's final "Runs for" format; the periodic claude.ai artifact is the
+  spec and the builder now matches it). `for {prec}` (`PERIODIC_RECS`,
+  display-only — the periodic Get still supplies the record) is asked first.
+  **Once** = "for {prec} once on {date} at {time}". **Every time period** is
+  not a drill: it makes a `__period` trigger whose `{sched}` blank
+  (`SCHED_OPTS`: Daily / Weekly / Monthly / Interval / Custom (cron); id =
+  the sentence words) switches the rest and re-guides its blanks:
+  - daily "every day at {time} starting from {date}";
+  - weekly "every week on {days} at {time} starting from {date}" — `days` is
+    a multi-select (Select all + Apply); `daysText()` shows weekdays /
+    weekends / every day, else 3 short names + "+N" with an instant
+    `data-tip` (Slot `tip`, Template `tips`);
+  - monthly "every {months} on {dom} at {time} starting from {date}" —
+    months multi-select (all 12 = "month (all)"); day of the month =
+    "Run on: A date | A weekday" (even 7-col grid 1–31 + last day, or
+    Occurrence + Weekday → "the last Friday"; `domItems()`, Popover chip
+    items with `grid`/`cols`/`label`); 29th–31st → `skipNote()` in red under
+    the sentence (`data-nf="trig-note"`) and in the popup;
+  - interval "every {iv} starting from {date} at {time}" (its time = the
+    first run, like the real product's one Start At; Popover `duration`);
+  - cron "on a custom schedule" + a white card under it (`data-nf=
+    "cron-card"`, `cronPlain()`); the popup has a live reading + the
+    crontab.guru link (Popover `below:"cron"`).
+  Display text for blanks comes from `triggerView(t).disp` via `trigVals()`.
+  Every special blank opens through `openTrigBlank()` (both
+  `pickTriggerSlot` and `advanceTrigger` — add new sentinels there) with
+  `anchorKey` `trig:{id}:{key}` (`Template anchorPrefix`), so popups follow
+  their blank on scroll; titles carry * (`TRIG_TITLE`). Search still finds
+  Hourly/Daily/… (`PERIOD_FLAT`, Hourly = interval 1 hour). The pill reads
+  **Runs** for a periodic trigger and while one is previewed. The trigger
+  row never wraps (`Station oneLine`, skin 76) — it grows past 900px.
+  Legacy hourly/daily/weekly/monthly types still render. Dates/times show
+  raw (2026-11-27, 15:04).
 - The field-change trigger reads **"When a record's field changed"** (was
   "changes"), menu + canvas + search.
 - **Help card** (station "?" hover) sits IN the flow and pushes the rows
@@ -677,31 +690,48 @@ Reference docs in the repo root (generated this project):
 - `OPERATORS.md`: Linear vs the real product's operators, side by side.
 - `CONDITION-FIELDS.md`: every condition key · operator · value, by record type.
 
-**Detached steps (Linear view, skin sections 47–75).** Two kinds of icon,
-both live (2026-11-18): a **gap icon** on the connector between two steps
-(InsertZone, `[data-iz=key] [data-nf=dt-trash]`) detaches the next step **and
-everything after it to the end of that path** (`detachAt` → `dtFlyOut` →
-`detachAtNow`; hover highlights the run from the icon's own point down, skin
-72); a **node / pill icon** beside a marker (`DT_ON_NODE = true`, `dtCtl`,
-21px left of the marker, grip 53px) detaches only that thing: a step → that
-step; IF row → whole IF / Else; BRANCH 1 row → whole Branching; **SPLIT PATH
-N pill → that whole path** (others renumber); **BRANCH N pill (2+) → that
-whole branch** (`detachBranchLane`, comes back as a one-branch Branching);
-ELSE / Otherwise / Merge success-timeout pills → their steps only. Merge rows
-have no icon. The lift-off copy flies only the visible part (`dtFlyOut`).
+**Detached steps (Linear view, skin sections 47–76).** Detaching = removing
+the CONNECTION between two nodes (the real product's node builder: hovering a
+connector shows + and delete; delete only removes the line, the node and
+everything after it stay together, unconnected). In Linear the piece goes to
+the stacked container on the right instead of staying on the canvas.
+**Two versions, top bar "Detach" switch** (`#dtRailSel`, message
+`wf:'dtrail'`, state `dtRail`; user 2026-11-20):
+- **Detach 2 · Container only** (DEFAULT): no detach icons anywhere in the
+  Linear flow — detaching happens in the Node view (delete a connection). The
+  container works exactly as before. `EMBED_DEMO_DOC.detached` seeds 3 SAMPLE
+  pieces "from Node view" (`nd_1..3`: Send Email · IF/Else · Wait + HTTP) so
+  it can be reviewed; the real Node → Linear link is NOT built (the views
+  hold separate workflows; deferred by the user).
+- **Detach 1 · On rails** (kept for reference): icons ONLY on connector
+  rails, never on single steps, IF rows or Branch / Else pills. A **gap
+  icon** (InsertZone, `[data-iz=key] [data-nf=dt-trash]`, next to Add step)
+  detaches the next step and **everything after it to the end of that
+  path** (`detachAt` → `dtFlyOut` → `detachAtNow`; hover highlights the run
+  from the icon down, skin 72). So: the gap before an IF / Else or a
+  Branching takes it whole; the first gap inside IF / Else / each Branch /
+  Otherwise / Merge success-timeout / Loop takes that next flow. One branch
+  of a Branching can never be detached on its own. A **split path** detaches
+  from its own horizontal connector (`dtCtl` returns an icon only for split
+  lanes, 21px left of the pill marker); the gap just under the pill has no
+  icon (`dtSplitTop` — same connection). The lift-off copy flies only the
+  visible part (`dtFlyOut`).
 **Split paths** (user rules): a split is ALWAYS the first node, straight out
 of the trigger — nothing sits above it (`EMBED_DEMO_DOC`'s assign + IF/Else
 is Split path 1). Once the flow is a split (+ its Merges) the main path has no
 gaps and only **"Add split path"** at the bottom (`splitRoot` / `topIsSplit`).
 All path removal goes through `splitTakePath(f, sp, pi, mkId)`: the others
-renumber, the path leaves its Merge's `feeders`, 2 → 1 paths unwraps the
-split; an emptied split path (its only step deleted or detached) is removed
-the same way (`pruneEmptyLanes`). A path's own Merge (fed only by it) goes
-with it into the piece. **Reattach** of a split piece (`isSplitPiece`) — or
-of ANY piece at the top of a split-rooted flow — only goes right after the
-trigger, as new split path(s) (`splitAttach`; list row "As a new split
-path"); a plain flow there is wrapped into Split path 1. A detached split
-path remembers its Merge (`piece.rejoin`) and rejoins it (`splitRejoin`).
+renumber, 2 → 1 paths unwraps the split; an emptied split path (its only step
+deleted or detached) is removed the same way (`pruneEmptyLanes`). **The Merge
+a path feeds ALWAYS goes with it** (with its Success / Timeout steps — user
+2026-11-20; was "only when it was the last feeder"); the other paths that fed
+it stay, no longer joined (their `feeds` cleared). Hovering the path's icon
+lights the path, its "Go to this merge" card (`mCut`, that path only) and
+the Merge row. **Reattach** of a split piece (`isSplitPiece`) — or of ANY
+piece at the top of a split-rooted flow — only goes right after the trigger,
+as new split path(s) (`splitAttach`; list row "As a new split path"); a plain
+flow there is wrapped into Split path 1. `piece.rejoin` / `splitRejoin` now
+only matter for pieces without their Merge.
 Hover state must stay referentially stable (same target → same object) or the
 remounting row loops. Pieces live in
 `doc.detached`, so undo/redo covers them. They never run and are never folded
@@ -786,7 +816,7 @@ sets `skel-v4` + `ld4…ld7`; each loader is an `.ldo.ldoN` svg in both views.
 Picking one holds it on screen. Designs 1 and 3 still exist but aren't
 listed. All grey except blue. No loading text (screen-reader label only).
 
-**Design switches:** Skeleton / loader and Trigger (above) are live review switches. Version 2 (2026-11-12) finalised **Text field
+**Design switches:** Skeleton / loader, Trigger and Detach (above) are live review switches; defaults Skeleton 2 · Step by step, Trigger 1 · Two triggers, Detach 2 · Container only. Version 2 (2026-11-12) finalised **Text field
 B** (Editor in popup) and **Detach 1 · Panel** — their switches were removed;
 the top bar sends `textver:'B'` / `dtver:'1'` on frame ready, which are also
 the Linear view's own defaults. The **Popup** switch is hidden (V1 always).

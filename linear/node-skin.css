@@ -1665,3 +1665,11 @@ html.embed [data-nf="trig-prev"]{ opacity:.55; pointer-events:none; display:inli
 /* 75. Resizer hover (user 2026-11-18): the detail card's horizontal scrollbar hides while the resizer is hovered or dragged.
    Made transparent (not removed) so its space stays and nothing below jumps. */
 html.embed [data-nf="dt-nc"][data-detail]:has(.dt-rsz:hover) .dt-flowbox, html.embed [data-nf="dt-nc"][data-detail][data-rsz] .dt-flowbox{ scrollbar-color:transparent transparent; }
+
+/* 76. Trigger sentence never wraps (user 2026-11-20): the trigger row stays ONE line and grows wider than the
+   900px canvas column when it has to (it may run past the right edge on small screens). Notes / the cron card
+   under it still sit on their own lines. */
+html.embed [data-nf="st"][data-oneline]{ width:max-content; min-width:100%; }
+html.embed [data-nf="st"][data-oneline] .slot,
+html.embed [data-nf="st"][data-oneline] .flex-1.min-w-0 > span{ white-space:nowrap; }
+html.embed [data-nf="st"][data-oneline] [data-nf="trig-note"]{ white-space:normal; }

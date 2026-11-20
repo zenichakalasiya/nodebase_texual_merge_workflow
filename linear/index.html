@@ -280,9 +280,39 @@ const DOM       = Array.from({length:31},(_,i)=>String(i+1)).concat(["last day"]
 // periodic "Runs for {prec}" — the records a scheduled workflow runs for (user 2026-11-20)
 const DOM_GRID_ITEMS = (sel) => [{ chips:DOM.map(d=>({id:d,label:d})), grid:true, sel },
   { header:"29th–31st: months without that date are skipped (Feb has a 29th only in leap years)." }];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTH_DAYS = [31,29,31,30,31,30,31,31,30,31,30,31];
+const ordN = (n) => n + ((n%100>=11 && n%100<=13) ? "th" : ({1:"st",2:"nd",3:"rd"})[n%10] || "th");
+// several weekdays → "weekdays" (Mon–Fri) · "weekends" (Sat+Sun) · "every day" (all 7) · else 3 short names + "+N"
+const daysText = (days) => { if (!days || !days.length) return null; const has = (d)=>days.includes(d);
+  if (days.length===7) return "every day";
+  if (days.length===5 && !has("Saturday") && !has("Sunday")) return "weekdays";
+  if (days.length===2 && has("Saturday") && has("Sunday")) return "weekends";
+  const o = WEEKDAYS.filter(has).map(d=>d.slice(0,3)); return o.length<=3 ? o.join(", ") : o.slice(0,3).join(", ")+" +"+(o.length-3); };
+const daysTip = (days) => days && days.length>3 && !["every day","weekdays"].includes(daysText(days)) ? WEEKDAYS.filter(d=>days.includes(d)).join(", ") : null;
+// all 12 months → "month (all)" · else 3 short names + "+N"
+const monthsText = (m) => { if (!m || !m.length) return null; if (m.length===12) return "month (all)";
+  const o = MONTHS.filter(x=>m.includes(x)).map(x=>x.slice(0,3)); return o.length<=3 ? o.join(", ") : o.slice(0,3).join(", ")+" +"+(o.length-3); };
+const monthsTip = (m) => m && m.length>3 && m.length<12 ? MONTHS.filter(x=>m.includes(x)).join(", ") : null;
+const domText = (d) => !d ? null : /^\d+$/.test(d) ? "the "+ordN(+d) : "the "+d;      // "the 15th" · "the first Monday" · "the last day"
+// 29th–31st: which of the picked months really have that date
+const skipNote = (v) => { if (!/^\d+$/.test(v.dom||"") || +v.dom<29) return ""; const n = +v.dom;
+  const sel = (v.months && v.months.length ? MONTHS.filter(m=>v.months.includes(m)) : MONTHS).map(m=>m.slice(0,3));
+  if (n===29) return sel.includes("Feb") ? "February has a 29th only in leap years (2028, 2032…), so in other years it skips February." : "";
+  const miss = sel.filter(m => MONTH_DAYS[MONTHS.findIndex(x=>x.startsWith(m))] < n), ok = sel.filter(m=>!miss.includes(m));
+  if (!miss.length) return "";
+  if (!ok.length) return "None of the selected months has a "+ordN(n)+", so this would never run.";
+  if (sel.length<12) return "Runs on the "+ordN(n)+" in "+ok.join(", ")+". Skipped: "+miss.join(", ")+" (no "+ordN(n)+").";
+  return "Runs on the "+ordN(n)+" every month except "+miss.join(", ")+", which "+(miss.length===1?"has":"have")+" no "+ordN(n)+"."; };
+// a cron expression in plain words (best effort — it's a hint, not a parser)
+const cronPlain = (x) => { const p = String(x||"").trim().split(/\s+/); if (p.length!==5) return "Needs 5 parts: minute hour day month weekday";
+  const [mi,h,dm,mo,wd] = p, DN = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  let out = (/^\d+$/.test(mi) && /^\d+$/.test(h)) ? "At "+h.padStart(2,"0")+":"+mi.padStart(2,"0") : mi.startsWith("*/") ? "Every "+mi.slice(2)+" minutes" : h.startsWith("*/") ? "Every "+h.slice(2)+" hours" : "At custom times";
+  if (wd!=="*") out += ", " + wd.split(",").map(r => r.includes("-") ? r.split("-").map(n=>DN[+n%7]||n).join(" to ") : (DN[+r%7]||r)).join(", ");
+  if (dm!=="*") out += ", on day "+dm; if (mo!=="*") out += ", in month "+mo; return out; };
 const PERIODIC_RECS = ["Requests","Incidents","Service Requests","Problems","Changes","Releases","Hardware Assets","Software Assets","CIs","Users","Tasks"];
 
-const PLACEHOLDER = { sched:"how often", iv:"how often", cron:"cron expression", act:"new activity", what:"an update", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often", prec:"records",
+const PLACEHOLDER = { days:"which days", months:"month", sched:"how often", iv:"how often", cron:"cron expression", act:"new activity", what:"an update", sub:"which", module:"record", field:"field", value:"a value", change:"updated", from:"any", to:"a value", cadence:"how often", prec:"records",
   weekday:"a weekday", dom:"a day", time:"a time", date:"a date" };
 
 const TRIGGER_TYPES = [
@@ -594,6 +624,18 @@ const EMBED_DEMO_DOC = {
             { id:"e_http", kind:"action", action:"http_request", data:{} } ] } ],
           otherwise:{ id:"e_bo", children:[ { id:"e_int", kind:"action", action:"execute_integration", arg:"Slack" } ] } } ] },
       otherwise:{ id:"e_mto", children:[ { id:"e_a2", kind:"action", action:"assign", arg:"the IT Head" } ] } },
+  ],
+  // SAMPLE detached pieces, as if detached in the Node view by deleting a connection (user 2026-11-20, step 1 of 2:
+  // the real Node → Linear link comes next). They behave like any piece: reattach, drag & drop, stack, preview, delete.
+  detached: [
+    { id:"nd_1", at:0, from:"Node view", above:null, items:[ { id:"n_em", kind:"action", action:"send_email", arg:"the requester", data:{} } ] },
+    { id:"nd_2", at:0, from:"Node view", above:null, items:[
+      { id:"n_if", kind:"branch", ifelse:true, otherwise:null, paths:[
+        { id:"n_if1", combiner:"and", clauses:[{ field:"priority", op:"is", value:"Urgent" }], children:[ { id:"n_as", kind:"action", action:"assign", arg:"the IT Head" } ] },
+        { id:"n_if2", isElse:true, combiner:"and", clauses:[], children:[ { id:"n_up", kind:"action", action:"update", fields:[] } ] } ] } ] },
+    { id:"nd_3", at:0, from:"Node view", above:null, items:[
+      { id:"n_w", kind:"delay", mode:"for", amount:2, unit:"hours", hours:"calendar" },
+      { id:"n_http", kind:"action", action:"http_request", data:{} } ] },
   ],
 };
 // Field gallery (canvas view): the embed demo plus one step of every other kind — each card renders ONE real canvas
@@ -1064,12 +1106,16 @@ function triggerView(trigger) {
   if (id==="weekly")  return { tpl:"for {prec} every week on {weekday} at {time}",     slots:[PR,{key:"weekday",options:WEEKDAYS},{key:"time",options:"__time"}] };
   if (id==="monthly") return { tpl:"for {prec} every month on day {dom} at {time}",    slots:[PR,{key:"dom",options:"__dom"},{key:"time",options:"__time"}] };
   if (id==="__period") { const S = {key:"sched",options:SCHED_OPTS}, T = {key:"time",options:"__time"}, sc = v.sched;
-    if (sc==="every day")   return { tpl:"for {prec} {sched} at {time}",                 slots:[PR,S,T] };
-    if (sc==="every week")  return { tpl:"for {prec} {sched} on {weekday} at {time}",    slots:[PR,S,{key:"weekday",options:WEEKDAYS},T] };
-    if (sc==="every month") return { tpl:"for {prec} {sched} on day {dom} at {time}",    slots:[PR,S,{key:"dom",options:"__dom"},T] };
+    const D = {key:"date",options:"__date"};
+    if (sc==="every day")   return { tpl:"for {prec} {sched} at {time} starting from {date}",                   slots:[PR,S,T,D] };
+    if (sc==="every week")  return { tpl:"for {prec} {sched} on {days} at {time} starting from {date}",         slots:[PR,S,{key:"days",options:"__days"},T,D],
+                                     disp:{ days:daysText(v.days) }, tips:{ days:daysTip(v.days) } };
+    // monthly: the schedule blank reads just "every" — the months blank carries the rest ("every month (all)" / "every Jan, Feb")
+    if (sc==="every month") return { tpl:"for {prec} {sched} {months} on {dom} at {time} starting from {date}", slots:[PR,S,{key:"months",options:"__months"},{key:"dom",options:"__dom"},T,D],
+                                     disp:{ sched:"every", months:monthsText(v.months), dom:domText(v.dom) }, tips:{ months:monthsTip(v.months) }, note:skipNote(v) };
     // interval has no time of day — its time is when the FIRST run happens (= the real product's one Start At)
     if (sc==="every")       return { tpl:"for {prec} {sched} {iv} starting from {date} at {time}", slots:[PR,S,{key:"iv",options:"__iv"},{key:"date",options:"__date"},T] };
-    if (sc==="on a custom schedule") return { tpl:"for {prec} {sched} {cron}",           slots:[PR,S,{key:"cron",options:"__cron"}] };
+    if (sc==="on a custom schedule") return { tpl:"for {prec} {sched}", slots:[PR,S,{key:"cron",options:"__cron"}], cron:true };   // the expression = a card under the sentence
     return { tpl:"for {prec} {sched}", slots:[PR,S] }; }
   // LEGACY (no longer creatable from the menu, kept so old seeded docs still render): date_reached + periodically
   if (id==="date_reached") return { tpl:"{date} is reached", slots:[{key:"date",options:"__date"}] };
@@ -3868,11 +3914,14 @@ const treeSetLevel = (nodes, path, arr) => {
 const splitTakePath = (f, sp, pi, mkId) => {
   const lvl = sp.slice(0, -1), idx = sp[sp.length-1], sibs = childrenAt(f, lvl), split = sibs[idx];
   if (!split || !split.paths || !split.paths[pi]) return { flow:f, moved:null, path:null };
-  const P = split.paths[pi], paths = split.paths.filter((_, k) => k !== pi);
+  const P = split.paths[pi];
   let j = idx + 1; const merges = []; while (sibs[j] && sibs[j].kind === "merge") { merges.push(sibs[j]); j++; }
+  // the Merge this path feeds ALWAYS goes with it (user 2026-11-20 — was: only when it was the last feeder). The other
+  // paths that fed it stay in the flow, no longer joined (their feeds link is cleared).
   let own = null; const kept = [];
-  merges.forEach(m => { const fed = (m.feeders||[]).includes(P.id) || P.feeds === m.id, fs = (m.feeders||[]).filter(x => x !== P.id);
-    if (fed && !fs.length) own = m; else kept.push(fed ? { ...m, feeders:fs } : m); });
+  merges.forEach(m => { const fed = (m.feeders||[]).includes(P.id) || P.feeds === m.id;
+    if (fed && !own) own = { ...m, feeders:[P.id] }; else kept.push(m); });
+  const paths = split.paths.filter((_, k) => k !== pi).map(q => (own && q.feeds === own.id) ? (({ feeds, ...r }) => r)(q) : q);
   const before = sibs.slice(0, idx), rest = sibs.slice(j);
   let level;
   if (!paths.length) level = [...before, ...kept, ...rest];
@@ -5744,7 +5793,7 @@ function VPicker({ choices, tree, sel, setSel, allowAdd, searchRef, popRef, onDo
       </div>, document.body)}
   </>);
 }
-function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, onSoftCancel, title, inputType, noSearch, footer, wide, matchWidth, back, help, solidIcons, selected, onHelp, onViewMore, hideHelp, noHover, itemsAsNodes, initActive, choices, smart, duration, moduleMorph, searchPlaceholder, clearOnPick, settleHover, offsetX, source, onQueryEnter, topSlot, listHeader, vp, pickVer, initVal }) {
+function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, onSoftCancel, title, inputType, noSearch, footer, below, wide, matchWidth, back, help, solidIcons, selected, onHelp, onViewMore, hideHelp, noHover, itemsAsNodes, initActive, choices, smart, duration, moduleMorph, searchPlaceholder, clearOnPick, settleHover, offsetX, source, onQueryEnter, topSlot, listHeader, vp, pickVer, initVal }) {
   const ref = useRef(null);
   // report Quick-Help to the parent so it renders in the CONTEXT RAIL (not a floating card). Two layers:
   // `base` = the node/menu help (e.g. "Trigger"); `item` = the specific hovered/active option (e.g. "Record
@@ -6255,6 +6304,10 @@ function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, on
               style={{background:"var(--panel)",color:"var(--text)"}}/>}
         {/* SIDEBAR popups: the key hint sits INSIDE the input, bottom right — no button (user 2026-10-21) */}
         </div>
+        {/* cron: the generator link + a live plain-words reading (= the periodic artifact) */}
+        {below==="cron" && <div data-nf="cron-help" className="mt-2 text-[length:var(--fs-12)] leading-snug" style={{color:"var(--muted)"}}>
+          <div>{val.trim() ? cronPlain(val) : "minute · hour · day of month · month · weekday — e.g. 0 9 * * 1-5"}</div>
+          <div className="mt-1">Need help? <a href="https://crontab.guru/" target="_blank" rel="noopener" style={{color:"var(--accent)", textDecoration:"underline"}}>Try the Cron Expression Generator ↗</a></div></div>}
         {/* the key hint sits OUTSIDE the field, under its bottom-right corner (user 2026-10-21) */}
         {cMode==="enter" && <div className="flex justify-end mt-1.5"><EnterHint multi={inputType==="textarea"} /></div>}
       </div>
@@ -6362,15 +6415,16 @@ function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, on
       {filtered.map((i,k)=>{
         // horizontal CHIP row (Popular shortcuts): small neutral pills, one compact line — costs ~36px
         // instead of a rows section. Not keyboard-selectable; clicking a chip picks like a normal item.
-        if (i.chips && i.grid) return (
-          <div key={"ch"+k} data-nf="dom-grid" className="grid gap-1.5 px-2.5 pt-1.5 pb-1" style={{gridTemplateColumns:"repeat(7, minmax(0, 1fr))"}}>
+        if (i.chips && i.grid) return (<React.Fragment key={"chg"+k}>
+          {i.label && <div className="px-2.5 pt-2 pb-0.5 text-[length:var(--fs-11)]" style={{color:"var(--muted)"}}>{i.label}</div>}
+          <div data-nf="dom-grid" className="grid gap-1.5 px-2.5 pt-1.5 pb-1" style={{gridTemplateColumns:"repeat("+(i.cols||7)+", minmax(0, 1fr))"}}>
             {i.chips.map(c=>(
               <button key={c.id} onClick={()=>{ if(!onPick(c)) onClose(); }} aria-pressed={i.sel===c.id}
-                className={"h-8 rounded-md text-[length:var(--fs-12)] font-medium transition-colors hover:bg-[var(--pop-hover)] " + (c.id.length>2 ? "col-span-3" : "")}
+                className={"h-8 rounded-md text-[length:var(--fs-12)] font-medium transition-colors hover:bg-[var(--pop-hover)] " + (!i.cols && c.id.length>2 ? "col-span-3" : "")}
                 style={{border:"1px solid " + (i.sel===c.id ? "var(--accent)" : "var(--border)"), color: i.sel===c.id ? "var(--accent)" : "var(--ink-mid)", background: i.sel===c.id ? "var(--accent-bg, #eaf3fb)" : undefined}}>
                 {c.label}
               </button>))}
-          </div>);
+          </div></React.Fragment>);
         if (i.chips) return (
           <div key={"ch"+k} className="flex items-center flex-wrap gap-1.5 px-2.5 pt-1.5 pb-2">
             {i.label && <span className="text-[length:var(--fs-105)] mr-0.5" style={{color:"var(--faint)"}}>{i.label}</span>}
@@ -6464,7 +6518,7 @@ function Popover({ anchor, anchorKey, items, flat, onPick, onActive, onClose, on
    Inline editable slot — underlined text, colored by role
 --------------------------------------------------------------------------- */
 const SLOT_COLOR = { trigger:"var(--c-when)", action:"var(--c-then)", value:"var(--c-then)", cond:"var(--c-if)" };
-function Slot({ value, placeholder, onClick, onClear, innerRef, open, dataAnchor, beckon, tourCue, smartKind, wrap, fullTitle }) {
+function Slot({ value, placeholder, onClick, onClear, innerRef, open, dataAnchor, beckon, tourCue, smartKind, wrap, fullTitle, tip }) {
   const filled = !!value;
   const [hovBadge, setHovBadge] = React.useState(false);
   // SMART VALUE → a rounded, neutral, editable BADGE inline in the sentence (reference / expression).
@@ -6515,7 +6569,7 @@ function Slot({ value, placeholder, onClick, onClear, innerRef, open, dataAnchor
     );
   }
   return (
-    <button ref={innerRef} data-anchor={dataAnchor} onClick={onClick} className={"slot " + (filled ? "font-medium" : "font-normal") + (beckon ? " slot-beckon" : "") + (tourCue ? " slot-tourcue" : "")}
+    <button ref={innerRef} data-anchor={dataAnchor} data-tip={tip || undefined} aria-label={tip ? (value + " — " + tip) : undefined} onClick={onClick} className={"slot " + (filled ? "font-medium" : "font-normal") + (beckon ? " slot-beckon" : "") + (tourCue ? " slot-tourcue" : "")}
       style={{ color: filled ? "var(--text)" : "var(--faint)",
                ...(open ? { textDecorationStyle:"solid", textDecorationColor:"var(--accent2)" } : {}) }}>
       {filled ? value : placeholder}
@@ -6523,11 +6577,11 @@ function Slot({ value, placeholder, onClick, onClear, innerRef, open, dataAnchor
   );
 }
 const Word = ({children}) => <span className="font-normal" style={{color:"var(--ink-mid)"}}>{children}</span>;
-function Template({ tpl, vals, onSlot, slotRef, ph, openKey }) {
+function Template({ tpl, vals, onSlot, slotRef, ph, openKey, tips, anchorPrefix }) {
   return tpl.split(/(\{[^}]+\})/).filter(p=>p!=="").map((p,i)=>{
     const m = p.match(/^\{(.+)\}$/);
     if (m) { const k = m[1];
-      return <Slot key={i} value={vals[k]} placeholder={(ph && ph[k]) || PLACEHOLDER[k] || k} open={k===openKey}
+      return <Slot key={i} value={vals[k]} tip={tips && tips[k]} dataAnchor={anchorPrefix ? anchorPrefix + k : undefined} placeholder={(ph && ph[k]) || PLACEHOLDER[k] || k} open={k===openKey}
         innerRef={slotRef ? (el)=>slotRef(k, el) : undefined} onClick={(e)=>onSlot(k,e)} />; }
     return <Word key={i}>{p}</Word>;
   });
@@ -7500,6 +7554,7 @@ function App() {
       else if (m.wf === "pickver" && ["1","2"].includes(m.v)) setPickVer(m.v);
       else if (m.wf === "textver" && ["A","B","C","D"].includes(m.v)) setTextVer(m.v);
       else if (m.wf === "dtver" && ["1","2"].includes(m.v)) setDtVer(m.v);
+      else if (m.wf === "dtrail" && ["1","2"].includes(m.v)) setDtRail(m.v);
       else if (m.wf === "trigver" && ["1","2"].includes(m.v)) { TRIG_V2 = m.v==="2"; setPop(null); setOpenSlot(null); setTrigVer(m.v); }   // Trigger design: 1 two triggers · 2 one sentence (user 2026-11-18)
       else if (m.wf === "dtcancel" && dtCancel.current) dtCancel.current();   // a click outside the Linear view unpicks a picked piece (user 2026-11-12)   // Detach design: 1 Panel · 2 Popover (user 2026-11-05)
       else if (m.wf === "popver" && ["1","2"].includes(m.v)) { setPop(null); setOpenSlot(null); setPopVer(m.v); }
@@ -7967,18 +8022,52 @@ function App() {
 
   // Guided chain: open the next empty slot of trigger `tid`; when all are filled, open the action menu.
   // Each pick just sets the value — the [triggers] effect re-runs this, so it works for mouse AND keyboard.
-  const TRIG_TITLE = { prec:"Records", sched:"Schedule", weekday:"Day", dom:"Day of the month", time:"Time", date:"Start date", iv:"Interval", cron:"Cron expression" };
-  const trigTitle = (t, key) => t.typeId==="once" && key==="date" ? "Run date" : t.typeId==="__period" && t.vals.sched==="every" && key==="time" ? "Start time" : (isPeriodicType(t.typeId) && TRIG_TITLE[key]) || null;
+  const trigVals = (t) => ({ ...t.vals, ...(triggerView(t).disp || {}) });
+  // under the sentence: the 29th–31st note and the cron card (= the artifact's)
+  const trigExtras = (t) => { const v = triggerView(t), note = v.note;
+    return <>
+      {note && <span data-nf="trig-note" className="block mt-1.5 text-[length:var(--fs-12)] rounded-lg px-2.5 py-1.5 w-fit" style={{color:"#b42318", background:"#fdecec"}}>{note}</span>}
+      {v.cron && <span data-nf="cron-card" data-anchor={`trig:${t.id}:cron`} role="button" tabIndex={0} onClick={(e)=>pickTriggerSlot(t,"cron",e)} ref={(el)=>setTriggerSlotRef(t.id,"cron",el)}
+        className="mt-2 flex items-center gap-3 w-fit min-w-[260px] rounded-xl px-3 py-2 cursor-pointer" style={{background:"#fff", border:"1px "+(t.vals.cron?"solid":"dashed")+" var(--border2)"}}>
+        <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{background:"var(--c-when-bg)", color:"var(--c-when)"}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <span className="flex flex-col leading-tight">
+          <span className="text-[length:var(--fs-13)] font-semibold" style={{color: t.vals.cron ? "var(--text)" : "var(--faint)", fontFamily: t.vals.cron ? "ui-monospace, monospace" : undefined}}>{t.vals.cron || "Add a cron expression"}</span>
+          <span className="text-[length:var(--fs-11)]" style={{color:"var(--muted)"}}>{t.vals.cron ? cronPlain(t.vals.cron) : "Cron expression"}</span></span>
+      </span>}
+    </>; };
+  const domModeRef = useRef("date"), domOccRef = useRef("first");
+  const domItems = (t) => { const mode = domModeRef.current, cur = t.vals.dom;
+    const out = [{ chips:[{id:"__mode:date",label:"A date"},{id:"__mode:day",label:"A weekday"}], grid:true, cols:2, sel:"__mode:"+mode, label:"Run on" }];
+    if (mode==="date") { out.push({ chips:DOM.map(d=>({id:d,label:d})), grid:true, sel:cur, label:"Date *" });
+      const n = skipNote({ ...t.vals, dom: /^\d+$/.test(cur||"") ? cur : null }); if (n) out.push({ header:n }); }
+    else { out.push({ chips:["first","second","third","fourth","last"].map(o=>({id:"occ:"+o,label:o})), grid:true, cols:5, sel:"occ:"+domOccRef.current, label:"Occurrence *" });
+      out.push({ chips:WEEKDAYS.map(d=>({id:"wd:"+d,label:d.slice(0,3)})), grid:true, sel: cur && cur.startsWith(domOccRef.current+" ") ? "wd:"+cur.split(" ")[1] : null, label:"Weekday *" }); }
+    return out; };
+  const TRIG_TITLE = { prec:"Records *", sched:"Schedule *", weekday:"Day *", dom:"Day of the month *", time:"Time *", date:"Start date *", iv:"Interval *", cron:"Cron expression *" };
+  const trigTitle = (t, key) => t.typeId==="once" && key==="date" ? "Run date *" : t.typeId==="__period" && t.vals.sched==="every" && key==="time" ? "Start time *" : (isPeriodicType(t.typeId) && TRIG_TITLE[key]) || null;
   const openTrigBlank = (el, t, slot, setter, back) => {
+    // follow the blank by KEY (data-anchor), not the element: the sentence re-renders as blanks fill, which
+    // replaces the element and froze the popup in place on scroll (user 2026-11-20)
+    const openK = (a, items, fn, ttl, o={}) => open(a, items, fn, ttl, { ...o, anchorKey:`trig:${t.id}:${slot.key}` });
     const title = trigTitle(t, slot.key);
-    if (slot.options==="__date") return open(el, [], setter, title || "Pick a date", {inputType:"date", back});
-    if (slot.options==="__time") return open(el, [], setter, title || "Pick a time", {inputType:"time", back});
-    if (slot.options==="__dom")  return open(el, DOM_GRID_ITEMS(t.vals.dom), setter, title, {back, noSearch:true});
+    if (slot.options==="__date") return openK(el, [], setter, title || "Pick a date", {inputType:"date", back});
+    if (slot.options==="__time") return openK(el, [], setter, title || "Pick a time", {inputType:"time", back});
+    if (slot.options==="__dom") { const cur = t.vals.dom || "";
+      domModeRef.current = cur && !/^\d+$/.test(cur) && cur!=="last day" ? "day" : "date"; if (domModeRef.current==="day") domOccRef.current = cur.split(" ")[0];
+      const pick = (c) => { const id = c.id, live = t;
+        if (id.startsWith("__mode:")) { domModeRef.current = id.slice(7); setPop(p => p && ({ ...p, items:domItems(live) })); return true; }
+        if (id.startsWith("occ:"))    { domOccRef.current = id.slice(4);   setPop(p => p && ({ ...p, items:domItems(live) })); return true; }
+        if (id.startsWith("wd:"))     { updateTrigger(t.id, "dom", domOccRef.current+" "+id.slice(3)); return; }
+        updateTrigger(t.id, "dom", id); };
+      return openK(el, domItems(t), pick, title, {back, noSearch:true}); }
+    if (slot.options==="__days")   return openK(el, [], (i)=>updateTrigger(t.id, "days", i.id), "Days * — pick one or more", {inputType:"multi", choices:WEEKDAYS, selected:t.vals.days || [], back});
+    if (slot.options==="__months") return openK(el, [], (i)=>updateTrigger(t.id, "months", i.id), "Months * — pick one or more", {inputType:"multi", choices:MONTHS, selected:t.vals.months || MONTHS, back});
     if (slot.options==="__iv") { const m = String(t.vals.iv||"").match(/^(\d+) (\w+?)s?$/);
-      return open(el, [], (i)=>{ const n = i.id.amount, u = i.id.unit; updateTrigger(t.id, "iv", n + " " + (n===1 ? u.replace(/s$/,"") : u)); }, title,
+      return openK(el, [], (i)=>{ const n = i.id.amount, u = i.id.unit; updateTrigger(t.id, "iv", n + " " + (n===1 ? u.replace(/s$/,"") : u)); }, title,
         { back, duration:{ title:"Interval · repeat every", units:["minutes","hours","days"], unit: m ? m[2]+"s" : "minutes", amount: m ? +m[1] : null } }); }
-    if (slot.options==="__cron") return open(el, [], setter, title, {inputType:"text", back});
-    return open(el, slot.options.map(o=>typeof o==="string"?{id:o,label:o}:o), setter, title || PLACEHOLDER[slot.key] || slot.key,
+    if (slot.options==="__cron") return openK(el, [], setter, title, {inputType:"text", back, below:"cron"});
+    return openK(el, slot.options.map(o=>typeof o==="string"?{id:o,label:o}:o), setter, title || PLACEHOLDER[slot.key] || slot.key,
       {selected: slot.key==="what" && t.vals.wk==="f" ? "f:"+t.vals.what : t.vals[slot.key], back});
   };
   const advanceTrigger = (tid) => {
@@ -11025,6 +11114,9 @@ function App() {
   // ── Detached steps v2 (user 2026-11-05): two designs behind the top bar's "Detach" switch — "1" Panel (drill-down)
   //    and "2" Popover. Both reattach through a step list (no drop spots): hover a step → it lights up on the canvas.
   const [dtVer, setDtVer] = useState("1");
+  // Detach design (user 2026-11-20): "2" = NO detach icons in the Linear flow — detaching happens in the Node view (delete a
+  // connection) and the pieces only show in this container · "1" = the icons on the rails / nodes / pills (kept for reference)
+  const [dtRail, setDtRail] = useState("2");
   const dtArrive = useRef(null), dtHl = useRef({ box:null, line:null, raf:0 });
   const DtMark = (t, k) => <mark data-k={k}>{t}</mark>;
   // the summary as parts: every step's phrase is wrapped in a <mark> of its node colour
@@ -11154,13 +11246,19 @@ function App() {
   // the per-node unlink icon was tried and dropped (user 2026-11-17): detach lives on the CONNECTOR gaps again — a gap's icon
   // detaches the next node and everything after it to the end of that path. Kept off here, not deleted.
   const DT_ON_NODE = true;   // back ON next to the gap icons (user 2026-11-18): a node / pill icon = only that; a gap icon = everything below
-  const dtCtl = (dnd, lane) => { if (!DT_ON_NODE || !EMBED || dtLock) return null; const f = dtFlowRef.current;
+  // Detach 1 · On rails (user 2026-11-20): detaching = removing the CONNECTION between two nodes, so icons sit only on rails —
+  // the gaps (with Add step: everything after it on that path goes) and, for a split path, its horizontal connector from the
+  // trigger rail (that whole path goes). No icons on single steps, IF rows or Branch / Else pills: a single step can't be
+  // pulled out of its flow, and one branch of a Branching can't be detached on its own.
+  const dtCtl = (dnd, lane) => { if (!DT_ON_NODE || !EMBED || dtLock || dtRail!=="1") return null; const f = dtFlowRef.current;
+    if (!lane) return null;
     if (lane) { let arr; try { arr = childrenAt(f, lane); } catch (e) { return null; }
       const seg = lane[lane.length-1], par = (isBranchSeg(seg) && seg.path!==undefined) ? nodeAt(f, lane.slice(0, -1)) : null;
       if (par && isSplitBranch(par)) { const sx = dtSplitAt(lane, 0, f); if (!sx || !sx.items.length) return null;
         const ids = new Set([...(arr||[]).map(n => n.id), ...(sx.own ? [sx.own.id] : [])]), hk = "sp:" + pathKey(lane);
         return { title:`Detach Split path ${seg.path+1} (${dtCount(sx.items)})`, text:`The whole path${sx.own ? " with its Merge and the Merge’s branches" : ""} moves to the Detached stack. The other paths renumber.`,
           run:()=>{ setDtOne(null); detachAt(lane, 0); }, hover:(on)=>setDtOne(c => on ? ((c && c.key===hk) ? c : { key:hk, ids }) : (c ? null : c)) }; }
+      return null;   // only split paths keep a lane icon (it sits on their horizontal connector)
       if (par && par.kind==="branch" && !isIfElse(par) && !isSplitBranch(par)) { const hk = "br:" + pathKey(lane), ids = new Set((arr||[]).map(n => n.id));
         return { title:`Detach Branch ${seg.path+1}${(arr||[]).length ? " ("+dtCount(arr)+")" : ""}`, text:"This whole branch — its condition and steps — moves to the Detached stack. The other branches renumber.",
           run:()=>{ setDtOne(null); detachBranchLane(lane); }, hover:(on)=>setDtOne(c => on ? ((c && c.key===hk) ? c : { key:hk, ids }) : (c ? null : c)) }; }
@@ -11514,7 +11612,7 @@ function App() {
     if (o.single) return one(xL, h, w-RAIL_OFF, 12);
     return (<>{one(xL, h, w, 12)}{one(xL+RAIL_OFF, h-RAIL_OFF, w-RAIL_OFF, Math.max(2, 12-RAIL_OFF))}</>);
   };
-  const Station = ({ marker, isFirst, isLast, head, headColor, headBg, hoverBg, onRemove, removeLabel, onInsert, onCopy, onHead, onAddCond, addLabel="new condition", addAccent="var(--c-if)", addActive=false, addHoverOnly=false, addAlwaysShow=false, addDisabled=false, addDisabledTip=null, wideContent, dnd, onFocus, onClick, focused, help, innerRef, dense, gapBottom, okBorder, editing, bgLeft="16px", bgRight="16px", padLeft="34px", padRight="28px", padY, markerY, headerBg, doubleRail, dashRail, noRail, dim, dimBg, dtLane, children }) => {
+  const Station = ({ marker, isFirst, isLast, head, headColor, headBg, hoverBg, onRemove, removeLabel, onInsert, onCopy, onHead, onAddCond, addLabel="new condition", addAccent="var(--c-if)", addActive=false, addHoverOnly=false, addAlwaysShow=false, addDisabled=false, addDisabledTip=null, wideContent, dnd, onFocus, onClick, focused, help, innerRef, dense, gapBottom, okBorder, editing, bgLeft="16px", bgRight="16px", padLeft="34px", padRight="28px", padY, markerY, headerBg, doubleRail, dashRail, noRail, dim, dimBg, dtLane, oneLine, children }) => {
     const [xHover, setXHover] = useState(false);
     const pt0 = padY!==undefined ? padY : (dense ? 6 : PAD), bgBottom = gapBottom!==undefined ? gapBottom : (dense ? 12 : GAP), pb0 = pt0 + bgBottom, mc0 = markerY!==undefined ? markerY : (pt0 + HEAD/2);
     // GAP-OPENING drop feedback (v5.11 Slice 2): while another node hovers this row, physically open a gap
@@ -11535,7 +11633,7 @@ function App() {
     // setFocusKey re-renders App, and App-scoped components remount their whole subtree — a mousedown-
     // triggered remount destroys the pressed element BETWEEN mousedown and mouseup, so the browser never
     // fires the click. With focus on click, the press completes first and the re-render follows.
-    <div ref={innerRef} data-nf="st" className={"relative group" + (dnd && !dnd.locked ? " cursor-grab" : "")} onClick={onFocus} {...dragAttrs}
+    <div ref={innerRef} data-nf="st" data-oneline={oneLine ? "" : undefined} className={"relative group" + (dnd && !dnd.locked ? " cursor-grab" : "")} onClick={onFocus} {...dragAttrs}
       onPointerDown={dnd && !dnd.locked ? (e)=>dnd.bodyDown(dnd.id, e) : undefined}
       style={{paddingLeft:padLeft, paddingRight:padRight, paddingTop:`${pt}px`, paddingBottom:`${pb}px`, ...(dnd&&dnd.dragging?{opacity:0.35}:{})}}>
       {/* drop indicator — sits INSIDE the opened gap: a rail-aligned node dot + a tapering accent bar, so the
@@ -12179,6 +12277,9 @@ function App() {
     const zk = pathKey(basePath)+":"+index, hot = EMBED && cutHover===zk;
     const dtArr = EMBED ? childrenAt(flowRef.current, basePath) : [];
     const dtBlocked = !!(dtArr[index] && dtArr[index].kind==="merge");
+    // the top of a SPLIT path = the same connection as its horizontal connector, which already carries the icon (user 2026-11-20)
+    const dtSplitTop = index===0 && basePath.length>0 && (()=>{ const seg = basePath[basePath.length-1]; if (!isBranchSeg(seg) || seg.path===undefined) return false;
+      const par = nodeAt(flowRef.current, basePath.slice(0,-1)); return !!(par && isSplitBranch(par)); })();
     const dtSx = EMBED ? dtSplitAt(basePath, index, flowRef.current) : null;
     const dtN = EMBED ? (dtSx ? dtCount(dtSx.items) : dtCount(dtArr.slice(index))) : 0;
     if (EMBED && placing) return dtDropBar(undefined, basePath, index, "Put it here", dbl, noRail, false);
@@ -12190,7 +12291,7 @@ function App() {
       {/* continuous connector line — full height, grows with the zone. DOUBLE = main path / parallel lane; SINGLE = a condition branch (user 2026-07-21). noRail = the LOOP body, where the box border is the one edge line. */}
       {noRail ? null : (dbl ? vLines(7, { top:0, bottom:0 }) : vSingle(8.2, { top:0, bottom:0 }))}
       {/* DETACH trash — outside the clipped height box below, so its tooltip is never cut off */}
-      {EMBED && dtN>0 && !dragging && !dtLock && (   /* back on the gaps (user 2026-11-17) */
+      {EMBED && dtRail==="1" && !dtSplitTop && dtN>0 && !dragging && !dtLock && (   /* back on the gaps (user 2026-11-17); only in Detach 1 (user 2026-11-20) */
         <span role="button" tabIndex={-1} data-nf="dt-trash" data-blocked={dtBlocked ? "" : undefined} aria-label={dtBlocked ? "Can’t detach here" : "Detach "+dtSteps(dtN)}
           onMouseDown={(e)=>{ e.stopPropagation(); e.preventDefault(); }}
           onClick={(e)=>{ e.stopPropagation(); e.preventDefault(); if (!dtBlocked) detachAt(basePath, index); }}
@@ -12997,7 +13098,9 @@ function App() {
           const goMerge = ()=>{ const el = mk && rowRefs.current[mk]; if (el) el.scrollIntoView({ behavior:"smooth", block:"center" }); };
           // rail POINT = a plain accent dot, same size as every other node marker (no diamond, no ring)
           const dot = <span className="block w-2.5 h-2.5 rounded-full" style={{ background:"var(--accent)", boxShadow:"0 0 0 4px var(--bg)" }}/>;
-          return (
+          // the path's "Go to this merge" card lights up with the Merge when a detach hover takes that Merge (user 2026-11-20)
+          const mCut = !!(dtOne && dtOne.key === "sp:" + pathKey(lanePath) && dtOneIds && pobj.feeds && dtOneIds.has(pobj.feeds));   // only THIS path's card — the other feeders stay
+          return (<div data-nf={mCut ? "cutset" : undefined} style={{ display:"contents" }}>
             <Station marker={dot} isLast doubleRail={dbl2} wideContent hoverBg="transparent" gapBottom={GAP} markerY={26} onClick={goMerge} innerRef={(el)=>setRowRef(pathKey(lanePath)+":feed", el)}>
               {/* the merge reference card — same footprint as an action's form-editor card; dashed neutral at rest,
                   turns purple on hover (it's a pointer to the merge, not an editable value). */}
@@ -13014,7 +13117,7 @@ function App() {
                   <span className="text-[length:var(--fs-115)] leading-tight truncate" style={{ color:"var(--muted)" }}>Go to this merge ↓</span>
                 </span>
               </span>
-            </Station>
+            </Station></div>
           );
         };
         lanes.push(
@@ -13483,16 +13586,16 @@ function App() {
 
             {/* WHEN — multiple triggers, OR'd */}
             {!hasTrigger
-              ? <Station marker={MARK.trigger} isFirst head={trigPreview && !trigPreview.tid && openSlot==="Twhen" && isPeriodicType(trigPreview.typeId) ? "Runs" : "When"} headColor="var(--c-when)" headBg="var(--c-when-bg)" hoverBg="var(--c-when-h)" help={NODE_HELP.when} gapBottom={0}
+              ? <Station oneLine marker={MARK.trigger} isFirst head={trigPreview && !trigPreview.tid && openSlot==="Twhen" && isPeriodicType(trigPreview.typeId) ? "Runs" : "When"} headColor="var(--c-when)" headBg="var(--c-when-bg)" hoverBg="var(--c-when-h)" help={NODE_HELP.when} gapBottom={0}
                   innerRef={(el)=>setRowRef("T", el)}
                   onAddCond={(el)=>addAnotherTrigger(el)} addLabel="add trigger" addAccent="var(--c-when)" addActive={openSlot==="Tadd"}
                   focused={focusKey==="T"} onFocus={()=>setFocusKey("T")}>
                   {trigPreview && !trigPreview.tid && openSlot==="Twhen"
-                    ? <span data-nf="trig-prev"><Template tpl={triggerView(trigPreview).tpl} vals={trigPreview.vals} onSlot={()=>{}} /></span>
+                    ? <span data-nf="trig-prev"><Template tpl={triggerView(trigPreview).tpl} vals={trigVals(trigPreview)} onSlot={()=>{}} /></span>
                     : <Slot value={null} placeholder="when this happens…" tourCue={tourStep===0} open={openSlot==="Twhen"} innerRef={(el)=>setRowRef("Twhen", el)} onClick={(e)=>pickTriggerType(e.currentTarget)} />}
                 </Station>
               : triggers.map((t,i)=>(
-                  <Station key={t.id} marker={i===0 ? MARK.trigger : null} doubleRail dashRail={flow.length===0 && i===triggers.length-1} isFirst={i===0} dense={i>0}
+                  <Station key={t.id} oneLine marker={i===0 ? MARK.trigger : null} doubleRail dashRail={flow.length===0 && i===triggers.length-1} isFirst={i===0} dense={i>0}
                     gapBottom={i < triggers.length-1 ? 4 : 0}
                     bgLeft={i===0 ? "16px" : "34px"} bgRight="16px" padLeft={i===0 ? "34px" : "50px"} padRight="28px"
                     head={i>0 ? "Or" : isPeriodicType(trigPreview && trigPreview.tid===t.id ? trigPreview.typeId : t.typeId) ? "Runs" : "When"} headColor="var(--c-when)" headBg="var(--c-when-bg)" hoverBg="var(--c-when-h)" help={NODE_HELP.when}
@@ -13502,10 +13605,11 @@ function App() {
                     addDisabled={i===0 && (isPeriodicType(t.typeId) || !t.vals.module)} addDisabledTip={isPeriodicType(t.typeId) ? "Periodic workflows don't support multiple triggers" : "Pick a record first"}
                     focused={focusKey===`trig:${t.id}`} onFocus={()=>setFocusKey(`trig:${t.id}`)} onRemove={()=>removeTrigger(t.id)}>
                     {trigPreview && trigPreview.tid===t.id
-                      ? <span data-nf="trig-prev"><Template tpl={triggerView(trigPreview).tpl} vals={trigPreview.vals} onSlot={()=>{}} /></span>
-                      : <Template tpl={triggerView(t).tpl} vals={t.vals}
+                      ? <span data-nf="trig-prev"><Template tpl={triggerView(trigPreview).tpl} vals={trigVals(trigPreview)} onSlot={()=>{}} /></span>
+                      : <><Template tpl={triggerView(t).tpl} vals={trigVals(t)} tips={triggerView(t).tips} anchorPrefix={`trig:${t.id}:`}
                       openKey={openSlot && openSlot.startsWith(`trig:${t.id}:`) ? openSlot.slice(`trig:${t.id}:`.length) : null}
-                      onSlot={(key,e)=>pickTriggerSlot(t,key,e)} slotRef={(k,el)=>setTriggerSlotRef(t.id,k,el)} />}
+                      onSlot={(key,e)=>pickTriggerSlot(t,key,e)} slotRef={(k,el)=>setTriggerSlotRef(t.id,k,el)} />
+                      {trigExtras(t)}</>}
                   </Station>
                 ))}
             {/* "add trigger" now lives inline on the first trigger row's right control cluster (Station onAddCond) */}
@@ -14869,7 +14973,7 @@ function App() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{cards}</div></div>))}
           </div></div>);
       })()}
-      {pop && <Popover key={openInsertKey || pop.anchorKey || undefined} anchor={pop.anchor} anchorKey={pop.anchorKey} items={pop.items} flat={pop.flat} title={pop.title} inputType={pop.inputType} initVal={pop.initVal} noSearch={pop.noSearch} footer={pop.footer} wide={pop.wide} matchWidth={pop.matchWidth} back={pop.back} help={pop.help} solidIcons={pop.solidIcons} selected={pop.selected} itemsAsNodes={pop.itemsAsNodes} initActive={pop.initActive} choices={pop.choices} smart={pop.smart} duration={pop.duration} moduleMorph={pop.moduleMorph} searchPlaceholder={pop.searchPlaceholder} clearOnPick={pop.clearOnPick} onQueryEnter={pop.onQueryEnter} topSlot={pop.topSlot} listHeader={pop.listHeader} vp={pop.vp} pickVer={pickVer} settleHover={pop.settleHover} offsetX={pop.offsetX} source={pop.source} onHelp={setRailHelp} onViewMore={(id)=>{ close(); setRefSel(id); setRefOpen(true); }} hideHelp={tourActive} noHover={tourActive} onPick={pop.onPick} onActive={pop.onActive} onClose={close} onSoftCancel={()=>{ dropPreviewGhost(); if (replaceRef.current) replaceRef.current = null; setSplitPreviewKey(null); }}/>}
+      {pop && <Popover key={openInsertKey || pop.anchorKey || undefined} anchor={pop.anchor} anchorKey={pop.anchorKey} items={pop.items} flat={pop.flat} title={pop.title} inputType={pop.inputType} below={pop.below} initVal={pop.initVal} noSearch={pop.noSearch} footer={pop.footer} wide={pop.wide} matchWidth={pop.matchWidth} back={pop.back} help={pop.help} solidIcons={pop.solidIcons} selected={pop.selected} itemsAsNodes={pop.itemsAsNodes} initActive={pop.initActive} choices={pop.choices} smart={pop.smart} duration={pop.duration} moduleMorph={pop.moduleMorph} searchPlaceholder={pop.searchPlaceholder} clearOnPick={pop.clearOnPick} onQueryEnter={pop.onQueryEnter} topSlot={pop.topSlot} listHeader={pop.listHeader} vp={pop.vp} pickVer={pickVer} settleHover={pop.settleHover} offsetX={pop.offsetX} source={pop.source} onHelp={setRailHelp} onViewMore={(id)=>{ close(); setRefSel(id); setRefOpen(true); }} hideHelp={tourActive} noHover={tourActive} onPick={pop.onPick} onActive={pop.onActive} onClose={close} onSoftCancel={()=>{ dropPreviewGhost(); if (replaceRef.current) replaceRef.current = null; setSplitPreviewKey(null); }}/>}
 
       {/* Use-case full description popup */}
       {ucPopup && isUsecase && USECASE_META[activeModule] && (
